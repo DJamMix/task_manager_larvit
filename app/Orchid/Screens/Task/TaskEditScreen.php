@@ -4,8 +4,10 @@ namespace App\Orchid\Screens\Task;
 
 use App\Models\Task;
 use App\Orchid\Layouts\Task\TaskEditLayout;
+use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Screen;
+use Orchid\Support\Facades\Toast;
 
 class TaskEditScreen extends Screen
 {
@@ -73,5 +75,32 @@ class TaskEditScreen extends Screen
         return [
             TaskEditLayout::class,
         ];
+    }
+
+    /**
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function save(Request $request, Task $task)
+    {
+        $task->fill($request->get('task'));
+        $task->save();
+
+        Toast::info(__('task.save'));
+
+        return redirect()->route('platform.systems.tasks');
+    }
+
+    /**
+     * @throws \Exception
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function remove(Task $task)
+    {
+        $task->delete();
+
+        Toast::info(__('task.remove'));
+
+        return redirect()->route('platform.systems.tasks');
     }
 }

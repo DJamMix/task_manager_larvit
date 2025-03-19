@@ -2,6 +2,9 @@
 
 namespace App\Orchid\Screens\TaskCategory;
 
+use App\Models\TaskCategory;
+use App\Orchid\Layouts\TaskCategory\TaskCategoryListLayout;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
 
 class TaskCategoryListScreen extends Screen
@@ -13,7 +16,9 @@ class TaskCategoryListScreen extends Screen
      */
     public function query(): iterable
     {
-        return [];
+        return [
+            'task_categories' => TaskCategory::all(),
+        ];
     }
 
     /**
@@ -23,7 +28,7 @@ class TaskCategoryListScreen extends Screen
      */
     public function name(): ?string
     {
-        return 'TaskCategoryListScreen';
+        return __('task_category.label');
     }
 
     /**
@@ -33,7 +38,11 @@ class TaskCategoryListScreen extends Screen
      */
     public function commandBar(): iterable
     {
-        return [];
+        return [
+            Link::make(__('project.add'))
+                ->icon('bs.plus-circle')
+                ->route('platform.systems.task_categories.create')
+        ];
     }
 
     /**
@@ -43,6 +52,8 @@ class TaskCategoryListScreen extends Screen
      */
     public function layout(): iterable
     {
-        return [];
+        return [
+            TaskCategoryListLayout::class,
+        ];
     }
 }

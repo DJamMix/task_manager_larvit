@@ -39,6 +39,12 @@ class PlatformProvider extends OrchidServiceProvider
                 ->title('Основная информация')
                 ->route(config('platform.index')),
 
+            Menu::make(__('Orchid\adminpanel.MyTasks'))
+                ->icon('bs.journal-bookmark')
+                ->route('platform.systems.my_tasks')
+                ->permission('platform.systems.my_tasks')
+                ->divider(),
+
             // Menu::make('Sample Screen')
             //     ->icon('bs.collection')
             //     ->route('platform.example')
@@ -119,6 +125,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->addPermission('platform.systems.roles', __('Orchid\adminpanel.Roles'))
                 ->addPermission('platform.systems.users', __('Orchid\adminpanel.Users'))
                 ->addPermission('platform.systems.tasks', __('Orchid\adminpanel.Tasks'))
+                ->addPermission('platform.systems.my_tasks', __('Orchid\adminpanel.MyTasks'))
                 ->addPermission('platform.systems.projects', __('Orchid\adminpanel.Projects'))
                 ->addPermission('platform.systems.task_categories', __('Orchid\adminpanel.TaskCategories')),
         ];

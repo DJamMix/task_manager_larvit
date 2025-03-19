@@ -3,6 +3,7 @@
 namespace App\Orchid\Layouts\TaskCategory;
 
 use Orchid\Screen\Field;
+use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Layouts\Rows;
 
 class TaskCategoryEditLayout extends Rows
@@ -21,6 +22,13 @@ class TaskCategoryEditLayout extends Rows
      */
     protected function fields(): iterable
     {
-        return [];
+        return [
+            Input::make('task_category.name')
+                ->type('text')
+                ->max(255)
+                ->required()
+                ->title(__('task_category.title'))
+                ->placeholder(__('task_category.title')),
+        ];
     }
 }

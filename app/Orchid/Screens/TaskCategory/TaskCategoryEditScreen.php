@@ -2,18 +2,30 @@
 
 namespace App\Orchid\Screens\TaskCategory;
 
+use App\Models\TaskCategory;
+use App\Orchid\Layouts\TaskCategory\TaskCategoryEditLayout;
+use Illuminate\Http\Request;
+use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Screen;
+use Orchid\Support\Facades\Toast;
 
 class TaskCategoryEditScreen extends Screen
 {
+    /**
+     * @var TaskCategory
+     */
+    public $task_category;
+
     /**
      * Fetch data to be displayed on the screen.
      *
      * @return array
      */
-    public function query(): iterable
+    public function query(TaskCategory $task_category): iterable
     {
-        return [];
+        return [
+            'task_category' => $task_category,
+        ];
     }
 
     /**
@@ -23,7 +35,14 @@ class TaskCategoryEditScreen extends Screen
      */
     public function name(): ?string
     {
-        return 'TaskCategoryEditScreen';
+        return $this->task_category->exists ? 'Редактировать' : 'Создать';
+    }
+
+    public function permission(): ?iterable
+    {
+        return [
+            'platform.systems.task_categories',
+        ];
     }
 
     /**
@@ -33,7 +52,17 @@ class TaskCategoryEditScreen extends Screen
      */
     public function commandBar(): iterable
     {
-        return [];
+        return [
+            Button::make(__('project.remove.title'))
+                ->icon('bs.trash3')
+                ->confirm(__('project.remove.warning'))
+                ->method('remove')
+                ->canSee($this->task_category->exists),
+
+            Button::make(__('project.save'))
+                ->icon('bs.check-circle')
+                ->method('save'),
+        ];
     }
 
     /**
@@ -43,6 +72,39 @@ class TaskCategoryEditScreen extends Screen
      */
     public function layout(): iterable
     {
-        return [];
+        return [
+            TaskCategoryEditLayout::class,
+        ];
+    }
+
+    /**
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function save(Request $request, TaskCategory $task_category)
+    {
+        $request->validate([
+            'task_category.name' => 'required|string|max:255',
+        ]);
+
+        $task_category->fill($request->get('task_category'));
+        $task_category->save();
+
+        Toast::info(__('task_category.save'));
+
+        return redirect()->route('platform.systems.task_categories');
+    }
+
+    /**
+     * @throws \Exception
+     *
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function remove(TaskCategory $task_category)
+    {
+        $task_category->delete();
+
+        Toast::info(__('task_category.remove'));
+
+        return redirect()->route('platform.systems.task_categories');
     }
 }

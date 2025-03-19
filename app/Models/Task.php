@@ -24,10 +24,6 @@ class Task extends Model
         'task_category_id',
     ];
 
-    protected $casts = [
-        'status' => TaskStatusEnum::class,
-    ];
-
     /**
      * Связь с пользователем, который создал задачу.
      */
@@ -42,5 +38,21 @@ class Task extends Model
     public function executor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'executor_id');
+    }
+
+    /**
+     * Связь с проектом, к которому принадлежит задача.
+     */
+    public function project(): BelongsTo
+    {
+        return $this->belongsTo(Project::class, 'project_id');
+    }
+
+    /**
+     * Связь с категорией задачи.
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(TaskCategory::class, 'task_category_id');
     }
 }

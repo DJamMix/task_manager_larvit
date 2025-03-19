@@ -11,6 +11,8 @@ use App\Orchid\Screens\Examples\ExampleGridScreen;
 use App\Orchid\Screens\Examples\ExampleLayoutsScreen;
 use App\Orchid\Screens\Examples\ExampleScreen;
 use App\Orchid\Screens\Examples\ExampleTextEditorsScreen;
+use App\Orchid\Screens\MyTasks\MyTasksListScreen;
+use App\Orchid\Screens\MyTasks\MyTasksViewScreen;
 use App\Orchid\Screens\PlatformScreen;
 use App\Orchid\Screens\Project\ProjectEditScreen;
 use App\Orchid\Screens\Project\ProjectListScreen;
@@ -157,12 +159,24 @@ Route::screen('task_categories', TaskCategoryListScreen::class)
 
 Route::screen('task_categories/{taskCategory}/edit', TaskCategoryEditScreen::class)
     ->name('platform.systems.task_categories.edit')
-    ->breadcrumbs(fn (Trail $trail, $taskCategory) => $trail
+    ->breadcrumbs(fn (Trail $trail, $task_category) => $trail
         ->parent('platform.systems.task_categories')
-        ->push($taskCategory->name, route('platform.systems.task_categories.edit', $taskCategory)));
+        ->push($task_category->name, route('platform.systems.task_categories.edit', $taskCategory)));
 
-Route::screen('task_categories/create', ProjectEditScreen::class)
+Route::screen('task_categories/create', TaskCategoryEditScreen::class)
     ->name('platform.systems.task_categories.create')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.systems.task_categories')
         ->push(__('project.add'), route('platform.systems.task_categories.create')));
+
+Route::screen('my_tasks', MyTasksListScreen::class)
+    ->name('platform.systems.my_tasks')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push(__('Orchid\adminpanel.MyTasks'), route('platform.systems.my_tasks')));
+
+Route::screen('my_tasks/{task}/view', MyTasksViewScreen::class)
+    ->name('platform.systems.my_tasks.view')
+    ->breadcrumbs(fn (Trail $trail, $task) => $trail
+        ->parent('platform.systems.my_tasks')
+        ->push($task->name, route('platform.systems.my_tasks.view', $task)));

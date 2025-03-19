@@ -2,6 +2,8 @@
 
 namespace App\Orchid\Layouts\TaskCategory;
 
+use App\Models\TaskCategory;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Layouts\Table;
 use Orchid\Screen\TD;
 
@@ -15,7 +17,7 @@ class TaskCategoryListLayout extends Table
      *
      * @var string
      */
-    protected $target = '';
+    protected $target = 'task_categories';
 
     /**
      * Get the table cells to be displayed.
@@ -24,6 +26,10 @@ class TaskCategoryListLayout extends Table
      */
     protected function columns(): iterable
     {
-        return [];
+        return [
+            TD::make('name', __('task_category.name'))
+                ->render(fn (TaskCategory $taskCategory) => Link::make($taskCategory->name)
+                    ->route('platform.systems.task_categories.edit', $taskCategory->id)),
+        ];
     }
 }
