@@ -3,12 +3,23 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Support\Facades\Route;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
-        health: '/up',
+        using: function () {
+            Route::middleware('web')
+                ->group(base_path('routes/web.php'));
+
+            Route::middleware('client')
+                ->prefix('client')
+                ->group(base_path('app/ClientLayer/routes/client.php'));
+
+            Route::middleware('staff')
+                ->prefix('staff')
+                ->group(base_path('app/StaffLayer/routes/staff.php'));
+        },
     )
     ->withMiddleware(function (Middleware $middleware) {
         //
