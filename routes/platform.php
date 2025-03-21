@@ -157,11 +157,11 @@ Route::screen('task_categories', TaskCategoryListScreen::class)
         ->parent('platform.index')
         ->push(__('adminpanel.TaskCategories'), route('platform.systems.task_categories')));
 
-Route::screen('task_categories/{taskCategory}/edit', TaskCategoryEditScreen::class)
+Route::screen('task_categories/{task_category}/edit', TaskCategoryEditScreen::class)
     ->name('platform.systems.task_categories.edit')
     ->breadcrumbs(fn (Trail $trail, $task_category) => $trail
         ->parent('platform.systems.task_categories')
-        ->push($task_category->name, route('platform.systems.task_categories.edit', $taskCategory)));
+        ->push($task_category->name, route('platform.systems.task_categories.edit', $task_category)));
 
 Route::screen('task_categories/create', TaskCategoryEditScreen::class)
     ->name('platform.systems.task_categories.create')
