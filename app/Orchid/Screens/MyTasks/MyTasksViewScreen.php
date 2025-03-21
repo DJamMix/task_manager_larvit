@@ -31,7 +31,7 @@ class MyTasksViewScreen extends Screen
      */
     public function name(): ?string
     {
-        return __('Orchid\adminpanel.MyTasksView');
+        return __('adminpanel.MyTasksView');
     }
 
     public function permission(): ?iterable

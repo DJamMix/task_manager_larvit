@@ -27,7 +27,7 @@ class MyTasksListScreen extends Screen
      */
     public function name(): ?string
     {
-        return __('Orchid\adminpanel.MyTasks');
+        return __('adminpanel.MyTasks');
     }
 
     /**

@@ -69,14 +69,14 @@ Route::screen('users', UserListScreen::class)
     ->name('platform.systems.users')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push(__('Orchid\adminpanel.Users'), route('platform.systems.users')));
+        ->push(__('adminpanel.Users'), route('platform.systems.users')));
 
 // Platform > System > Tasks
 Route::screen('tasks', TaskListScreen::class)
     ->name('platform.systems.tasks')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push(__('Orchid\adminpanel.Tasks'), route('platform.systems.tasks')));
+        ->push(__('adminpanel.Tasks'), route('platform.systems.tasks')));
 
 // Platform > System > Tasks > Task
 Route::screen('tasks/{task}/edit', TaskEditScreen::class)
@@ -111,7 +111,7 @@ Route::screen('roles', RoleListScreen::class)
     ->name('platform.systems.roles')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push(__('Orchid\adminpanel.Roles'), route('platform.systems.roles')));
+        ->push(__('adminpanel.Roles'), route('platform.systems.roles')));
 
 // Example...
 Route::screen('example', ExampleScreen::class)
@@ -136,7 +136,7 @@ Route::screen('projects', ProjectListScreen::class)
     ->name('platform.systems.projects')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push(__('Orchid\adminpanel.Projects'), route('platform.systems.projects')));
+        ->push(__('adminpanel.Projects'), route('platform.systems.projects')));
 
 Route::screen('projects/{project}/edit', ProjectEditScreen::class)
     ->name('platform.systems.projects.edit')
@@ -155,7 +155,7 @@ Route::screen('task_categories', TaskCategoryListScreen::class)
     ->name('platform.systems.task_categories')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push(__('Orchid\adminpanel.TaskCategories'), route('platform.systems.task_categories')));
+        ->push(__('adminpanel.TaskCategories'), route('platform.systems.task_categories')));
 
 Route::screen('task_categories/{taskCategory}/edit', TaskCategoryEditScreen::class)
     ->name('platform.systems.task_categories.edit')
@@ -173,7 +173,7 @@ Route::screen('my_tasks', MyTasksListScreen::class)
     ->name('platform.systems.my_tasks')
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
-        ->push(__('Orchid\adminpanel.MyTasks'), route('platform.systems.my_tasks')));
+        ->push(__('adminpanel.MyTasks'), route('platform.systems.my_tasks')));
 
 Route::screen('my_tasks/{task}/view', MyTasksViewScreen::class)
     ->name('platform.systems.my_tasks.view')
