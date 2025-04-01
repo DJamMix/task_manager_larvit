@@ -10,6 +10,7 @@ use Orchid\Screen\Field;
 use Orchid\Screen\Fields\CheckBox;
 use Orchid\Screen\Fields\DateTimer;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Quill;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\TextArea;
 use Orchid\Screen\Layouts\Rows;
@@ -50,7 +51,7 @@ class TaskEditLayout extends Rows
                 ->title(__('task.executor_id'))
                 ->empty('Не выбран'),
 
-            TextArea::make('task.description')
+            Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])
                 ->title(__('task.description')),
 
             DateTimer::make('task.start_datetime')

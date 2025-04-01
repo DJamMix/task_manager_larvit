@@ -1,3 +1,5 @@
+@props(['status'])
+
 @php
 $colors = [
     'new' => 'bg-blue-500 text-white',

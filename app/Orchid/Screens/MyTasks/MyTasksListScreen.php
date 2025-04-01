@@ -30,6 +30,13 @@ class MyTasksListScreen extends Screen
         return __('adminpanel.MyTasks');
     }
 
+    public function permission(): ?iterable
+    {
+        return [
+            'platform.systems.my_tasks',
+        ];
+    }
+
     /**
      * The screen's action buttons.
      *

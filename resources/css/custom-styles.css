@@ -1,0 +1,54 @@
+
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Стили для блока с комментарием */
+.comment-box {
+    margin-bottom: 24px;
+    padding: 20px;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Стили для шапки комментария (автор и дата) */
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 8px;
+}
+
+.comment-author {
+    font-weight: bold;
+    color: #4a4a4a;
+}
+
+.comment-date {
+    font-size: 12px;
+    color: #888;
+}
+
+/* Стили для текста комментария */
+.comment-text {
+    padding: 16px;
+    background-color: #f9f9f9;
+    color: #333;
+    border-left: 4px solid #6c63ff;
+    border-radius: 8px;
+    white-space: pre-line;
+}
+
+.comment-text code {
+    background-color: #333;
+    color: #fff;
+    padding: 2px 4px;
+    border-radius: 4px;
+}

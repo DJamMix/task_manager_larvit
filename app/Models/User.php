@@ -83,4 +83,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Task::class, 'executor_id');
     }
+
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
+    }
 }
