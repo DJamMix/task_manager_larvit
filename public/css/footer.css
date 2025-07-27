@@ -1,0 +1,95 @@
+.task-manager-footer {
+    background-color: transparent; /* Прозрачный фон */
+    color: #000; /* Черный текст */
+    padding: 20px 0 10px; /* Уменьшенные отступы */
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    border-top: 1px solid #e0e0e0; /* Легкая граница сверху */
+}
+
+.footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 30px; /* Уменьшенный gap */
+}
+
+.footer-brand {
+    flex: 1;
+    min-width: 200px; /* Уменьшенная минимальная ширина */
+}
+
+.footer-brand .logo {
+    font-size: 22px; /* Уменьшенный размер лого */
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    display: block;
+    margin-bottom: 8px;
+    color: #000; /* Черный цвет лого */
+}
+
+.footer-slogan {
+    color: #666; /* Темно-серый вместо светлого */
+    font-size: 13px; /* Уменьшенный размер */
+    margin: 0;
+}
+
+.footer-links {
+    display: flex;
+    gap: 40px; /* Уменьшенный gap */
+    flex-wrap: wrap;
+}
+
+.tech-links, .dev-links {
+    min-width: 120px; /* Уменьшенная минимальная ширина */
+}
+
+.footer-links h4 {
+    font-size: 15px; /* Уменьшенный размер */
+    margin-bottom: 15px; /* Уменьшенный отступ */
+    font-weight: 600;
+    color: #000; /* Черный цвет заголовков */
+}
+
+.footer-links ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-links li {
+    margin-bottom: 8px; /* Уменьшенный отступ */
+}
+
+.footer-links a {
+    color: #555; /* Темно-серый вместо светлого */
+    text-decoration: none;
+    font-size: 13px; /* Уменьшенный размер */
+    transition: color 0.3s ease;
+}
+
+.footer-links a:hover {
+    color: #000; /* Черный при наведении */
+}
+
+.footer-copyright {
+    border-top: 1px solid #e0e0e0; /* Светлая граница */
+    margin-top: 20px; /* Уменьшенный отступ */
+    padding-top: 15px; /* Уменьшенный отступ */
+    text-align: center;
+    color: #666; /* Темно-серый */
+    font-size: 12px; /* Уменьшенный размер */
+}
+
+@media (max-width: 768px) {
+    .footer-container {
+        flex-direction: column;
+        gap: 20px; /* Уменьшенный gap для мобильных */
+    }
+    
+    .footer-links {
+        gap: 20px; /* Уменьшенный gap для мобильных */
+    }
+}

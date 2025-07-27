@@ -2,9 +2,11 @@
 
 namespace App\Orchid\Layouts\MyTasks;
 
+use App\CoreLayer\Enums\TaskStatusEnum;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Group;
+use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Quill;
 use Orchid\Screen\Fields\TextArea;
@@ -27,62 +29,56 @@ class MyTasksViewLayout extends Rows
     protected function fields(): iterable
     {
         return [
+            // Основная информация в компактных группах
             Group::make([
-                Button::make('Внести затраченные часы')
-                    ->method('handler'),
-
-                Button::make('Взял в работу')
-                    ->method('handler'),
-
-                Button::make('Сдать задачу')
-                    ->method('handler'),
-            ])->autoWidth(),
+                $this->createLabel('Название задачи', 'task.name')->width('50%'),
+                $this->createLabel('Создатель задачи', 'task.creator.name')->width('50%'),
+            ])->fullWidth(),
 
             Group::make([
-                Label::make('task.name')
-                    ->title('Название задачи'),
-                    
-                Label::make('task.creator.name')
-                    ->title('Создатель задачи'),
-            ])->autoWidth(),
+                $this->createLabel('Проект', 'task.project.name')->width('50%'),
+                $this->createLabel('Категория', 'task.task_category.name')->width('50%'),
+            ])->fullWidth(),
 
+            // Статус с цветным индикатором
+            $this->createLabel('Статус задачи', 'task_status_label'),
+            
+            // Затраченное время
             Group::make([
-                Label::make('task.project.name')
-                    ->title('Проект'),
-                    
-                Label::make('task.task_category.name')
-                    ->title('Категория'),
-            ])->autoWidth(),
+                $this->createLabel('Затраченные часы', 'task.hours_spent')->width('50%'),
+                $this->createLabel('Ваша оценка в часах', 'task.estimation_hours')->width('50%'),
+            ])->fullWidth(),
 
-            Group::make([
-                Label::make('task.status_label')
-                    ->title('Статус задачи'),
-            ])->autoWidth(),
-
-            Group::make([
-                Label::make('task.start_datetime')
-                    ->title('Дата начала'),
-                    
-                Label::make('task.end_datetime')
-                    ->title('Дата сдачи'),
-            ])->autoWidth(),
-
-            Group::make([
-                Label::make('task.hours_spent')
-                    ->title('Затраченные часы'),
-
-            ])->autoWidth(),
-
+            // Описание с фиксированной высотой
             Quill::make('task.description')
                 ->toolbar([])
                 ->title('Описание')
                 ->readonly()
-                ->rows(7),
+                ->rows(10)
+                ->class('border rounded p-3 bg-light'),
 
-            Group::make([
-                Label::make('')
-                    ->title('Прикрепленные файлы (СКОРО)'),
-            ])->autoWidth(),
+            // Файлы
+            Label::make('attachments')
+                ->title('Прикрепленные файлы')
+                ->class('h4 mt-3')
+                ->value('Будет доступно в следующей версии'),
         ];
+    }
+
+    /**
+     * Создает группу с меткой для единообразного отображения
+     */
+    protected function createLabelGroup(string $title, string $name): Group
+    {
+        return Group::make([
+            $this->createLabel($title, $name)
+        ])->fullWidth();
+    }
+
+    protected function createLabel(string $title, string $name): Label
+    {
+        return Label::make($name)
+            ->title($title)
+            ->class('form-control-plaintext border-bottom pb-2 mb-3');
     }
 }

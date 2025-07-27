@@ -34,11 +34,6 @@ class PlatformProvider extends OrchidServiceProvider
     public function menu(): array
     {
         return [
-            Menu::make('О сервисе')
-                ->icon('bs.book')
-                ->title('Основная информация')
-                ->route(config('platform.index')),
-
             Menu::make(__('adminpanel.MyTasks'))
                 ->icon('bs.journal-bookmark')
                 ->route('platform.systems.my_tasks')

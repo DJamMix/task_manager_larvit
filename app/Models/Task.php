@@ -3,11 +3,16 @@
 namespace App\Models;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Orchid\Screen\AsSource;
 
 class Task extends Model
 {
+    use HasFactory, AsSource;
+
     protected $fillable = [
         'creator_id',
         'name',
@@ -22,6 +27,7 @@ class Task extends Model
         'pay_status',
         'hours_spent',
         'task_category_id',
+        'estimation_hours',
     ];
 
     /**
@@ -59,5 +65,13 @@ class Task extends Model
     public function comments()
     {
         return $this->hasMany(Comment::class);
+    }
+
+    /**
+     * Связь с записями учета времени
+     */
+    public function timeEntries(): HasMany
+    {
+        return $this->hasMany(TrackingTime::class);
     }
 }

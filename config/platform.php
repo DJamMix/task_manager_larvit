@@ -99,7 +99,7 @@ return [
      |
      */
 
-    'index' => 'platform.main',
+    'index' => 'platform.systems.my_tasks',
 
     /*
      |--------------------------------------------------------------------------
@@ -126,7 +126,9 @@ return [
      */
 
     'resource' => [
-        'stylesheets' => [],
+        'stylesheets' => [
+            '/css/footer.css'
+        ],
         'scripts'     => [],
     ],
 
@@ -161,7 +163,7 @@ return [
 
     'template' => [
         'header' => '',
-        'footer' => '',
+        'footer' => 'brand.footer',
     ],
 
     /*

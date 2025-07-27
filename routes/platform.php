@@ -22,6 +22,7 @@ use App\Orchid\Screens\Task\TaskEditScreen;
 use App\Orchid\Screens\Task\TaskListScreen;
 use App\Orchid\Screens\TaskCategory\TaskCategoryEditScreen;
 use App\Orchid\Screens\TaskCategory\TaskCategoryListScreen;
+use App\Orchid\Screens\TaskScreen;
 use App\Orchid\Screens\User\UserEditScreen;
 use App\Orchid\Screens\User\UserListScreen;
 use App\Orchid\Screens\User\UserProfileScreen;
@@ -40,8 +41,6 @@ use Tabuna\Breadcrumbs\Trail;
 */
 
 // Main
-Route::screen('/main', PlatformScreen::class)
-    ->name('platform.main');
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)
@@ -70,6 +69,9 @@ Route::screen('users', UserListScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
         ->push(__('adminpanel.Users'), route('platform.systems.users')));
+
+// Platform > Tasks
+Route::screen('task', TaskScreen::class)->name('platform.task');
 
 // Platform > System > Tasks
 Route::screen('tasks', TaskListScreen::class)

@@ -25,6 +25,10 @@ class CommentListLayout extends Rows
     {
         $comments = $this->query->get('comments', []);
 
+        $comments = $comments->sortByDesc(function ($comment) {
+            return strtotime($comment['created_at']);
+        });
+
         if (empty($comments)) {
             return [
                 CommentField::make('no_comments')

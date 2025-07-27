@@ -1,9 +1,35 @@
-
-.container {
+/* Основной контейнер для комментариев */
+.comments-container {
     width: 100%;
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+}
+
+/* Прокручиваемая область с комментариями */
+.comments-scrollable {
+    max-height: 600px; /* Фиксированная высота */
+    overflow-y: auto;  /* Вертикальный скролл */
+    padding-right: 8px; /* Чтобы скролл не наезжал на контент */
+    
+    /* Кастомный скроллбар */
+    scrollbar-width: thin;
+    scrollbar-color: #6c63ff #f1f1f1;
+}
+
+/* Стилизация скроллбара для WebKit браузеров */
+.comments-scrollable::-webkit-scrollbar {
+    width: 8px;
+}
+
+.comments-scrollable::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.comments-scrollable::-webkit-scrollbar-thumb {
+    background-color: #6c63ff;
+    border-radius: 4px;
 }
 
 /* Стили для блока с комментарием */
@@ -11,44 +37,66 @@
     margin-bottom: 24px;
     padding: 20px;
     background-color: #fff;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
 }
 
-/* Стили для шапки комментария (автор и дата) */
+.comment-box:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+/* Стили для шапки комментария */
 .comment-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 8px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f3f4f6;
 }
 
 .comment-author {
-    font-weight: bold;
-    color: #4a4a4a;
+    font-weight: 600;
+    color: #374151;
+    font-size: 15px;
 }
 
 .comment-date {
     font-size: 12px;
-    color: #888;
+    color: #9ca3af;
 }
 
 /* Стили для текста комментария */
 .comment-text {
-    padding: 16px;
-    background-color: #f9f9f9;
-    color: #333;
-    border-left: 4px solid #6c63ff;
-    border-radius: 8px;
     white-space: pre-line;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    color: #4b5563;
+    line-height: 1.6;
+    font-size: 14px;
+    padding: 8px 0;
 }
 
 .comment-text code {
-    background-color: #333;
-    color: #fff;
-    padding: 2px 4px;
+    background-color: #1e293b;
+    color: #f8fafc;
+    padding: 2px 6px;
     border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+/* Анимация для плавного появления новых комментариев */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.comment-box {
+    animation: fadeIn 0.3s ease-out forwards;
 }

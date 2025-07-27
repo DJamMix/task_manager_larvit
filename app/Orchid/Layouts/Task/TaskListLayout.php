@@ -38,11 +38,8 @@ class TaskListLayout extends Table
                 ->render(fn (Task $task) => $task->creator->name ?? 'Неизвестен'),
 
             TD::make('status', __('task.status.label'))
-                ->render(fn (Task $task) => 
-                    // Возвращаем статус с цветом и стилизацией
-                    '<span style="background-color: ' . TaskStatusEnum::from($task->status)->color() . '; color: white; padding: 5px; border-radius: 3px;">' .
-                    TaskStatusEnum::from($task->status)->label() .
-                    '</span>'),
+                ->width('100px')
+                ->render(fn (Task $task) => view('components.task.status', ['status' => $task->status])),
 
             TD::make('project_id', __('task.project_id'))
                 ->render(fn (Task $task) => $task->project->name),
