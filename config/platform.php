@@ -99,7 +99,7 @@ return [
      |
      */
 
-    'index' => 'platform.systems.my_tasks',
+    'index' => 'platform.welcome',
 
     /*
      |--------------------------------------------------------------------------

@@ -95,7 +95,38 @@ class UserProfileScreen extends Screen
                         ->icon('bs.check-circle')
                         ->method('changePassword')
                 ),
+
+            Layout::block(Layout::rows([
+                // Здесь можно добавить поле для отображения статуса привязки
+            ]))
+                ->title('Привязка Telegram')
+                ->description('Привяжите свой аккаунт Telegram для получения уведомлений')
+                ->commands(
+                    Button::make(__('Привязать Telegram'))
+                        ->type(Color::SUCCESS())
+                        ->icon('bs.paperclip')
+                        ->method('bindTelegram')
+                        ->canSee(!auth()->user()->telegram_id)
+                ),
         ];
+    }
+
+    public function bindTelegram(Request $request)
+    {
+        $user = $request->user();
+        
+        if ($user->telegram_id === null) {
+            $user->telegram_verification_code = bin2hex(random_bytes(6));
+            $user->save();
+
+            $botRedirectUrl = "https://t.me/crewdev_task_manage_bot?start={$user->telegram_verification_code}";
+
+            $request->session()->flash('telegram_redirect_url', $botRedirectUrl);
+
+            return redirect()->route('platform.telegram.connect');
+        }
+
+        return back();
     }
 
     public function save(Request $request): void

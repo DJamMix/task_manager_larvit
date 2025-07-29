@@ -7,6 +7,7 @@ namespace App\Orchid\Screens\User;
 use App\Orchid\Layouts\Role\RolePermissionLayout;
 use App\Orchid\Layouts\User\UserEditLayout;
 use App\Orchid\Layouts\User\UserPasswordLayout;
+use App\Orchid\Layouts\User\UserProjectsLayout;
 use App\Orchid\Layouts\User\UserRoleLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -35,7 +36,7 @@ class UserEditScreen extends Screen
      */
     public function query(User $user): iterable
     {
-        $user->load(['roles']);
+        $user->load(['roles', 'projects']);
 
         return [
             'user'       => $user,
@@ -97,7 +98,7 @@ class UserEditScreen extends Screen
      */
     public function layout(): iterable
     {
-        return [
+        $layouts = [
 
             Layout::block(UserEditLayout::class)
                 ->title(__('Profile Information'))
@@ -144,6 +145,20 @@ class UserEditScreen extends Screen
                 ),
 
         ];
+
+        if ($this->user->exists) {
+            $layouts[] = Layout::block(UserProjectsLayout::class)
+                ->title('Проекты клиента')
+                ->description('Назначьте проекты этому клиенту')
+                ->commands(
+                    Button::make(__('Save'))
+                        ->type(Color::BASIC)
+                        ->icon('bs.check-circle')
+                        ->method('save')
+                );
+        }
+
+        return $layouts;
     }
 
     /**
@@ -157,6 +172,18 @@ class UserEditScreen extends Screen
                 Rule::unique(User::class, 'email')->ignore($user),
             ],
         ]);
+
+        if (!in_array('client', $user->roles->pluck('slug')->toArray())) {
+            $user->projects()->detach();
+        }
+
+        if (in_array('client', $request->input('user.roles', []))) {
+            $request->validate([
+                'user.projects' => 'required|array|min:1',
+            ], [
+                'user.projects.required' => 'Для клиента должен быть выбран хотя бы один проект',
+            ]);
+        }
 
         $permissions = collect($request->get('permissions'))
             ->map(fn ($value, $key) => [base64_decode($key) => $value])
@@ -173,6 +200,11 @@ class UserEditScreen extends Screen
             ->save();
 
         $user->replaceRoles($request->input('user.roles'));
+
+        // Синхронизируем проекты
+        if ($request->has('user.projects')) {
+            $user->projects()->sync($request->input('user.projects'));
+        }
 
         Toast::info(__('User was saved.'));
 

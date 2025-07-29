@@ -1,9 +1,7 @@
 <?php
 
-namespace App\Orchid\Layouts\MyTasks;
+namespace App\Orchid\Layouts\Client;
 
-use App\CoreLayer\Enums\TaskPriorityEnum;
-use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
 use Carbon\Carbon;
 use Orchid\Screen\Actions\DropDown;
@@ -11,7 +9,7 @@ use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Layouts\Table;
 use Orchid\Screen\TD;
 
-class MyTasksListLayout extends Table
+class ClientListTaskLayout extends Table
 {
     /**
      * Data source.
@@ -33,34 +31,13 @@ class MyTasksListLayout extends Table
         return [
             TD::make('name', __('task.name'))
                 ->render(fn (Task $task) => Link::make($task->name)
-                    ->route('platform.systems.my_tasks.view', $task)),
-
-            TD::make('creator_id', __('task.creator_id'))
-                ->render(fn (Task $task) => $task->creator->name ?? 'Неизвестен'),
+                    ->route('platform.systems.client.project.tasks.view', ['project' => $task->project, 'task' => $task])),
 
             TD::make('status', __('task.status.label'))
-                ->width('100px')
                 ->render(fn (Task $task) => view('components.task.status', ['status' => $task->status])),
-
-            TD::make('project_id', __('task.project_id'))
-                ->render(fn (Task $task) => $task->project->name),
 
             TD::make('task_category_id', __('task.task_category_id'))
                 ->render(fn (Task $task) => $task->category->name),
-
-            TD::make('priority', __('Приоритет'))
-                ->render(function (Task $task) {
-                    $priority = TaskPriorityEnum::tryFrom($task->priority);
-                    if (!$priority) {
-                        return 'N/A';
-                    }
-                    
-                    return sprintf(
-                        '<span class="me-2">%s</span> %s',
-                        $priority->icon(),
-                        $priority->label()
-                    );
-                }),
 
             TD::make('actions', 'Действия')
                 ->align(TD::ALIGN_CENTER)
@@ -70,15 +47,10 @@ class MyTasksListLayout extends Table
                         ->icon('bs.justify')
                         ->list([
                             Link::make('Просмотр')
-                                ->route('platform.systems.my_tasks.view', $task)
+                                ->route('platform.systems.client.project.tasks.view', ['project' => $task->project, 'task' => $task])
                                 ->icon('bs.eye'),
                         ]);
                 }),
         ];
-    }
-
-    public function viewTask(Task $task)
-    {
-        return redirect()->route('platform.systems.my_tasks.view', ['task' => $task]);
     }
 }

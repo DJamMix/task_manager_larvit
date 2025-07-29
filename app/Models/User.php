@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Orchid\Filters\Types\Like;
 use Orchid\Filters\Types\Where;
 use Orchid\Filters\Types\WhereDateStartEnd;
 use Orchid\Platform\Models\User as Authenticatable;
+use Orchid\Screen\AsSource;
 
 class User extends Authenticatable
 {
+    use HasFactory, AsSource;
+
     /**
      * The attributes that are mass assignable.
      *
@@ -19,6 +23,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'telegram_id',
+        'telegram_verification_code'
     ];
 
     /**
@@ -82,6 +88,14 @@ class User extends Authenticatable
     public function assignedTasks(): HasMany
     {
         return $this->hasMany(Task::class, 'executor_id');
+    }
+
+    /**
+     * Связь многие-ко-многим с проектами
+     */
+    public function projects()
+    {
+        return $this->belongsToMany(Project::class, 'client_project');
     }
 
     public function comments()

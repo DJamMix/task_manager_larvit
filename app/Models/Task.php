@@ -28,6 +28,8 @@ class Task extends Model
         'hours_spent',
         'task_category_id',
         'estimation_hours',
+        'type_task',
+        'priority',
     ];
 
     /**

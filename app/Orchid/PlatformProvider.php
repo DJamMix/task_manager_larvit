@@ -38,6 +38,14 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.journal-bookmark')
                 ->route('platform.systems.my_tasks')
                 ->permission('platform.systems.my_tasks')
+                ->title('Инструменты сотрудника')
+                ->divider(),
+
+            Menu::make('Мои проекты')
+                ->icon('bs.briefcase-fill')
+                ->route('platform.systems.client.projects')
+                ->permission('platform.systems.client.projects')
+                ->title('Инструменты клиента')
                 ->divider(),
 
             // Menu::make('Sample Screen')
@@ -120,9 +128,16 @@ class PlatformProvider extends OrchidServiceProvider
                 ->addPermission('platform.systems.roles', __('adminpanel.Roles'))
                 ->addPermission('platform.systems.users', __('adminpanel.Users'))
                 ->addPermission('platform.systems.tasks', __('adminpanel.Tasks'))
-                ->addPermission('platform.systems.my_tasks', __('adminpanel.MyTasks'))
                 ->addPermission('platform.systems.projects', __('adminpanel.Projects'))
                 ->addPermission('platform.systems.task_categories', __('adminpanel.TaskCategories')),
+
+            ItemPermission::group('Сотрудник')
+                ->addPermission('platform.systems.my_tasks', __('adminpanel.MyTasks')),
+
+            ItemPermission::group('Клиент')
+                ->addPermission('platform.systems.client.project.tasks', 'Просмотр списка задач')
+                ->addPermission('platform.systems.client.projects', 'Проекты клиента')
+                ->addPermission('platform.systems.client.project.tasks.view', 'Просмотр задач'),
         ];
     }
 }

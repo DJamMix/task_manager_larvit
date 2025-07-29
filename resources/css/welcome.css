@@ -1,0 +1,384 @@
+/* Базовые стили с уникальными классами */
+.crewdev-welcome-page {
+    min-height: 100vh;
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #ffffff;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Анимированный фон */
+.crewdev-particles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.crewdev-particles::before {
+    content: "";
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.03) 0%, transparent 70%);
+    top: 20%;
+    left: 10%;
+    animation: crewdev-float 15s infinite ease-in-out;
+}
+
+/* Контейнер */
+.crewdev-container {
+    position: relative;
+    z-index: 10;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+}
+
+/* Шапка */
+.crewdev-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: crewdev-fadeIn 0.8s ease-out forwards;
+}
+
+.crewdev-logo-icon {
+    display: inline-flex;
+    padding: 0.75rem;
+    margin-bottom: 1.5rem;
+    border-radius: 0.75rem;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.crewdev-icon {
+    width: 2rem;
+    height: 2rem;
+    color: #333;
+}
+
+.crewdev-title {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1a1a1a;
+    margin-bottom: 1rem;
+}
+
+.crewdev-accent {
+    color: #333;
+    font-weight: 800;
+}
+
+.crewdev-subtitle {
+    font-size: 1.25rem;
+    color: #555;
+    max-width: 42rem;
+    margin: 0 auto;
+}
+
+/* Основная карточка */
+.crewdev-main-card {
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    margin-bottom: 3rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.crewdev-main-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.crewdev-card-header {
+    background: #2c3e50;
+    padding: 1rem 1.5rem;
+}
+
+.crewdev-card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #fff;
+    margin: 0;
+}
+
+.crewdev-user-name {
+    font-weight: 700;
+    color: #ecf0f1;
+}
+
+.crewdev-card-content {
+    padding: 1.5rem;
+}
+
+/* Стили для администратора */
+.crewdev-admin-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .crewdev-admin-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.crewdev-admin-card {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    text-align: center;
+    color: #333;
+    text-decoration: none;
+}
+
+.crewdev-admin-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.crewdev-card-icon {
+    width: 2rem;
+    height: 2rem;
+    margin-bottom: 0.75rem;
+    color: #555;
+}
+
+.crewdev-card-heading {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #222;
+}
+
+.crewdev-card-text {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+/* Стили для сотрудника */
+.crewdev-employee-section {
+    margin-bottom: 2rem;
+}
+
+.crewdev-section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #222;
+    margin-bottom: 1rem;
+}
+
+.crewdev-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.crewdev-stat-card {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.crewdev-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.crewdev-stat-value {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 0.25rem;
+}
+
+.crewdev-stat-label {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+/* Стили для клиента */
+.crewdev-client-section {
+    margin-bottom: 1rem;
+}
+
+.crewdev-project-card {
+    padding: 1.25rem;
+    border-radius: 0.75rem;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.crewdev-project-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.crewdev-project-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.crewdev-project-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #222;
+}
+
+.crewdev-project-progress {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #555;
+}
+
+.crewdev-progress-bar {
+    height: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: #e0e0e0;
+    overflow: hidden;
+}
+
+.crewdev-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #555, #777);
+    transition: width 0.6s ease;
+}
+
+.crewdev-empty-projects {
+    padding: 1.5rem 0;
+    text-align: center;
+    color: #777;
+}
+
+/* Кнопки */
+.crewdev-primary-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    background-color: #2c3e50;
+    color: white;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    margin-top: 1rem;
+}
+
+.crewdev-primary-btn:hover {
+    background-color: #34495e;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.crewdev-btn-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.5rem;
+    color: #fff;
+}
+
+/* Технологии */
+.crewdev-technologies {
+    max-width: 64rem;
+    margin: 0 auto 3rem;
+}
+
+.crewdev-tech-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: center;
+    color: #222;
+    margin-bottom: 1.5rem;
+}
+
+.crewdev-tech-grid {
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 1rem;
+}
+
+@media (min-width: 768px) {
+    .crewdev-tech-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.crewdev-tech-card {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    text-align: center;
+    transition: all 0.3s ease;
+}
+
+.crewdev-tech-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.crewdev-tech-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+.crewdev-tech-name {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #222;
+    margin-bottom: 0.25rem;
+}
+
+.crewdev-tech-purpose {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+/* Футер */
+.crewdev-footer {
+    text-align: center;
+    font-size: 0.875rem;
+    color: #777;
+    padding-top: 2rem;
+}
+
+/* Анимации */
+@keyframes crewdev-float {
+    0%, 100% { transform: translateY(0) translateX(0); }
+    50% { transform: translateY(-20px) translateX(20px); }
+}
+
+@keyframes crewdev-fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: crewdev-fadeIn 0.8s ease-out forwards;
+}

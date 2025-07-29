@@ -9,6 +9,7 @@ use App\Orchid\Layouts\Comment\CommentListLayout;
 use App\Orchid\Layouts\Comment\CommentSendLayout;
 use App\Orchid\Layouts\MyTasks\HoursSpentTask;
 use App\Orchid\Layouts\MyTasks\MyTasksViewLayout;
+use App\Orchid\Layouts\MyTasks\StatusSwitcherLayout;
 use App\Orchid\Layouts\MyTasks\TaskEvaluationLayout;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -142,7 +143,8 @@ class MyTasksViewScreen extends Screen
             $task['status'] === TaskStatusEnum::TESTING_STAGE->value ||
             $task['status'] === TaskStatusEnum::ESTIMATION->value ||
             $task['status'] === TaskStatusEnum::TESTING_PROD->value ||
-            $task['status'] === TaskStatusEnum::DEMO->value)
+            $task['status'] === TaskStatusEnum::DEMO->value ||
+            $task['status'] === TaskStatusEnum::UNPAID->value)
         ) {
             $buttons[] = ModalToggle::make('Добавить время')
                 ->modalTitle('Учет рабочего времени')
@@ -151,11 +153,32 @@ class MyTasksViewScreen extends Screen
                 ->icon('clock');
         }
 
+        if(
+            auth()->id() == $task['executor']['id'] &&
+            $task['status'] === TaskStatusEnum::NEW->value
+        ) {
+            $buttons[] = Button::make('Взять в работу')
+                ->method('takeWork')
+                ->icon('check')
+                ->class('btn btn-primary')
+                ->confirm('При нажатии задача перейдет в статус "В работе"');
+        }
+
         $buttons[] = Button::make('Назад')
             ->icon('arrow-left')
             ->method('back');
 
         return $buttons;
+    }
+
+    public function takeWork(Task $task)
+    {
+        $task->status = TaskStatusEnum::IN_PROGRESS->value;
+        $task->save();
+
+        Toast::success('Задача успешно перешла в статус "В работе"');
+
+        return redirect()->back();
     }
 
     public function saveTimeEntry(Task $task, Request $request)
@@ -213,6 +236,34 @@ class MyTasksViewScreen extends Screen
         Toast::info('Затраченные часы успешно сохранены!');
     }
 
+    public function changeStatus(Task $task, Request $request)
+    {
+        $validStatuses = [
+            TaskStatusEnum::IN_PROGRESS->value,
+            TaskStatusEnum::TESTING_STAGE->value,
+            TaskStatusEnum::TESTING_PROD->value,
+            TaskStatusEnum::DEMO->value,
+            TaskStatusEnum::UNPAID->value,
+        ];
+
+        $newStatus = $request->get('status');
+
+        if (!in_array($newStatus, $validStatuses)) {
+            Toast::error('Недопустимый статус');
+            return back();
+        }
+
+        if($newStatus === TaskStatusEnum::UNPAID->value && $task->type_task == 'bug') {
+            $newStatus = TaskStatusEnum::COMPLETED->value;
+        }
+
+        $task->status = $newStatus;
+        $task->save();
+
+        Toast::success('Статус задачи обновлен');
+        return back();
+    }
+
     /**
      * The screen's layout elements.
      *
@@ -220,9 +271,14 @@ class MyTasksViewScreen extends Screen
      */
     public function layout(): iterable
     {
-        return [
+        $layouts = [];
+
+        $layouts[] = [
             Layout::tabs([
-                'Основная информация' => MyTasksViewLayout::class,
+                'Основная информация' => [
+                    StatusSwitcherLayout::class,
+                    MyTasksViewLayout::class,
+                ],
                 'Комментарии' => [
                     CommentSendLayout::class,
                     CommentListLayout::class,
@@ -253,6 +309,8 @@ class MyTasksViewScreen extends Screen
             ->title('Оценка задачи')
             ->applyButton('Отправить'),
         ];
+
+        return $layouts;
     }
 
     public function asyncGetTimeEntryData(Task $task): array

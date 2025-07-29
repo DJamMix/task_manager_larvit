@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Orchid\Layouts\Client\ClientTaskViewLayout;
+use App\Orchid\Screens\Client\ClientListProjectScreen;
+use App\Orchid\Screens\Client\ClientListTaskScreen;
+use App\Orchid\Screens\Client\ClientViewTaskScreen;
 use App\Orchid\Screens\Examples\ExampleActionsScreen;
 use App\Orchid\Screens\Examples\ExampleCardsScreen;
 use App\Orchid\Screens\Examples\ExampleChartsScreen;
@@ -18,11 +22,13 @@ use App\Orchid\Screens\Project\ProjectEditScreen;
 use App\Orchid\Screens\Project\ProjectListScreen;
 use App\Orchid\Screens\Role\RoleEditScreen;
 use App\Orchid\Screens\Role\RoleListScreen;
+use App\Orchid\Screens\System\WelcomeScreen;
 use App\Orchid\Screens\Task\TaskEditScreen;
 use App\Orchid\Screens\Task\TaskListScreen;
 use App\Orchid\Screens\TaskCategory\TaskCategoryEditScreen;
 use App\Orchid\Screens\TaskCategory\TaskCategoryListScreen;
 use App\Orchid\Screens\TaskScreen;
+use App\Orchid\Screens\Telegram\TelegramConnectScreen;
 use App\Orchid\Screens\User\UserEditScreen;
 use App\Orchid\Screens\User\UserListScreen;
 use App\Orchid\Screens\User\UserProfileScreen;
@@ -41,6 +47,8 @@ use Tabuna\Breadcrumbs\Trail;
 */
 
 // Main
+Route::screen('/welcome', WelcomeScreen::class)
+    ->name('platform.welcome');
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)
@@ -69,6 +77,21 @@ Route::screen('users', UserListScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
         ->push(__('adminpanel.Users'), route('platform.systems.users')));
+
+Route::screen('client/projects/{project}/tasks', ClientListTaskScreen::class)
+    ->name('platform.systems.client.project.tasks');
+
+Route::screen('client/projects', ClientListProjectScreen::class)
+    ->name('platform.systems.client.projects')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Мои проекты', route('platform.systems.client.projects')));
+
+Route::screen('client/projects/{project}/tasks/{task}', ClientViewTaskScreen::class)
+    ->name('platform.systems.client.project.tasks.view');
+
+Route::screen('telegram/connect', TelegramConnectScreen::class)
+    ->name('platform.telegram.connect');
 
 // Platform > Tasks
 Route::screen('task', TaskScreen::class)->name('platform.task');
