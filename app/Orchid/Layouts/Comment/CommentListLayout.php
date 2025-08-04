@@ -2,6 +2,7 @@
 
 namespace App\Orchid\Layouts\Comment;
 
+use App\Models\Comment;
 use App\Orchid\Fields\CommentField;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Label;
@@ -25,11 +26,7 @@ class CommentListLayout extends Rows
     {
         $comments = $this->query->get('comments', []);
 
-        $comments = $comments->sortByDesc(function ($comment) {
-            return strtotime($comment['created_at']);
-        });
-
-        if (empty($comments)) {
+        if ($comments->isEmpty()) {
             return [
                 CommentField::make('no_comments')
                     ->author('Система')
@@ -44,7 +41,7 @@ class CommentListLayout extends Rows
             $fields[] = CommentField::make("comment_{$comment['id']}")
                 ->author($comment['user']['name'] ?? 'Неизвестно')
                 ->date($comment['created_at'])
-                ->text($comment['text'])
+                ->text($comment['text']) // Используем оригинальное поле
                 ->borderColor($i % 2 ? 'border-blue-400' : 'border-indigo-400');
         }
 

@@ -39,7 +39,7 @@ class ClientViewTaskScreen extends Screen
             'task_status_label' => TaskStatusEnum::from($task->status)?->label(),
             'comments' => $task->comments()
                 ->with('user')
-                ->oldest()
+                ->latest()
                 ->get()
                 ->map(fn($comment) => $this->transformComment($comment)),
         ];
@@ -51,7 +51,7 @@ class ClientViewTaskScreen extends Screen
             'id' => $comment->id,
             'user' => ['name' => $comment->user->name ?? 'Неизвестно'],
             'created_at' => $comment->created_at->format('d.m.Y H:i'),
-            'text' => $comment->text
+            'text' => $comment->plain_text
         ];
     }
 
@@ -256,13 +256,41 @@ class ClientViewTaskScreen extends Screen
 
     public function addComment(Request $request, Task $task)
     {
-        $request->validate([
-            'comment.text' => 'required|string|max:1000',
-        ]);
+        // Получаем данные из Quill редактора
+        $quillData = $request->input('comment.text');
+        
+        // Если данные пришли как массив (обычный случай для Quill)
+        if (is_array($quillData)) {
+            $quillContent = $quillData;
+        } 
+        // Если данные пришли как JSON строка (на всякий случай)
+        elseif (json_validate($quillData)) {
+            $quillContent = json_decode($quillData, true);
+        } 
+        // Если данные в непонятном формате
+        else {
+            $quillContent = [
+                'ops' => [
+                    ['insert' => $quillData]
+                ]
+            ];
+        }
+
+        // Извлекаем plain text из Quill delta
+        $plainText = '';
+        foreach ($quillContent['ops'] ?? [] as $op) {
+            if (is_string($op['insert'] ?? null)) {
+                $plainText .= $op['insert'];
+            }
+        }
+
+        // Удаляем лишние переносы строк
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
 
         $task->comments()->create([
             'user_id' => auth()->id(),
-            'text' => $request->input('comment.text'),
+            'text' => $quillContent,
+            'plain_text' => $plainText
         ]);
 
         Toast::success('Комментарий добавлен');
