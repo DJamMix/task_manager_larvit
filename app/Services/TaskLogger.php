@@ -21,17 +21,14 @@ class TaskLogger
     public function logStatusChange(
         Task $task,
         User $user,
-        string $fromStatus,
         string $toStatus,
         ?string $additionalMessage = null
     ): void {
-        $fromStatusLabel = TaskStatusEnum::tryFrom($fromStatus)?->label() ?? $fromStatus;
         $toStatusLabel = TaskStatusEnum::tryFrom($toStatus)?->label() ?? $toStatus;
 
         $plainText = sprintf(
-            "🔄 Пользователь %s изменил статус задачи с '%s' на '%s'",
+            "🔄 Пользователь %s изменил статус задачи на '%s'",
             $user->name,
-            $fromStatusLabel,
             $toStatusLabel
         );
 
@@ -87,6 +84,27 @@ class TaskLogger
     ): void {
         $plainText = sprintf(
             "↩️ Пользователь %s вернул задачу на оценку: %s",
+            $user->name,
+            $task->name
+        );
+
+        if ($reason) {
+            $plainText .= "\n📌 Причина: " . $reason;
+        }
+
+        $quillContent = $this->formatForQuill($plainText);
+        $telegramMessage = $this->formatForTelegram($plainText, $task);
+
+        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+    }
+
+    public function logTaskReturnDemoEstimation(
+        Task $task,
+        User $user,
+        ?string $reason = null
+    ): void {
+        $plainText = sprintf(
+            "↩️ Пользователь %s вернул задачу в работу после результатов ДЕМО: %s",
             $user->name,
             $task->name
         );

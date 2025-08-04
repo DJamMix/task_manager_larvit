@@ -144,7 +144,8 @@ class MyTasksViewScreen extends Screen
             $task['status'] === TaskStatusEnum::ESTIMATION->value ||
             $task['status'] === TaskStatusEnum::TESTING_PROD->value ||
             $task['status'] === TaskStatusEnum::DEMO->value ||
-            $task['status'] === TaskStatusEnum::UNPAID->value)
+            $task['status'] === TaskStatusEnum::UNPAID->value ||
+            $task['status'] === TaskStatusEnum::ESTIMATION_REVIEW->value)
         ) {
             $buttons[] = ModalToggle::make('Добавить время')
                 ->modalTitle('Учет рабочего времени')

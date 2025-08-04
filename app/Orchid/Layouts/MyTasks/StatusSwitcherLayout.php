@@ -5,6 +5,7 @@ namespace App\Orchid\Layouts\MyTasks;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Field;
+use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Layouts\Rows;
 
 class StatusSwitcherLayout extends Rows
@@ -26,6 +27,15 @@ class StatusSwitcherLayout extends Rows
         $task = $this->query->get('task');
         $isExecutor = auth()->id() == $task['executor']['id'];
         $currentStatus = $task['status'];
+
+        if ($currentStatus === TaskStatusEnum::DEMO->value) {
+            return [
+                Label::make('demo_info')
+                    ->title('Статус задачи')
+                    ->value('Задача находится на демонстрации заказчику. Ожидайте решения - задача будет либо принята, либо возвращена на доработку.')
+                    ->hr()
+            ];
+        }
 
         $buttons = [];
 
@@ -82,27 +92,9 @@ class StatusSwitcherLayout extends Rows
                         ])
                         ->icon('tv')
                         ->class('btn btn-info')
-                        ->confirm('Вы уверены, что хотите перевести задачу в ДЕМО?');
+                        ->confirm('Вы уверены, что хотите перевести задачу в ДЕМО? Это ФИНАЛЬНЫЙ СТАТУС!!!');
                     break;
-                case TaskStatusEnum::DEMO->value:
-                    $buttons[] = Button::make('Вернуть в тестирование PROD')
-                        ->method('changeStatus')
-                        ->parameters([
-                            'status' => TaskStatusEnum::TESTING_PROD->value
-                        ])
-                        ->icon('arrow-left')
-                        ->class('btn btn-warning')
-                        ->confirm('Вы уверены, что хотите вернуть задачу в тестирование PROD?');
 
-                    $buttons[] = Button::make('Сдать задачу')
-                        ->method('changeStatus')
-                        ->parameters([
-                            'status' => TaskStatusEnum::UNPAID->value
-                        ])
-                        ->icon('cash-stack')
-                        ->class('btn btn-success')
-                        ->confirm('Вы уверены, что хотите сдать задачу, ведь этот процесс не обратим!');
-                    break;
                 default:
                     // Никаких кнопок для этих статусов
                     break;

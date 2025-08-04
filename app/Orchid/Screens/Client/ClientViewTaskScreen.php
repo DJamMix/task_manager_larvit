@@ -112,6 +112,20 @@ class ClientViewTaskScreen extends Screen
                 ->confirm('При нажатии задача будет переведена в статус "Не оплачена" в связи с тем, что исполнитель затратил время на оценивание реализации.');
         }
 
+        if($task['status'] === TaskStatusEnum::DEMO->value) {
+            $buttons[] = Button::make('Принять демо')
+                ->method('applyDemoTask')
+                ->icon('check')
+                ->class('btn btn-success')
+                ->confirm('При нажатии "принять", вы соглашаетесь с выполненой работой и задача считается выполненной.');
+
+            $buttons[] = Button::make('Вернуть на доработку')
+                ->method('returnDemoModal')
+                ->icon('arrow-return-right')
+                ->class('btn btn-warning')
+                ->confirm('При нажатии вы не принимаете задачу, задача возвращается на доработку!');
+        }
+
         return $buttons;
     }
 
@@ -131,6 +145,22 @@ class ClientViewTaskScreen extends Screen
         $task->save();
 
         Toast::success('Оценка успешно согласована и переведена в статус "Новая"');
+
+        return redirect()->back();
+    }
+
+    public function applyDemoTask(Task $task)
+    {
+        $task->status = TaskStatusEnum::UNPAID->value;
+        $task->save();
+
+        app(TaskLogger::class)->logStatusChange(
+            $task, 
+            auth()->user(),
+            $task->status
+        );
+
+        Toast::success('Вы приняли задачу и она считается выполненной!');
 
         return redirect()->back();
     }
@@ -170,7 +200,22 @@ class ClientViewTaskScreen extends Screen
             $request->input('return_reason')
         );
 
-        Toast::success('Задача отменена. Причина: ' . $request->input('return_reason'));
+        Toast::success('Задача возвращена на оценку. Причина: ' . $request->input('return_reason'));
+
+        return redirect()->back();
+    }
+
+    public function returnDemoModal(Task $task,  Request $request)
+    {
+        $task->status = TaskStatusEnum::IN_PROGRESS->value;
+        $task->save();
+
+        app(TaskLogger::class)->logTaskReturnDemoEstimation(
+            $task, 
+            auth()->user()
+        );
+
+        Toast::success('Задача возвращена исполнителю после результатов ДЕМО!');
 
         return redirect()->back();
     }
