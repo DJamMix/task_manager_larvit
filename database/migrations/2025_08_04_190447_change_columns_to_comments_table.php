@@ -47,44 +47,35 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('comments', function (Blueprint $table) {
-            // 1. Создаем временное поле старого типа
-            $table->text('text_old')->after('text');
-        });
+        // 1. Полностью очищаем таблицу
+        \DB::table('comments')->truncate();
 
-        // 2. Переносим данные обратно
-        \DB::transaction(function () {
-            \DB::table('comments')->orderBy('id')->chunk(100, function ($comments) {
-                foreach ($comments as $comment) {
-                    $textData = json_decode($comment->text, true);
-                    $plainText = '';
-                    foreach ($textData['ops'] as $op) {
-                        if (isset($op['insert'])) {
-                            $plainText .= $op['insert'];
-                        }
-                    }
-                    
-                    \DB::table('comments')
-                        ->where('id', $comment->id)
-                        ->update([
-                            'text_old' => $plainText
-                        ]);
+        // 2. Удаляем все изменения схемы безопасным способом
+        Schema::table('comments', function (Blueprint $table) {
+            // Для MySQL сначала удаляем индекс через прямое SQL
+            if (\DB::connection()->getDriverName() === 'mysql') {
+                try {
+                    \DB::statement('ALTER TABLE comments DROP INDEX comments_plain_text_fulltext');
+                } catch (\Exception $e) {
+                    // Игнорируем ошибку, если индекс не существует
                 }
-            });
-        });
+            }
 
-        Schema::table('comments', function (Blueprint $table) {
-            // 3. Удаляем json поле
-            $table->dropColumn('text');
+            // Удаляем добавленные колонки (с проверкой существования)
+            $columns = Schema::getColumnListing('comments');
             
-            // 4. Переименовываем временное поле
-            $table->renameColumn('text_old', 'text');
+            if (in_array('text_temp', $columns)) {
+                $table->dropColumn('text_temp');
+            }
             
-            // 5. Удаляем plain_text поле
-            $table->dropColumn('plain_text');
-            
-            // 6. Удаляем fulltext индекс
-            $table->dropFullText(['plain_text']);
+            if (in_array('plain_text', $columns)) {
+                $table->dropColumn('plain_text');
+            }
+
+            // Восстанавливаем оригинальную колонку text
+            if (!in_array('text', $columns)) {
+                $table->text('text')->nullable();
+            }
         });
     }
 };
