@@ -23,7 +23,7 @@ class EBot
      */
     public static function sendMessage($chatId, $text, $messageThreadId = null, string $parseMode = null, $replyMarkup = null, string $token = null)
     {
-        $token = $token ?? config('ebot.bot_token.auth_bot');
+        $token = $token ?? config('ebot.bot_token.task_bot');
         $url = "https://api.telegram.org/bot{$token}/sendMessage";
 
         $data = [
