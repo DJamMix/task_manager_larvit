@@ -31,8 +31,14 @@ class TaskListLayout extends Table
     {
         return [
             TD::make('name', __('task.name'))
-                ->render(fn (Task $task) => Link::make($task->name)
-                    ->route('platform.systems.tasks.edit', $task->id)),
+                ->render(function (Task $task) {
+                    return Link::make($task->name)
+                        ->route('platform.systems.tasks.edit', $task->id)
+                        ->class('text-truncate d-inline-block')
+                        ->style('max-width: 200px; white-space: normal; word-break: break-word;');
+                })
+                ->width('200px')
+                ->style('max-width: 200px'),
 
             TD::make('creator_id', __('task.creator_id'))
                 ->render(fn (Task $task) => $task->creator->name ?? 'Неизвестен'),
