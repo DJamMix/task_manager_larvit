@@ -13,6 +13,7 @@ use Orchid\Access\Impersonation;
 use App\Models\User;
 use Orchid\Screen\Action;
 use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Fields\TextArea;
 use Orchid\Screen\Screen;
 use Orchid\Support\Color;
 use Orchid\Support\Facades\Layout;
@@ -97,7 +98,16 @@ class UserProfileScreen extends Screen
                 ),
 
             Layout::block(Layout::rows([
-                // Здесь можно добавить поле для отображения статуса привязки
+                TextArea::make('telegram_status')
+                    ->title('Статус привязки')
+                    ->value(function () {
+                        $user = auth()->user();
+                        return $user->telegram_id 
+                            ? "✅ Аккаунт Telegram привязан (ID: {$user->telegram_id})"
+                            : "❌ Аккаунт Telegram не привязан";
+                    })
+                    ->readonly()
+                    ->style('color: ' . (auth()->user()->telegram_id ? 'green' : 'red')),
             ]))
                 ->title('Привязка Telegram')
                 ->description('Привяжите свой аккаунт Telegram для получения уведомлений')
