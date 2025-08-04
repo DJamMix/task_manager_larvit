@@ -16,6 +16,7 @@ use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
+use App\Services\TaskLogger;
 
 class ClientViewTaskScreen extends Screen
 {
@@ -96,11 +97,19 @@ class ClientViewTaskScreen extends Screen
                 ->class('btn btn-success')
                 ->confirm('При нажатии "принять", вы соглашаетесь с оценкой и задача переходит исполнителю.');
 
-            $buttons[] = Button::make('Отклонить')
+            $buttons[] = ModalToggle::make('Отклонить оценку')
+                ->modal('returnTaskModal')
+                ->method('returnTask')
+                ->icon('arrow-return-right')
+                ->class('btn btn-warning')
+                ->confirm('При нажатии вы не принимаете оценку, задача возвращается на оценивание, после чего исполнитель либо переоценивает её, либо даёт пояснение почему задача займёт столько времени.');
+
+            $buttons[] = ModalToggle::make('Отменить задачу')
+                ->modal('cancelTaskModal')
                 ->method('cancelTask')
                 ->icon('x')
                 ->class('btn btn-danger')
-                ->confirm('При нажатии "отклонить", задача будет отменена.');
+                ->confirm('При нажатии задача будет переведена в статус "Не оплачена" в связи с тем, что исполнитель затратил время на оценивание реализации.');
         }
 
         return $buttons;
@@ -126,12 +135,42 @@ class ClientViewTaskScreen extends Screen
         return redirect()->back();
     }
 
-    public function cancelTask(Task $task)
+    public function cancelTask(Task $task,  Request $request)
     {
+        $request->validate([
+            'cancel_reason' => 'required|string|min:10|max:1000',
+        ]);
+
         $task->status = TaskStatusEnum::CANCELED->value;
         $task->save();
 
-        Toast::success('Оценка отклонена и задача переведена в статус "Отменена"');
+        app(TaskLogger::class)->logTaskCancellation(
+            $task, 
+            auth()->user(), 
+            $request->input('cancel_reason')
+        );
+
+        Toast::success('Задача отменена. Причина: ' . $request->input('cancel_reason'));
+
+        return redirect()->back();
+    }
+
+    public function returnTask(Task $task,  Request $request)
+    {
+        $request->validate([
+            'return_reason' => 'required|string|min:10|max:1000',
+        ]);
+
+        $task->status = TaskStatusEnum::ESTIMATION->value;
+        $task->save();
+
+        app(TaskLogger::class)->logTaskReturnEstimation(
+            $task, 
+            auth()->user(), 
+            $request->input('return_reason')
+        );
+
+        Toast::success('Задача отменена. Причина: ' . $request->input('return_reason'));
 
         return redirect()->back();
     }
@@ -187,6 +226,30 @@ class ClientViewTaskScreen extends Screen
             ])
                 ->title('Редактирование задачи')
                 ->applyButton('Сохранить')
+                ->closeButton('Отмена'),
+
+            Layout::modal('cancelTaskModal', [
+                Layout::rows([
+                    \Orchid\Screen\Fields\TextArea::make('cancel_reason')
+                        ->title('Причина отмены')
+                        ->required()
+                        ->help('Пожалуйста, укажите подробную причину отмены задачи')
+                ])
+            ])
+                ->title('Отмена задачи')
+                ->applyButton('Подтвердить отмену')
+                ->closeButton('Отмена'),
+
+            Layout::modal('returnTaskModal', [
+                Layout::rows([
+                    \Orchid\Screen\Fields\TextArea::make('return_reason')
+                        ->title('Причина возврата на оценку?')
+                        ->required()
+                        ->help('Пожалуйста, укажите подробную причину возврата на оценку задачи')
+                ])
+            ])
+                ->title('Отклонение оценки')
+                ->applyButton('Подтвердить отклонение оценки')
                 ->closeButton('Отмена'),
         ];
     }
