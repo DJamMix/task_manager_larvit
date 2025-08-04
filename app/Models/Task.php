@@ -3,15 +3,18 @@
 namespace App\Models;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
+use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskStatusFilter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Orchid\Filters\Filterable;
 use Orchid\Screen\AsSource;
 
 class Task extends Model
 {
-    use HasFactory, AsSource;
+    use HasFactory, AsSource, Filterable;
 
     protected $fillable = [
         'creator_id',
@@ -30,6 +33,11 @@ class Task extends Model
         'estimation_hours',
         'type_task',
         'priority',
+    ];
+
+    protected $allowedFilters = [
+        'task_category_id' => TaskCategoryFilter::class,
+        'status' => TaskStatusFilter::class,
     ];
 
     /**

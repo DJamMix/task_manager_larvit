@@ -3,9 +3,13 @@
 namespace App\Orchid\Screens\Task;
 
 use App\Models\Task;
+use App\Models\TaskCategory;
+use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\Task\TaskListLayout;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
+use Orchid\Support\Facades\Layout;
 
 class TaskListScreen extends Screen
 {
@@ -17,7 +21,10 @@ class TaskListScreen extends Screen
     public function query(): iterable
     {
         return [
-            'tasks' => Task::paginate(15),
+            'tasks' => Task::with(['creator', 'executor', 'project', 'category'])
+                ->filters()
+                ->defaultSort('id')
+                ->paginate(10),
         ];
     }
 
@@ -53,6 +60,11 @@ class TaskListScreen extends Screen
     public function layout(): iterable
     {
         return [
+            Layout::selection([
+                TaskCategoryFilter::class,
+                TaskStatusFilter::class,
+            ]),
+
             TaskListLayout::class,
         ];
     }
