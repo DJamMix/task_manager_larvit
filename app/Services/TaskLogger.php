@@ -213,37 +213,79 @@ class TaskLogger
 
     protected function formatForTelegram(string $text, Task $task): string
     {
-        $taskUrl = URL::route('platform.systems.tasks.edit', $task->id);
-        
+        // Базовое сообщение без специфичной ссылки
         return sprintf(
-            "%s\n\n🔗 [Перейти к задаче](%s)\n🏷️ ID: #T%d\n📂 Проект: %s",
+            "%s\n\n🏷️ ID: #T%d\n📂 Проект: %s",
             $text,
-            $taskUrl,
             $task->id,
             $task->project->name
         );
     }
 
-    protected function sendTelegramNotification(Task $task, User $actor, string $message): void
+    protected function sendTelegramNotification(Task $task, User $actor, string $baseMessage): void
     {
+        // Отправка исполнителю
         if ($task->executor && $task->executor->id !== $actor->id && $task->executor->telegram_id) {
+            $executorUrl = URL::route('platform.systems.my_tasks.view', $task->id);
+            $executorMessage = $baseMessage . "\n\n🔗 [Перейти к задаче](" . $executorUrl . ")" .
+                             "\nℹ️ Вы исполнитель этой задачи";
+            
             $this->ebot->sendMessage(
                 $task->executor->telegram_id,
-                $message,
+                $executorMessage,
                 null,
                 'Markdown'
             );
         }
 
+        // Отправка создателю
         if ($task->creator && $task->creator->id !== $actor->id && 
             (!$task->executor || $task->creator->id !== $task->executor->id) &&
             $task->creator->telegram_id) {
+            $creatorUrl = URL::route('platform.systems.client.project.tasks.view', [
+                'project' => $task->project,
+                'task' => $task
+            ]);
+            $creatorMessage = $baseMessage . "\n\n🔗 [Перейти к задаче](" . $creatorUrl . ")" .
+                            "\nℹ️ Это ваша задача";
+            
             $this->ebot->sendMessage(
                 $task->creator->telegram_id,
-                $message,
+                $creatorMessage,
                 null,
                 'Markdown'
             );
         }
+
+        // Отправка клиентам проекта
+        foreach ($task->project->clients as $client) {
+            if ($client->id !== $actor->id && 
+                $client->id !== $task->creator_id && 
+                $client->telegram_id) {
+                $clientUrl = URL::route('platform.systems.client.project.tasks.view', [
+                    'project' => $task->project,
+                    'task' => $task
+                ]);
+                $clientMessage = $baseMessage . "\n\n🔗 [Перейти к задаче](" . $clientUrl . ")" .
+                                "\nℹ️ Это задача вашего проекта";
+                
+                $this->ebot->sendMessage(
+                    $client->telegram_id,
+                    $clientMessage,
+                    null,
+                'Markdown'
+                );
+            }
+        }
+    }
+
+    protected function getExecutorSpecificText(string $text): string
+    {
+        return $text . "\n\nℹ️ Вы исполнитель этой задачи";
+    }
+
+    protected function getClientSpecificText(string $text): string
+    {
+        return $text . "\n\nℹ️ Это задача вашего проекта";
     }
 }
