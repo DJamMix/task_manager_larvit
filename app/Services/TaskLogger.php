@@ -6,6 +6,7 @@ use App\CoreLayer\Enums\TaskStatusEnum;
 use App\CoreLayer\Integrations\Ebot\EBot;
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class TaskLogger
