@@ -17,7 +17,7 @@ class TaskListScreen extends Screen
     public function query(): iterable
     {
         return [
-            'tasks' => Task::all(),
+            'tasks' => Task::paginate(15),
         ];
     }
 

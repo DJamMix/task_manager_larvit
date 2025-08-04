@@ -28,8 +28,8 @@ class MyTasksListScreen extends Screen
                     TaskStatusEnum::COMPLETED->value,
                     TaskStatusEnum::CANCELED->value
                 ])
-                ->orderBy('created_at', 'desc') // Сортировка по дате создания (новые сначала)
-                ->get(),
+                ->orderBy('created_at', 'desc')
+                ->paginate(15),
         ];
     }
 

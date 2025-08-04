@@ -24,7 +24,7 @@ class ClientListTaskScreen extends Screen
     public function query(Project $project): iterable
     {
         return [
-            'tasks' => $project->tasks,
+            'tasks' => $project->tasks()->paginate(15),
             'project' => $project,
         ];
     }
