@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\TaskAttachment;
 use App\Orchid\Layouts\Client\ClientTaskViewLayout;
 use App\Orchid\Screens\Client\ClientListProjectScreen;
 use App\Orchid\Screens\Client\ClientListTaskScreen;
@@ -92,6 +93,18 @@ Route::screen('client/projects/{project}/tasks/{task}', ClientViewTaskScreen::cl
 
 Route::screen('telegram/connect', TelegramConnectScreen::class)
     ->name('platform.telegram.connect');
+
+
+Route::get('task/attachment/download/{attachment}', function (TaskAttachment $attachment) {
+    $path = storage_path('app/public/' . $attachment->path);
+    
+    if (!file_exists($path)) {
+        abort(404);
+    }
+
+    return response()->download($path, $attachment->original_name);
+})->name('platform.task.attachment.download');
+
 
 // Platform > Tasks
 Route::screen('task', TaskScreen::class)->name('platform.task');

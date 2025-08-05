@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Orchid\Attachment\Attachable;
 use Orchid\Filters\Types\Like;
 use Orchid\Filters\Types\Where;
 use Orchid\Filters\Types\WhereDateStartEnd;
@@ -12,7 +13,7 @@ use Orchid\Screen\AsSource;
 
 class User extends Authenticatable
 {
-    use HasFactory, AsSource;
+    use HasFactory, AsSource, Attachable;
 
     /**
      * The attributes that are mass assignable.

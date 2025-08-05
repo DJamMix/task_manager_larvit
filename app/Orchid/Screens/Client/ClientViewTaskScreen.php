@@ -6,6 +6,7 @@ use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
 use App\Orchid\Layouts\Client\ClientTaskCreateModalLayout;
+use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
 use App\Orchid\Layouts\Client\ClientTaskViewLayout;
 use App\Orchid\Layouts\Comment\CommentListLayout;
 use App\Orchid\Layouts\Comment\CommentSendLayout;
@@ -296,6 +297,8 @@ class ClientViewTaskScreen extends Screen
                 ->title('Отклонение оценки')
                 ->applyButton('Подтвердить отклонение оценки')
                 ->closeButton('Отмена'),
+
+            ClientTaskFilesLayout::class,
         ];
     }
 
