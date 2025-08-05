@@ -5,11 +5,13 @@ namespace App\Orchid\Screens\Client;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskAttachment;
 use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\Client\ClientListTaskLayout;
 use App\Orchid\Layouts\Client\ClientTaskCreateModalLayout;
 use Illuminate\Http\Request;
+use Orchid\Attachment\Models\Attachment;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Screen;
@@ -82,6 +84,8 @@ class ClientListTaskScreen extends Screen
             'task.task_category_id' => 'required|exists:task_categories,id',
             'task.type' => 'required|string',
             'task.priority' => 'required|string',
+            'task.attachments' => 'nullable|array',
+            'task.attachments.*' => 'file|max:1024000'
         ]);
 
         $task->fill($validated['task']);
@@ -89,6 +93,24 @@ class ClientListTaskScreen extends Screen
         $task->project_id = $project->id;
         $task->status = TaskStatusEnum::DRAFT->value;
         $task->save();
+
+        // Сохранение прикрепленных файлов
+        if ($request->has('task.attachments')) {
+            foreach ($request->input('task.attachments', []) as $fileId) {
+                $attachment = Attachment::find($fileId);
+                
+                if ($attachment) {
+                    TaskAttachment::create([
+                        'task_id' => $task->id,
+                        'user_id' => auth()->id(),
+                        'original_name' => $attachment->original_name,
+                        'path' => $attachment->path,
+                        'mime_type' => $attachment->mime,
+                        'size' => $attachment->size,
+                    ]);
+                }
+            }
+        }
 
         Toast::info('Задача успешно создана и передана на согласование');
 

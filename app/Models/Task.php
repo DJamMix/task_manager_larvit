@@ -84,4 +84,12 @@ class Task extends Model
     {
         return $this->hasMany(TrackingTime::class);
     }
+
+    /**
+     * Связь с прикрепленными файлами
+     */
+    public function attachments()
+    {
+        return $this->hasMany(TaskAttachment::class);
+    }
 }

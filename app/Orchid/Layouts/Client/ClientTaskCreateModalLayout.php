@@ -6,10 +6,12 @@ use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\TaskCategory;
 use Orchid\Screen\Field;
+use Orchid\Screen\Fields\Attach;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Quill;
 use Orchid\Screen\Fields\Select;
+use Orchid\Screen\Fields\Upload;
 use Orchid\Screen\Layouts\Rows;
 
 class ClientTaskCreateModalLayout extends Rows
@@ -64,6 +66,15 @@ class ClientTaskCreateModalLayout extends Rows
             Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])
                 ->title(__('task.description'))
                 ->required(),
+
+            Attach::make('task.attachments')
+                ->title('Прикрепленные файлы')
+                ->multiple()
+                ->maxSize(1024)
+                ->maxCount(3) // или любое другое ограничение
+                ->accept('image/*,application/pdf,.psd') // или укажите конкретные типы
+                ->storage('public') // или другое хранилище
+                ->help('Максимальный размер файла: 1 ГБ'),
         ];
     }
 }
