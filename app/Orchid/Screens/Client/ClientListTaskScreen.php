@@ -5,6 +5,8 @@ namespace App\Orchid\Screens\Client;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
+use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\Client\ClientListTaskLayout;
 use App\Orchid\Layouts\Client\ClientTaskCreateModalLayout;
 use Illuminate\Http\Request;
@@ -24,7 +26,7 @@ class ClientListTaskScreen extends Screen
     public function query(Project $project): iterable
     {
         return [
-            'tasks' => $project->tasks()->paginate(15),
+            'tasks' => $project->tasks()->filters()->paginate(15),
             'project' => $project,
         ];
     }
@@ -101,6 +103,11 @@ class ClientListTaskScreen extends Screen
     public function layout(): iterable
     {
         return [
+            Layout::selection([
+                TaskCategoryFilter::class,
+                TaskStatusFilter::class,
+            ]),
+
             ClientListTaskLayout::class,
 
             Layout::modal('createTaskModal', [

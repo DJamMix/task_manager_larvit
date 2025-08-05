@@ -4,26 +4,6 @@
             <span class="logo">CrewDev</span>
             <p class="footer-slogan">Управляйте задачами эффективно</p>
         </div>
-        
-        <div class="footer-links">
-            <div class="tech-links">
-                <h4>Технологии</h4>
-                <ul>
-                    <li><a href="#" target="_blank">Laravel</a></li>
-                    <li><a href="#" target="_blank">Vue.js</a></li>
-                    <li><a href="#" target="_blank">Docker</a></li>
-                </ul>
-            </div>
-            
-            <div class="dev-links">
-                <h4>Разработка</h4>
-                <ul>
-                    <li><a href="#" target="_blank">GitHub</a></li>
-                    <li><a href="#" target="_blank">Документация</a></li>
-                    <li><a href="#" target="_blank">API</a></li>
-                </ul>
-            </div>
-        </div>
     </div>
     
     <div class="footer-copyright">

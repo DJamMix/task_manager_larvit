@@ -30,8 +30,14 @@ class ClientListTaskLayout extends Table
     {
         return [
             TD::make('name', __('task.name'))
-                ->render(fn (Task $task) => Link::make($task->name)
-                    ->route('platform.systems.client.project.tasks.view', ['project' => $task->project, 'task' => $task])),
+                ->render(function (Task $task) {
+                    return Link::make($task->name)
+                        ->route('platform.systems.client.project.tasks.view', ['project' => $task->project, 'task' => $task])
+                        ->class('text-truncate d-inline-block')
+                        ->style('max-width: 200px; white-space: normal; word-break: break-word;');
+                })
+                ->width('200px')
+                ->style('max-width: 200px'),
 
             TD::make('status', __('task.status.label'))
                 ->render(fn (Task $task) => view('components.task.status', ['status' => $task->status])),
