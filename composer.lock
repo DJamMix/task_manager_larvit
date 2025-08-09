@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "831ea01eba4a56c9f43962270b2d5932",
+    "content-hash": "0d662d287a52ac238776cebdac13da3d",
     "packages": [
         {
             "name": "brick/math",
@@ -290,6 +290,65 @@
                 "source": "https://github.com/dflydev/dflydev-dot-access-data/tree/v3.0.3"
             },
             "time": "2024-07-08T12:26:09+00:00"
+        },
+        {
+            "name": "djammix/ebot",
+            "version": "v0.0.4.x-dev",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/DJamMix/EBot.git",
+                "reference": "8be80e88c89f62ee27cf0694fea317a0d3a01cb0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/DJamMix/EBot/zipball/8be80e88c89f62ee27cf0694fea317a0d3a01cb0",
+                "reference": "8be80e88c89f62ee27cf0694fea317a0d3a01cb0",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.1"
+            },
+            "suggest": {
+                "ext-curl": "For better HTTP request handling",
+                "laravel/framework": "For full Laravel integration"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "djammix\\EBot\\EBotServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "djammix\\EBot\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "DJamMix",
+                    "email": "antropov.viktor1234@yandex.ru",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Laravel package for Telegram Bot API integration",
+            "keywords": [
+                "api",
+                "bot",
+                "integration",
+                "laravel",
+                "telegram"
+            ],
+            "support": {
+                "issues": "https://github.com/DJamMix/EBot/issues",
+                "source": "https://github.com/DJamMix/EBot/tree/v0.0.4"
+            },
+            "time": "2025-08-09T22:41:48+00:00"
         },
         {
             "name": "doctrine/inflector",
@@ -8747,7 +8806,9 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": [],
+    "stability-flags": {
+        "djammix/ebot": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {

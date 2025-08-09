@@ -277,8 +277,7 @@ class TaskLogger
 
         // Отправка клиентам проекта
         foreach ($task->project->clients as $client) {
-            if ($client->id !== $actor->id && 
-                $client->id !== $task->creator_id && 
+            if ($client->id !== $actor->id &&
                 $client->telegram_id) {
                 $clientUrl = URL::route('platform.systems.client.project.tasks.view', [
                     'project' => $task->project,

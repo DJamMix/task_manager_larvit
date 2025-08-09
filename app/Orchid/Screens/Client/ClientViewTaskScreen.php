@@ -184,7 +184,7 @@ class ClientViewTaskScreen extends Screen
             'cancel_reason' => 'required|string|min:10|max:1000',
         ]);
 
-        $task->status = TaskStatusEnum::CANCELED->value;
+        $task->status = TaskStatusEnum::UNPAID->value;
         $task->save();
 
         app(TaskLogger::class)->logTaskCancellation(

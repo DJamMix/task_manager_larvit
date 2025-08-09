@@ -111,10 +111,11 @@ class TaskEditScreen extends Screen
     public function save(Request $request, Task $task)
     {
         $task->fill($request->get('task'));
+        $task->save();
+
         $task->attachments()->syncWithoutDetaching(
             $request->input('task.attachments', [])
         );
-        $task->save();
 
         Toast::info(__('task.save'));
 
