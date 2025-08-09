@@ -16,6 +16,7 @@ use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Quill;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\TextArea;
+use Orchid\Screen\Fields\Upload;
 use Orchid\Screen\Layouts\Rows;
 
 class TaskEditLayout extends Rows
@@ -142,6 +143,12 @@ class TaskEditLayout extends Rows
             Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])
                 ->title(__('task.description')),
 
+            Upload::make('task.attachments')
+                ->title('Прикрепленные файлы')
+                ->acceptedFiles('image/*,application/pdf,.psd')
+                ->storage('public')
+                ->maxFileSize(1024)
+                ->help('Допустимые форматы: JPG, PNG, PDF, PSD. Макс. размер: 1 ГБ'),
         ];
     }
 }

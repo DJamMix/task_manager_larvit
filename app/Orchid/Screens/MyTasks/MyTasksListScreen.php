@@ -5,6 +5,9 @@ namespace App\Orchid\Screens\MyTasks;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
+use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskProjectFilter;
+use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\MyTasks\MyTasksCreateModalLayout;
 use App\Orchid\Layouts\MyTasks\MyTasksListLayout;
 use Illuminate\Http\Request;
@@ -24,6 +27,7 @@ class MyTasksListScreen extends Screen
     {
         return [
             'tasks' => Task::where('executor_id', auth()->id())
+                ->filters()
                 ->whereNotIn('status', [
                     TaskStatusEnum::COMPLETED->value,
                     TaskStatusEnum::CANCELED->value
@@ -98,6 +102,12 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
+            Layout::selection([
+                TaskCategoryFilter::class,
+                TaskStatusFilter::class,
+                TaskProjectFilter::class,
+            ]),
+
             MyTasksListLayout::class,
 
             Layout::modal('createTaskModal', [

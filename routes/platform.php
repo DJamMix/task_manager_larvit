@@ -34,6 +34,7 @@ use App\Orchid\Screens\User\UserEditScreen;
 use App\Orchid\Screens\User\UserListScreen;
 use App\Orchid\Screens\User\UserProfileScreen;
 use Illuminate\Support\Facades\Route;
+use Orchid\Attachment\Models\Attachment;
 use Tabuna\Breadcrumbs\Trail;
 
 /*
@@ -95,9 +96,9 @@ Route::screen('telegram/connect', TelegramConnectScreen::class)
     ->name('platform.telegram.connect');
 
 
-Route::get('task/attachment/download/{attachment}', function (TaskAttachment $attachment) {
-    $path = storage_path('app/public/' . $attachment->path);
-    
+Route::get('task/attachment/download/{attachment}', function (Attachment $attachment) {
+    $path = storage_path('app/public/' . $attachment->physicalPath());
+
     if (!file_exists($path)) {
         abort(404);
     }

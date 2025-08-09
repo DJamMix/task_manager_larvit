@@ -5,6 +5,8 @@ namespace App\Orchid\Screens\Task;
 use App\Models\Task;
 use App\Models\TaskCategory;
 use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskExecutorFilter;
+use App\Orchid\Filters\TaskProjectFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\Task\TaskListLayout;
 use Orchid\Screen\Actions\Link;
@@ -63,6 +65,8 @@ class TaskListScreen extends Screen
             Layout::selection([
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
+                TaskProjectFilter::class,
+                TaskExecutorFilter::class,
             ]),
 
             TaskListLayout::class,

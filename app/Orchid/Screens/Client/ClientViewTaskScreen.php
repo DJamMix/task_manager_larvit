@@ -135,6 +135,12 @@ class ClientViewTaskScreen extends Screen
         $task->status = TaskStatusEnum::ESTIMATION->value;
         $task->save();
 
+        app(TaskLogger::class)->logCustomAction(
+            $task, 
+            auth()->user(),
+            'Согласовал задачу'
+        );
+
         Toast::success('Задача успешно согласована и переведена в статус "Оценки исполнителем"');
 
         return redirect()->back();
@@ -144,6 +150,12 @@ class ClientViewTaskScreen extends Screen
     {
         $task->status = TaskStatusEnum::NEW->value;
         $task->save();
+
+        app(TaskLogger::class)->logCustomAction(
+            $task, 
+            auth()->user(),
+            'Согласовал оценку исполнителя'
+        );
 
         Toast::success('Оценка успешно согласована и переведена в статус "Новая"');
 
@@ -231,6 +243,10 @@ class ClientViewTaskScreen extends Screen
             'task.priority' => 'required|string',
         ]);
 
+        $task->attachments()->syncWithoutDetaching(
+            $request->input('task.attachments', [])
+        );
+
         $task->fill($validated['task']);
         $task->save();
 
@@ -260,7 +276,10 @@ class ClientViewTaskScreen extends Screen
     {
         return [
             Layout::tabs([
-                'Основная информация' => ClientTaskViewLayout::class,
+                'Основная информация' => [
+                    ClientTaskViewLayout::class,
+                    ClientTaskFilesLayout::class,
+                ],
                 'Обсуждение' => [
                     CommentSendLayout::class,
                     CommentListLayout::class,
@@ -297,8 +316,6 @@ class ClientViewTaskScreen extends Screen
                 ->title('Отклонение оценки')
                 ->applyButton('Подтвердить отклонение оценки')
                 ->closeButton('Отмена'),
-
-            ClientTaskFilesLayout::class,
         ];
     }
 

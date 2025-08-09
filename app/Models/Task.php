@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskExecutorFilter;
+use App\Orchid\Filters\TaskProjectFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +41,8 @@ class Task extends Model
     protected $allowedFilters = [
         'task_category_id' => TaskCategoryFilter::class,
         'status' => TaskStatusFilter::class,
+        'project' => TaskProjectFilter::class,
+        'executor' => TaskExecutorFilter::class,
     ];
 
     /**
@@ -86,11 +90,11 @@ class Task extends Model
         return $this->hasMany(TrackingTime::class);
     }
 
-    /**
-     * Связь с прикрепленными файлами
-     */
-    public function attachments()
-    {
-        return $this->hasMany(TaskAttachment::class);
-    }
+    // /**
+    //  * Связь с прикрепленными файлами
+    //  */
+    // public function attachments()
+    // {
+    //     return $this->hasMany(TaskAttachment::class);
+    // }
 }

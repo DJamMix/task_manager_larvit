@@ -3,10 +3,14 @@
 namespace App\Orchid\Screens\Task;
 
 use App\Models\Task;
+use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
+use App\Orchid\Layouts\Comment\CommentListLayout;
+use App\Orchid\Layouts\Comment\CommentSendLayout;
 use App\Orchid\Layouts\Task\TaskEditLayout;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Screen;
+use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
 
 class TaskEditScreen extends Screen
@@ -25,6 +29,21 @@ class TaskEditScreen extends Screen
     {
         return [
             'task' => $task,
+            'comments' => $task->comments()
+                ->with('user')
+                ->latest()
+                ->get()
+                ->map(fn($comment) => $this->transformComment($comment)),
+        ];
+    }
+
+    protected function transformComment($comment): array
+    {
+        return [
+            'id' => $comment->id,
+            'user' => ['name' => $comment->user->name ?? 'Неизвестно'],
+            'created_at' => $comment->created_at->format('d.m.Y H:i'),
+            'text' => $comment->plain_text
         ];
     }
 
@@ -73,7 +92,16 @@ class TaskEditScreen extends Screen
     public function layout(): iterable
     {
         return [
-            TaskEditLayout::class,
+            Layout::tabs([
+                'Редактирование информации' => [
+                    TaskEditLayout::class,
+                    ClientTaskFilesLayout::class,
+                ],
+                'Комментарии' => [
+                    CommentSendLayout::class,
+                    CommentListLayout::class,
+                ],
+            ]),
         ];
     }
 
@@ -83,6 +111,9 @@ class TaskEditScreen extends Screen
     public function save(Request $request, Task $task)
     {
         $task->fill($request->get('task'));
+        $task->attachments()->syncWithoutDetaching(
+            $request->input('task.attachments', [])
+        );
         $task->save();
 
         Toast::info(__('task.save'));
@@ -102,5 +133,47 @@ class TaskEditScreen extends Screen
         Toast::info(__('task.remove'));
 
         return redirect()->route('platform.systems.tasks');
+    }
+
+    public function addComment(Request $request, Task $task)
+    {
+        // Получаем данные из Quill редактора
+        $quillData = $request->input('comment.text');
+        
+        // Если данные пришли как массив (обычный случай для Quill)
+        if (is_array($quillData)) {
+            $quillContent = $quillData;
+        } 
+        // Если данные пришли как JSON строка (на всякий случай)
+        elseif (json_validate($quillData)) {
+            $quillContent = json_decode($quillData, true);
+        } 
+        // Если данные в непонятном формате
+        else {
+            $quillContent = [
+                'ops' => [
+                    ['insert' => $quillData]
+                ]
+            ];
+        }
+
+        // Извлекаем plain text из Quill delta
+        $plainText = '';
+        foreach ($quillContent['ops'] ?? [] as $op) {
+            if (is_string($op['insert'] ?? null)) {
+                $plainText .= $op['insert'];
+            }
+        }
+
+        // Удаляем лишние переносы строк
+        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
+
+        $task->comments()->create([
+            'user_id' => auth()->id(),
+            'text' => $quillContent,
+            'plain_text' => $plainText
+        ]);
+
+        Toast::success('Комментарий добавлен');
     }
 }

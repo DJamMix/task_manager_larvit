@@ -127,6 +127,7 @@ class PlatformProvider extends OrchidServiceProvider
             ItemPermission::group(__('System'))
                 ->addPermission('platform.systems.roles', __('adminpanel.Roles'))
                 ->addPermission('platform.systems.users', __('adminpanel.Users'))
+                ->addPermission('platform.systems.attachment', 'Загрузка файлов')
                 ->addPermission('platform.systems.tasks', __('adminpanel.Tasks'))
                 ->addPermission('platform.systems.projects', __('adminpanel.Projects'))
                 ->addPermission('platform.systems.task_categories', __('adminpanel.TaskCategories')),

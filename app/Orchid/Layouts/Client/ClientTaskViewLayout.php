@@ -48,12 +48,6 @@ class ClientTaskViewLayout extends Rows
                 ->readonly()
                 ->rows(10)
                 ->class('border rounded p-3 bg-light'),
-
-            // Файлы
-            Label::make('attachments')
-                ->title('Прикрепленные файлы')
-                ->class('h4 mt-3')
-                ->value('Будет доступно в следующей версии'),
         ];
     }
 

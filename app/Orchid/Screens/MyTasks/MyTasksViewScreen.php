@@ -5,6 +5,7 @@ namespace App\Orchid\Screens\MyTasks;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
 use App\Models\TrackingTime;
+use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
 use App\Orchid\Layouts\Comment\CommentListLayout;
 use App\Orchid\Layouts\Comment\CommentSendLayout;
 use App\Orchid\Layouts\MyTasks\HoursSpentTask;
@@ -39,7 +40,7 @@ class MyTasksViewScreen extends Screen
         $statusLabel = TaskStatusEnum::from($task->status)?->label();
 
         return [
-            'task' => $this->transformTask($task),
+            'task' => $task,
             'task_status_label' => $statusLabel,
             'comments' => $task->comments()
                 ->with('user')
@@ -279,6 +280,7 @@ class MyTasksViewScreen extends Screen
                 'Основная информация' => [
                     StatusSwitcherLayout::class,
                     MyTasksViewLayout::class,
+                    ClientTaskFilesLayout::class,
                 ],
                 'Комментарии' => [
                     CommentSendLayout::class,

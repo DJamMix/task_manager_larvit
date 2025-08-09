@@ -6,6 +6,7 @@ use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\TaskCategory;
 use Orchid\Screen\Field;
+use Orchid\Screen\Fields\Attach;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Quill;
@@ -68,10 +69,10 @@ class ClientTaskCreateModalLayout extends Rows
 
             Upload::make('task.attachments')
                 ->title('Прикрепленные файлы')
-                ->maxFiles(3) // или любое другое ограничение
-                ->acceptedFiles('*') // или укажите конкретные типы
-                ->storage('public') // или другое хранилище
-                ->help('Максимальный размер файла: 1 ГБ'),
+                ->acceptedFiles('image/*,application/pdf,.psd')
+                ->storage('public')
+                ->maxFileSize(1024)
+                ->help('Допустимые форматы: JPG, PNG, PDF, PSD. Макс. размер: 1 ГБ'),
         ];
     }
 }

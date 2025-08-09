@@ -37,7 +37,7 @@ class MyTasksViewLayout extends Rows
 
             Group::make([
                 $this->createLabel('Проект', 'task.project.name')->width('50%'),
-                $this->createLabel('Категория', 'task.task_category.name')->width('50%'),
+                $this->createLabel('Категория', 'task.category.name')->width('50%'),
             ])->fullWidth(),
 
             // Статус с цветным индикатором
@@ -56,12 +56,6 @@ class MyTasksViewLayout extends Rows
                 ->readonly()
                 ->rows(10)
                 ->class('border rounded p-3 bg-light'),
-
-            // Файлы
-            Label::make('attachments')
-                ->title('Прикрепленные файлы')
-                ->class('h4 mt-3')
-                ->value('Будет доступно в следующей версии'),
         ];
     }
 

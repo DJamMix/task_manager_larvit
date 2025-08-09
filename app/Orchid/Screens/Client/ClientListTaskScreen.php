@@ -84,8 +84,6 @@ class ClientListTaskScreen extends Screen
             'task.task_category_id' => 'required|exists:task_categories,id',
             'task.type' => 'required|string',
             'task.priority' => 'required|string',
-            'task.attachments' => 'nullable|array',
-            'task.attachments.*' => 'file|max:1024000'
         ]);
 
         $task->fill($validated['task']);
@@ -94,23 +92,26 @@ class ClientListTaskScreen extends Screen
         $task->status = TaskStatusEnum::DRAFT->value;
         $task->save();
 
+        $task->attachments()->syncWithoutDetaching(
+            $request->input('task.attachments', [])
+        );
+
+
         // Сохранение прикрепленных файлов
-        if ($request->has('task.attachments')) {
-            foreach ($request->input('task.attachments', []) as $fileId) {
-                $attachment = Attachment::find($fileId);
-                
-                if ($attachment) {
-                    TaskAttachment::create([
-                        'task_id' => $task->id,
-                        'user_id' => auth()->id(),
-                        'original_name' => $attachment->original_name,
-                        'path' => $attachment->path,
-                        'mime_type' => $attachment->mime,
-                        'size' => $attachment->size,
-                    ]);
-                }
-            }
-        }
+        // if ($request->has('task.attachments')) {
+        //     $attachments = Attachment::whereIn('id', $request->input('task.attachments'))->get();
+
+        //     // foreach ($attachments as $attachment) {
+        //     //     TaskAttachment::create([
+        //     //         'task_id' => $task->id,
+        //     //         'user_id' => auth()->id(),
+        //     //         'original_name' => $attachment->original_name,
+        //     //         'path' => $attachment->path,
+        //     //         'mime_type' => $attachment->mime,
+        //     //         'size' => $attachment->size,
+        //     //     ]);
+        //     // }
+        // }
 
         Toast::info('Задача успешно создана и передана на согласование');
 
