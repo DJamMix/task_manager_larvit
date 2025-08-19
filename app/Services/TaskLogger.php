@@ -315,20 +315,11 @@ class TaskLogger
 
         $taskUrl = route('platform.systems.tasks.edit', $task);
 
-        $cleanDescription = strip_tags($task->description);
-        $truncatedDescription = strlen($cleanDescription) > 100 
-            ? substr($cleanDescription, 0, 100) . '...' 
-            : $cleanDescription;
-
         $message = $this->getPriorityHeader($priority) . "\n\n";
         $message .= "📌 *{$task->name}*\n\n";
         $message .= "👤 *Создатель задачи:* {$task->creator->name}\n";
         $message .= "📅 *Создана:* {$task->created_at->format('d.m.Y в H:i')}\n";
         $message .= $this->getPriorityLine($priority) . "\n";
-
-        if (!empty(trim($cleanDescription))) {
-            $message .= "📝 *Описание:* " . $truncatedDescription . "\n\n";
-        }
 
         $message .= "\n🔗 [🚀 Перейти к задаче]({$taskUrl})";
         $message .= "\n_Требуется назначить исполнителя_ 👤";
