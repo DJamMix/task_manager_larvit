@@ -309,7 +309,7 @@ class TaskLogger
 
     public function createTaskPushNotifPM(Task $task)
     {
-        $pmTelegramId = 625170774; //Пока хардкод
+        $pmTelegramId = 965982077; //Пока хардкод
 
         $priority = TaskPriorityEnum::from($task->priority);
 
