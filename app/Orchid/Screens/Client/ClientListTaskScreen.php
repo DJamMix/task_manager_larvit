@@ -17,6 +17,7 @@ use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
+use App\Services\TaskLogger;
 
 class ClientListTaskScreen extends Screen
 {
@@ -96,22 +97,9 @@ class ClientListTaskScreen extends Screen
             $request->input('task.attachments', [])
         );
 
-
-        // Сохранение прикрепленных файлов
-        // if ($request->has('task.attachments')) {
-        //     $attachments = Attachment::whereIn('id', $request->input('task.attachments'))->get();
-
-        //     // foreach ($attachments as $attachment) {
-        //     //     TaskAttachment::create([
-        //     //         'task_id' => $task->id,
-        //     //         'user_id' => auth()->id(),
-        //     //         'original_name' => $attachment->original_name,
-        //     //         'path' => $attachment->path,
-        //     //         'mime_type' => $attachment->mime,
-        //     //         'size' => $attachment->size,
-        //     //     ]);
-        //     // }
-        // }
+        app(TaskLogger::class)->createTaskPushNotifPM(
+            $task
+        );
 
         Toast::info('Задача успешно создана и передана на согласование');
 

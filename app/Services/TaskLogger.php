@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\CoreLayer\Integrations\Ebot\EBot;
 use App\Models\Task;
@@ -304,5 +305,56 @@ class TaskLogger
     protected function getClientSpecificText(string $text): string
     {
         return $text . "\n\nℹ️ Это задача вашего проекта";
+    }
+
+    public function createTaskPushNotifPM(Task $task)
+    {
+        $pmTelegramId = 625170774; //Пока хардкод
+
+        $priority = TaskPriorityEnum::from($task->priority);
+
+        $taskUrl = route('platform.systems.tasks.edit', $task);
+
+        $message = $this->getPriorityHeader($priority) . "\n\n";
+        $message .= "📌 *{$task->name}*\n\n";
+        $message .= "👤 *Создатель задачи:* {$task->creator->name}\n";
+        $message .= "📅 *Создана:* {$task->created_at->format('d.m.Y в H:i')}\n";
+        $message .= $this->getPriorityLine($priority) . "\n";
+        $message .= "📝 *Описание:* " . substr($task->description, 0, 100) . "...\n\n";
+        $message .= "\n🔗 [🚀 Перейти к задаче]({$taskUrl})";
+        $message .= "\n_Требуется назначить исполнителя_ 👤";
+
+        $this->ebot->sendMessage(
+            $pmTelegramId,
+            $message,
+            null,
+            'Markdown'
+        );
+    }
+
+    private function getPriorityHeader(TaskPriorityEnum $priority): string
+    {
+        return match($priority) {
+            TaskPriorityEnum::EMERGENCY => "🔥 *🚨 АВАРИЙНАЯ ЗАДАЧА! 🚨*",
+            TaskPriorityEnum::BLOCKER => "⛔ *🚧 БЛОКИРУЮЩАЯ ЗАДАЧА*",
+            TaskPriorityEnum::HIGH => "⚠️ *📈 ВЫСОКИЙ ПРИОРИТЕТ*",
+            TaskPriorityEnum::MEDIUM => "🔵 *📊 НОВАЯ ЗАДАЧА*",
+            TaskPriorityEnum::LOW => "🔹 *📉 ЗАДАЧА НИЗКОГО ПРИОРИТЕТА*",
+            TaskPriorityEnum::TRIVIAL => "⚪ *📋 НЕСРОЧНАЯ ЗАДАЧА*",
+        };
+    }
+
+    private function getPriorityLine(TaskPriorityEnum $priority): string
+    {
+        $emoji = match($priority) {
+            TaskPriorityEnum::EMERGENCY => '🔥',
+            TaskPriorityEnum::BLOCKER => '⛔',
+            TaskPriorityEnum::HIGH => '⚠️',
+            TaskPriorityEnum::MEDIUM => '🔵',
+            TaskPriorityEnum::LOW => '🔹',
+            TaskPriorityEnum::TRIVIAL => '⚪',
+        };
+        
+        return "🎯 *Уровень важности:* {$emoji} {$priority->label()}";
     }
 }
