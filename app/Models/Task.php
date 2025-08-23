@@ -5,6 +5,7 @@ namespace App\Models;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskExecutorFilter;
+use App\Orchid\Filters\TaskPriorityFilter;
 use App\Orchid\Filters\TaskProjectFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -43,6 +44,7 @@ class Task extends Model
         'status' => TaskStatusFilter::class,
         'project' => TaskProjectFilter::class,
         'executor' => TaskExecutorFilter::class,
+        'priority' => TaskPriorityFilter::class,
     ];
 
     /**

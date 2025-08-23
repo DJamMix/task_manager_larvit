@@ -12,6 +12,7 @@ use App\Orchid\Layouts\MyTasks\MyTasksCreateModalLayout;
 use App\Orchid\Layouts\MyTasks\MyTasksListLayout;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\ModalToggle;
+use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
@@ -102,6 +103,15 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
+            Layout::rows([
+                Input::make('search')
+                    ->type('text')
+                    ->placeholder('Поиск временно недоступен')
+                    ->title('Быстрый поиск')
+                    ->disabled()
+                    ->help('Данная функция находится в разработке и будет доступна в следующем обновлении системы'),
+            ]),
+
             Layout::selection([
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,

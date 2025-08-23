@@ -31,6 +31,7 @@ class WelcomeScreen extends Screen
                             TaskStatusEnum::COMPLETED->value,
                             TaskStatusEnum::CANCELED->value,
                             TaskStatusEnum::UNPAID->value,
+                            TaskStatusEnum::DEMO->value,
                         ])->count();
                         
                         $progress = round(($completedTasks / $totalTasks) * 100);

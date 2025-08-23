@@ -2,6 +2,7 @@
 
 namespace App\Orchid\Layouts\Client;
 
+use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\Models\Task;
 use Carbon\Carbon;
 use Orchid\Screen\Actions\DropDown;
@@ -44,6 +45,20 @@ class ClientListTaskLayout extends Table
 
             TD::make('task_category_id', __('task.task_category_id'))
                 ->render(fn (Task $task) => $task->category->name),
+
+            TD::make('priority', __('Приоритет'))
+                ->render(function (Task $task) {
+                    $priority = TaskPriorityEnum::tryFrom($task->priority);
+                    if (!$priority) {
+                        return 'N/A';
+                    }
+                    
+                    return sprintf(
+                        '<span class="me-2">%s</span> %s',
+                        $priority->icon(),
+                        $priority->label()
+                    );
+                }),
 
             TD::make('actions', 'Действия')
                 ->align(TD::ALIGN_CENTER)
