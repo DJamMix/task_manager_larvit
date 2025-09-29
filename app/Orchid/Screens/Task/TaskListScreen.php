@@ -64,7 +64,6 @@ class TaskListScreen extends Screen
     {
         return [
             Layout::selection([
-                TaskSearchFilter::class,
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
                 TaskProjectFilter::class,

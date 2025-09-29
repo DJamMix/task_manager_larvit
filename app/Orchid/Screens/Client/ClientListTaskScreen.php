@@ -132,7 +132,6 @@ class ClientListTaskScreen extends Screen
             ]),
 
             Layout::selection([
-                TaskSearchFilter::class,
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
                 TaskPriorityFilter::class,

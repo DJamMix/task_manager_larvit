@@ -50,7 +50,7 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function url(): string
     {
-        return route('platform.tasks.edit', $this->entity);
+        return route('platform.systems.tasks.edit', $this->entity);
     }
 
     /**
