@@ -94,7 +94,7 @@ class TaskPresenter extends Presenter implements Searchable
         $user = auth()->user();
 
         if (!$user) {
-            return '##';
+            return '#';
         }
 
         if ($user->hasAccess('platform.systems.tasks')) {
@@ -132,21 +132,42 @@ class TaskPresenter extends Presenter implements Searchable
     {
         $user = auth()->user();
 
-        return $this->entity->search($query);
+        if(!$user) {
+            $this->entity->search('');
+        }
+
+        if($user->hasAccess('platform.systems.tasks')) {
+            return $this->entity->search($query);
+        } else if ($user->hasAccess('platform.systems.my_tasks')) {
+            return $this->entity->search($query)->where('executor_id', $user->id)
+                ->whereNotIn('status', [
+                    TaskStatusEnum::COMPLETED->value,
+                    TaskStatusEnum::CANCELED->value,
+                    TaskStatusEnum::UNPAID->value,
+                    TaskStatusEnum::DEMO->value,
+                ]);
+        } else if ($user->hasAccess('platform.systems.client.project.tasks')) {
+            return $this->searchForClient($query, $user);
+        } else {
+            return $this->entity->search('');
+        }
     }
 
-    protected function userHasSearchAccess($user): bool
+    /**
+     * Поиск для клиента - задачи проектов, где он является клиентом
+     */
+    protected function searchForClient(string $query = null, $user): Builder
     {
-        return $user->inRole('admin') || 
-               $user->inRole('employee') || 
-               $user->inRole('client');
-    }
+        // Получаем ID проектов, где пользователь является клиентом
+        $clientProjectIds = $user->projects()->pluck('projects.id')->toArray();
+        
+        // Если у клиента нет проектов, возвращаем пустой результат
+        if (empty($clientProjectIds)) {
+            return $this->entity->search('');
+        }
 
-    protected function emptySearch(string $query = null): Builder
-    {
-        return new Builder($this->entity, $query, function() {
-            return collect();
-        });
+        // Ищем задачи, которые принадлежат проектам клиента
+        return $this->entity->search($query)->whereIn('project_id', $clientProjectIds);
     }
 
     /**
