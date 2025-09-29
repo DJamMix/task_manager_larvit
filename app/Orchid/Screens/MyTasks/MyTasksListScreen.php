@@ -32,7 +32,9 @@ class MyTasksListScreen extends Screen
                 ->filters()
                 ->whereNotIn('status', [
                     TaskStatusEnum::COMPLETED->value,
-                    TaskStatusEnum::CANCELED->value
+                    TaskStatusEnum::CANCELED->value,
+                    TaskStatusEnum::UNPAID->value,
+                    TaskStatusEnum::DEMO->value,
                 ])
                 ->orderBy('created_at', 'desc')
                 ->paginate(15),
