@@ -29,7 +29,7 @@
 
         <!-- Высокий приоритет -->
         <div class="col-md-4 col-lg-2 mb-3">
-            <a href="?priority=high" class="card text-decoration-none bg-white rounded-3">
+            <a href="?priority[]=high" class="card text-decoration-none bg-white rounded-3">
                 <div class="card-body text-center p-4">
                     <div class="text-warning mb-2">
                         <i class="icon-clock" style="font-size: 2rem;"></i>
@@ -42,7 +42,7 @@
 
         <!-- В работе -->
         <div class="col-md-4 col-lg-2 mb-3">
-            <a href="?status=in_progress" class="card text-decoration-none bg-white rounded-3">
+            <a href="?filter[status]=in_progress" class="card text-decoration-none bg-white rounded-3">
                 <div class="card-body text-center p-4">
                     <div class="text-info mb-2">
                         <i class="icon-refresh" style="font-size: 2rem;"></i>
