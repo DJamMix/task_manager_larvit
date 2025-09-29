@@ -136,55 +136,17 @@ class TaskPresenter extends Presenter implements Searchable
             return $this->emptySearch($query);
         }
 
-        $builder = $this->entity->newQuery();
-
         if ($user->inRole('admin')) {
-            // Без дополнительных фильтров
+            return $this->entity->search($query);
         } else if ($user->inRole('employee')) {
-            $builder->where(function($q) use ($user) {
-                $q->where('executor_id', $user->id)
-                ->orWhere('creator_id', $user->id)
-                ->orWhereJsonContains('observers_ids', (string)$user->id);
-            });
+            return $this->emptySearch($query);
         } else if ($user->inRole('client')) {
-            $builder->whereHas('project', function($projectQuery) use ($user) {
-                $projectQuery->whereHas('clients', function($clientQuery) use ($user) {
-                    $clientQuery->where('user_id', $user->id);
-                })->orWhere('creator_id', $user->id); // или проекты, которые он создал
-            });
+            return $this->emptySearch($query);
         } else {
             return $this->emptySearch($query);
         }
-
-        if (!empty($query)) {
-            $builder->where(function($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                  ->orWhere('description', 'like', "%{$query}%")
-                  ->orWhereHas('project', function($projectQuery) use ($query) {
-                      $projectQuery->where('name', 'like', "%{$query}%");
-                  })
-                  ->orWhereHas('executor', function($userQuery) use ($query) {
-                      $userQuery->where('name', 'like', "%{$query}%");
-                  });
-            });
-        }
-
-        $builder->with(['project', 'executor', 'category'])
-                ->orderBy('created_at', 'desc')
-                ->limit($this->perSearchShow());
-
-        return new \Laravel\Scout\Builder(
-            $this->entity, 
-            $query,
-            function() use ($builder) {
-                return $builder->get();
-            }
-        );
     }
 
-    /**
-     * Проверяет, имеет ли пользователь доступ к поиску задач
-     */
     protected function userHasSearchAccess($user): bool
     {
         return $user->inRole('admin') || 
@@ -192,14 +154,15 @@ class TaskPresenter extends Presenter implements Searchable
                $user->inRole('client');
     }
 
-    /**
-     * Пустой поиск (для неавторизованных или без прав)
-     */
     protected function emptySearch(string $query = null): Builder
     {
-        return new \Laravel\Scout\Builder($this->entity, $query, function() {
-            return collect();
-        });
+        return new \Laravel\Scout\Builder(
+            $this->entity, 
+            $query,
+            function() {
+                return collect();
+            }
+        );
     }
 
     /**
