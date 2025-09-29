@@ -91,7 +91,28 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function url(): string
     {
-        return route('platform.systems.tasks.edit', $this->entity);
+        $user = auth()->user();
+
+        if (!$user) {
+            return '#';
+        }
+
+        if ($user->inRole('admin')) {
+            return route('platform.systems.tasks.edit', $this->entity);
+        }
+
+        if ($user->inRole('employee')) {
+            return route('platform.systems.my_tasks.view', $this->entity);
+        }
+
+        if ($user->inRole('client') && $this->entity->project) {
+            return route('platform.systems.client.project.tasks.view', [
+                'project' => $this->entity->project,
+                'task' => $this->entity
+            ]);
+        }
+
+        return '#';
     }
 
     /**
@@ -109,7 +130,77 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function searchQuery(string $query = null): Builder
     {
-        return $this->entity->search($query);
+        $user = auth()->user();
+
+        if (!$user || !$this->userHasSearchAccess($user)) {
+            return $this->emptySearch($query);
+        }
+
+        $builder = $this->entity->newQuery();
+
+        if ($user->inRole('admin')) {
+            // Без дополнительных фильтров
+        } else if ($user->inRole('employee')) {
+            $builder->where(function($q) use ($user) {
+                $q->where('executor_id', $user->id)
+                  ->orWhere('creator_id', $user->id)
+                  ->orWhereJsonContains('observers_ids', (string)$user->id);
+            });
+        } else if ($user->inRole('client')) {
+            $builder->whereHas('project', function($projectQuery) use ($user) {
+                // Предполагаем, что у клиента есть связь с проектами
+                // через поле client_id или что-то подобное
+                $projectQuery->where('client_id', $user->id)
+                           ->orWhere('creator_id', $user->id);
+            });
+        } else {
+            return $this->emptySearch($query);
+        }
+
+        if (!empty($query)) {
+            $builder->where(function($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('description', 'like', "%{$query}%")
+                  ->orWhereHas('project', function($projectQuery) use ($query) {
+                      $projectQuery->where('name', 'like', "%{$query}%");
+                  })
+                  ->orWhereHas('executor', function($userQuery) use ($query) {
+                      $userQuery->where('name', 'like', "%{$query}%");
+                  });
+            });
+        }
+
+        $builder->with(['project', 'executor', 'category'])
+                ->orderBy('created_at', 'desc')
+                ->limit($this->perSearchShow());
+
+        return new \Laravel\Scout\Builder(
+            $this->entity, 
+            $query,
+            function() use ($builder) {
+                return $builder->get();
+            }
+        );
+    }
+
+    /**
+     * Проверяет, имеет ли пользователь доступ к поиску задач
+     */
+    protected function userHasSearchAccess($user): bool
+    {
+        return $user->inRole('admin') || 
+               $user->inRole('employee') || 
+               $user->inRole('client');
+    }
+
+    /**
+     * Пустой поиск (для неавторизованных или без прав)
+     */
+    protected function emptySearch(string $query = null): Builder
+    {
+        return new \Laravel\Scout\Builder($this->entity, $query, function() {
+            return collect();
+        });
     }
 
     /**
