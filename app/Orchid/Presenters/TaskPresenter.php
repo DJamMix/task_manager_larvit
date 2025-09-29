@@ -68,26 +68,52 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function searchQuery(string $query = null): Builder
     {
-        // Для отладки - логируем запрос
-        \Log::debug('Task search', [
+        $userId = auth()->id();
+        
+        \Log::debug('Task search called', [
             'query' => $query,
-            'user_id' => auth()->id(),
-            'scout_driver' => config('scout.driver')
+            'user_id' => $userId,
+            'authenticated' => auth()->check()
         ]);
 
-        // Если Scout не настроен, используем fallback
-        if (config('scout.driver') === 'null' || empty($query)) {
+        // Если пользователь не аутентифицирован, возвращаем пустой результат
+        if (!$userId) {
+            return new \Laravel\Scout\Builder($this->entity, $query, function() {
+                return collect();
+            });
+        }
+
+        // Если пустой запрос, возвращаем последние задачи пользователя
+        if (empty($query)) {
             return $this->fallbackSearch($query);
         }
 
         try {
+            // ПРОСТОЙ поиск через Scout - убираем сложную логику
+            $results = $this->entity->search($query)
+                ->where('executor_id', $userId)
+                ->get();
+                
+            \Log::debug('Scout search results', [
+                'query' => $query,
+                'user_id' => $userId,
+                'results_count' => $results->count()
+            ]);
+                
             return $this->entity->search($query)
-                ->where('executor_id', auth()->id())
-                ->query(function ($builder) {
-                    $builder->with(['project', 'executor', 'category']);
+                ->where('executor_id', $userId)
+                ->query(function ($builder) use ($userId) {
+                    $builder->where('executor_id', $userId)
+                            ->with(['project', 'executor', 'category']);
                 });
+                
         } catch (\Exception $e) {
-            \Log::error('Scout search failed: ' . $e->getMessage());
+            \Log::error('Scout search failed', [
+                'error' => $e->getMessage(),
+                'query' => $query,
+                'user_id' => $userId
+            ]);
+            
             return $this->fallbackSearch($query);
         }
     }
