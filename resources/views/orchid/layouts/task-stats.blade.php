@@ -16,7 +16,7 @@
 
         <!-- Срочные -->
         <div class="col-md-4 col-lg-2 mb-3">
-            <a href="?priority=emergency,blocker" class="card text-decoration-none bg-white rounded-3">
+            <a href="?priority[]=blocker&priority[]=emergency" class="card text-decoration-none bg-white rounded-3">
                 <div class="card-body text-center p-4">
                     <div class="text-danger mb-2">
                         <i class="icon-fire" style="font-size: 2rem;"></i>
