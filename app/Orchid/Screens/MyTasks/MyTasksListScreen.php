@@ -2,6 +2,7 @@
 
 namespace App\Orchid\Screens\MyTasks;
 
+use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
@@ -11,6 +12,7 @@ use App\Orchid\Filters\TaskProjectFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\MyTasks\MyTasksCreateModalLayout;
 use App\Orchid\Layouts\MyTasks\MyTasksListLayout;
+use App\Orchid\Layouts\MyTasks\TaskStatsLayout;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Fields\Input;
@@ -27,17 +29,45 @@ class MyTasksListScreen extends Screen
      */
     public function query(): iterable
     {
+        $userId = auth()->id();
+
+        // Получаем задачи с учетом фильтров
+        $tasks = Task::where('executor_id', $userId)
+            ->filters()
+            ->whereNotIn('status', [
+                TaskStatusEnum::COMPLETED->value,
+                TaskStatusEnum::CANCELED->value,
+                TaskStatusEnum::UNPAID->value,
+                TaskStatusEnum::DEMO->value,
+            ])
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
+        // Статистика для виджетов
+        $allTasks = Task::where('executor_id', $userId);
+        
+        $urgentTasks = clone $allTasks;
+        $highPriorityTasks = clone $allTasks;
+        $inProgressTasks = clone $allTasks;
+        $todayTasks = clone $allTasks;
+
         return [
-            'tasks' => Task::where('executor_id', auth()->id())
-                ->filters()
-                ->whereNotIn('status', [
-                    TaskStatusEnum::COMPLETED->value,
-                    TaskStatusEnum::CANCELED->value,
-                    TaskStatusEnum::UNPAID->value,
-                    TaskStatusEnum::DEMO->value,
-                ])
-                ->orderBy('created_at', 'desc')
-                ->paginate(15),
+            'tasks' => $tasks,
+            'stats' => [
+                'total' => $allTasks->count(),
+                'urgent' => $urgentTasks->whereIn('priority', [
+                    TaskPriorityEnum::EMERGENCY->value,
+                    TaskPriorityEnum::BLOCKER->value
+                ])->count(),
+                'high_priority' => $highPriorityTasks->where('priority', TaskPriorityEnum::HIGH->value)->count(),
+                'in_progress' => $inProgressTasks->where('status', TaskStatusEnum::IN_PROGRESS->value)->count(),
+                'today_created' => $todayTasks->whereDate('created_at', today())->count(),
+                'overdue' => $allTasks->where('end_datetime', '<', now())
+                    ->whereNotIn('status', [
+                        TaskStatusEnum::COMPLETED->value,
+                        TaskStatusEnum::CANCELED->value
+                    ])->count(),
+            ]
         ];
     }
 
@@ -114,6 +144,8 @@ class MyTasksListScreen extends Screen
                     ->disabled()
                     ->help('Данная функция находится в разработке и будет доступна в следующем обновлении системы'),
             ]),
+
+            TaskStatsLayout::class,
 
             Layout::selection([
                 TaskCategoryFilter::class,
