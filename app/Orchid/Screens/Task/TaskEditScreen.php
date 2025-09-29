@@ -8,8 +8,10 @@ use App\Orchid\Layouts\Comment\CommentListLayout;
 use App\Orchid\Layouts\Comment\CommentSendLayout;
 use App\Orchid\Layouts\Task\TaskEditLayout;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Screen;
+use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
 
@@ -100,6 +102,18 @@ class TaskEditScreen extends Screen
                 'Комментарии' => [
                     CommentSendLayout::class,
                     CommentListLayout::class,
+                ],
+                'Учет времени' => [
+                    Layout::table('timeEntries', [
+                        TD::make('work_date', 'Дата')
+                            ->render(fn($entry) => $entry->work_date->format('d.m.Y')),
+                        TD::make('user.name', 'Исполнитель'),
+                        TD::make('hours_spent', 'Часы')
+                            ->alignRight()
+                            ->render(fn($entry) => number_format($entry->hours_spent, 2)),
+                        TD::make('work_description', 'Описание')
+                            ->render(fn($entry) => Str::limit($entry->work_description, 100)),
+                    ]),
                 ],
             ]),
         ];
