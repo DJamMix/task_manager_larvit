@@ -29,7 +29,7 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function subTitle(): string
     {
-        return 'Small descriptions';
+        return $this->entity->description ?? 'Нет описания';
     }
 
     /**
