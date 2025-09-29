@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskPriorityFilter;
+use App\Orchid\Filters\TaskSearchFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\Client\ClientListTaskLayout;
 use App\Orchid\Layouts\Client\ClientTaskCreateModalLayout;
@@ -131,6 +132,7 @@ class ClientListTaskScreen extends Screen
             ]),
 
             Layout::selection([
+                TaskSearchFilter::class,
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
                 TaskPriorityFilter::class,

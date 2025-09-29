@@ -164,11 +164,11 @@ class MyTasksListScreen extends Screen
             Layout::view('orchid.layouts.task-stats'),
 
             Layout::selection([
+                TaskSearchFilter::class,
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
                 TaskProjectFilter::class,
                 TaskPriorityFilter::class,
-                TaskSearchFilter::class,
             ]),
 
             MyTasksListLayout::class,

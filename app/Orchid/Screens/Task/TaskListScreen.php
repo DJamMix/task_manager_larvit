@@ -7,6 +7,7 @@ use App\Models\TaskCategory;
 use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskExecutorFilter;
 use App\Orchid\Filters\TaskProjectFilter;
+use App\Orchid\Filters\TaskSearchFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\Task\TaskListLayout;
 use Orchid\Screen\Actions\Link;
@@ -63,6 +64,7 @@ class TaskListScreen extends Screen
     {
         return [
             Layout::selection([
+                TaskSearchFilter::class,
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
                 TaskProjectFilter::class,
