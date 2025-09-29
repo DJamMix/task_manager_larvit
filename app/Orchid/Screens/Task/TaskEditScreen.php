@@ -36,6 +36,10 @@ class TaskEditScreen extends Screen
                 ->latest()
                 ->get()
                 ->map(fn($comment) => $this->transformComment($comment)),
+            'timeEntries' => $task->timeEntries()
+                ->with('user')
+                ->latest()
+                ->get(),
         ];
     }
 
