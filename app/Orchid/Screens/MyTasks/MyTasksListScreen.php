@@ -145,7 +145,7 @@ class MyTasksListScreen extends Screen
                     ->help('Данная функция находится в разработке и будет доступна в следующем обновлении системы'),
             ]),
 
-            Layout::view('layouts.task-stats'),
+            Layout::view('orchid.layouts.task-stats'),
 
             Layout::selection([
                 TaskCategoryFilter::class,
