@@ -143,15 +143,14 @@ class TaskPresenter extends Presenter implements Searchable
         } else if ($user->inRole('employee')) {
             $builder->where(function($q) use ($user) {
                 $q->where('executor_id', $user->id)
-                  ->orWhere('creator_id', $user->id)
-                  ->orWhereJsonContains('observers_ids', (string)$user->id);
+                ->orWhere('creator_id', $user->id)
+                ->orWhereJsonContains('observers_ids', (string)$user->id);
             });
         } else if ($user->inRole('client')) {
             $builder->whereHas('project', function($projectQuery) use ($user) {
-                // Предполагаем, что у клиента есть связь с проектами
-                // через поле client_id или что-то подобное
-                $projectQuery->where('client_id', $user->id)
-                           ->orWhere('creator_id', $user->id);
+                $projectQuery->whereHas('clients', function($clientQuery) use ($user) {
+                    $clientQuery->where('user_id', $user->id);
+                })->orWhere('creator_id', $user->id); // или проекты, которые он создал
             });
         } else {
             return $this->emptySearch($query);
