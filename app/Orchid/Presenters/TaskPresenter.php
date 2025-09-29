@@ -29,7 +29,34 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function subTitle(): string
     {
-        return $this->entity->description ?? 'Нет описания';
+        $description = $this->entity->description ?? 'Нет описания';
+        
+        // Убираем HTML теги
+        $cleanDescription = strip_tags($description);
+        
+        // Обрезаем длинное описание
+        if (mb_strlen($cleanDescription) > 100) {
+            $cleanDescription = mb_substr($cleanDescription, 0, 100) . '...';
+        }
+        
+        // Добавляем информацию о проекте и статусе
+        $parts = [];
+        
+        if ($this->entity->project) {
+            $parts[] = 'Проект: ' . $this->entity->project->name;
+        }
+        
+        if ($this->entity->status) {
+            $parts[] = 'Статус: ' . $this->entity->status->label();
+        }
+        
+        if ($this->entity->priority) {
+            $parts[] = 'Приоритет: ' . $this->entity->priority->label();
+        }
+        
+        $additionalInfo = implode(' | ', $parts);
+        
+        return $cleanDescription . ($additionalInfo ? " | " . $additionalInfo : "");
     }
 
     /**
