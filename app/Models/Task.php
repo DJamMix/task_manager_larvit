@@ -7,6 +7,7 @@ use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskExecutorFilter;
 use App\Orchid\Filters\TaskPriorityFilter;
 use App\Orchid\Filters\TaskProjectFilter;
+use App\Orchid\Filters\TaskSearchFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Presenters\TaskPresenter;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
