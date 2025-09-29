@@ -31,47 +31,41 @@ class MyTasksListScreen extends Screen
     {
         $userId = auth()->id();
 
-        // Используем Scout для поиска, если есть поисковый запрос
+        // Всегда начинаем с базового запроса
+        $query = Task::where('executor_id', $userId)
+            ->whereNotIn('status', [
+                TaskStatusEnum::COMPLETED->value,
+                TaskStatusEnum::CANCELED->value,
+                TaskStatusEnum::UNPAID->value,
+                TaskStatusEnum::DEMO->value,
+            ]);
+
+        // Применяем поиск через Scout если есть поисковый запрос
         if (request()->has('search') && !empty(request('search'))) {
             $searchTerm = request('search');
             
-            // Получаем ID задач через Scout
             $taskIds = Task::search($searchTerm)
                 ->where('executor_id', $userId)
-                ->take(1000) // Ограничиваем количество результатов
-                ->keys()
-                ->toArray();
-            
-            // Если есть результаты поиска - фильтруем по ID, иначе возвращаем пустой результат
-            if (!empty($taskIds)) {
-                $tasks = Task::where('executor_id', $userId)
-                    ->whereIn('id', $taskIds)
-                    ->filters()
-                    ->whereNotIn('status', [
-                        TaskStatusEnum::COMPLETED->value,
-                        TaskStatusEnum::CANCELED->value,
-                        TaskStatusEnum::UNPAID->value,
-                        TaskStatusEnum::DEMO->value,
-                    ])
-                    ->orderBy('created_at', 'desc')
-                    ->paginate(15);
+                ->take(500)
+                ->keys();
+                
+            // Если Scout нашел задачи - фильтруем по ID, иначе ищем через LIKE как fallback
+            if ($taskIds->isNotEmpty()) {
+                $query->whereIn('id', $taskIds);
             } else {
-                // Если поиск не дал результатов - возвращаем пустую коллекцию
-                $tasks = Task::where('id', 0)->paginate(15);
+                // Fallback на обычный поиск если Scout не нашел
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('name', 'like', "%{$searchTerm}%")
+                    ->orWhere('description', 'like', "%{$searchTerm}%");
+                });
             }
-        } else {
-            // Обычный запрос без поиска
-            $tasks = Task::where('executor_id', $userId)
-                ->filters()
-                ->whereNotIn('status', [
-                    TaskStatusEnum::COMPLETED->value,
-                    TaskStatusEnum::CANCELED->value,
-                    TaskStatusEnum::UNPAID->value,
-                    TaskStatusEnum::DEMO->value,
-                ])
-                ->orderBy('created_at', 'desc')
-                ->paginate(15);
         }
+
+        // Применяем остальные фильтры и пагинацию
+        $tasks = $query->filters()
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+
 
         // Статистика для виджетов (остается без изменений)
         $allTasks = Task::where('executor_id', $userId);

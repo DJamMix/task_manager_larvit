@@ -69,15 +69,15 @@ class Task extends Model
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'description' => $this->description,
+            'description' => strip_tags($this->description),
             'status' => $this->status,
             'priority' => $this->priority,
-            'type' => $this->type,
+            'type_task' => $this->type_task, // Исправлено с type на type_task
             'project_id' => $this->project_id,
             'executor_id' => $this->executor_id,
             'creator_id' => $this->creator_id,
             'created_at' => $this->created_at->timestamp,
-            'searchable' => $this->name . ' ' . $this->description,
+            // Убираем searchable поле - Meilisearch сам формирует поисковый индекс
         ];
     }
 
