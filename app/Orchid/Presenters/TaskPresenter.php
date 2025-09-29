@@ -68,7 +68,7 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function searchQuery(string $query = null): Builder
     {
-        return $this->entity->search($query)->where('active', true);
+        return $this->entity->search($query);
     }
 
     /**
