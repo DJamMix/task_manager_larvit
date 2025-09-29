@@ -247,6 +247,7 @@ return [
 
     'search' => [
         // \App\Models\User::class
+        \App\Models\Task::class,
     ],
 
     /*

@@ -31,7 +31,6 @@ class MyTasksListScreen extends Screen
     {
         $userId = auth()->id();
 
-        // Получаем задачи с учетом фильтров
         $tasks = Task::where('executor_id', $userId)
             ->filters()
             ->whereNotIn('status', [
@@ -39,9 +38,20 @@ class MyTasksListScreen extends Screen
                 TaskStatusEnum::CANCELED->value,
                 TaskStatusEnum::UNPAID->value,
                 TaskStatusEnum::DEMO->value,
-            ])
-            ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ]);
+
+        // Используем Scout для поиска
+        if (request()->has('search') && !empty(request('search'))) {
+            $searchTerm = request('search');
+            $taskIds = Task::search($searchTerm)
+                ->where('executor_id', $userId)
+                ->get()
+                ->pluck('id');
+
+            $tasks->whereIn('id', $taskIds);
+        }
+
+        $tasks = $tasks->orderBy('created_at', 'desc')->paginate(15);
 
         // Статистика для виджетов
         $allTasks = Task::where('executor_id', $userId);
@@ -139,10 +149,9 @@ class MyTasksListScreen extends Screen
             Layout::rows([
                 Input::make('search')
                     ->type('text')
-                    ->placeholder('Поиск временно недоступен')
+                    ->placeholder('Поиск по названию, описанию...')
                     ->title('Быстрый поиск')
-                    ->disabled()
-                    ->help('Данная функция находится в разработке и будет доступна в следующем обновлении системы'),
+                    ->help('Ищите задачи по названию, описанию или статусу'),
             ]),
 
             Layout::view('orchid.layouts.task-stats'),
