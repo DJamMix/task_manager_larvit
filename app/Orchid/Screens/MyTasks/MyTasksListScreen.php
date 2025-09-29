@@ -160,8 +160,19 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::wrapper('orchid.layouts.search-form', [
-                'search' => request('search'),
+            Layout::rows([
+                \Orchid\Screen\Fields\Group::make([
+                    Input::make('search')
+                        ->type('text')
+                        ->placeholder('Поиск по названию, описанию...')
+                        ->title('Быстрый поиск')
+                        ->help('Ищите задачи по названию, описанию или статусу')
+                        ->value(request('search')), // Сохраняем значение при перезагрузке
+                        
+                    \Orchid\Screen\Actions\Button::make('Найти')
+                        ->method('searchTasks')
+                        ->icon('magnifier'),
+                ])->autoWidth(),
             ]),
 
             Layout::view('orchid.layouts.task-stats'),
@@ -181,5 +192,14 @@ class MyTasksListScreen extends Screen
             ->title('Создание задачи')
             ->applyButton('Создать'),
         ];
+    }
+
+    // Добавьте метод для обработки поиска
+    public function searchTasks(Request $request)
+    {
+        // Просто редирект с параметром search
+        return redirect()->route('platform.mytasks', [
+            'search' => $request->get('search')
+        ]);
     }
 }
