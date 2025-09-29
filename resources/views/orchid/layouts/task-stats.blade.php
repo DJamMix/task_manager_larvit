@@ -66,15 +66,16 @@
             </a>
         </div>
 
-        <!-- Просрочено -->
+        <!-- Можно добавить другую карточку вместо просроченных -->
+        <!-- Например, "Завершено" или "Новые" -->
         <div class="col-md-4 col-lg-2 mb-3">
-            <a href="?overdue=1" class="card text-decoration-none bg-white rounded-3">
+            <a href="?filter[status]=completed" class="card text-decoration-none bg-white rounded-3">
                 <div class="card-body text-center p-4">
-                    <div class="text-dark mb-2">
-                        <i class="icon-exclamation" style="font-size: 2rem;"></i>
+                    <div class="text-success mb-2">
+                        <i class="icon-check" style="font-size: 2rem;"></i>
                     </div>
-                    <h3 class="text-dark mb-1">{{ $stats['overdue'] ?? 0 }}</h3>
-                    <small class="text-muted">Просрочено</small>
+                    <h3 class="text-dark mb-1">{{ $stats['completed'] ?? 0 }}</h3>
+                    <small class="text-muted">Завершено</small>
                 </div>
             </a>
         </div>
@@ -102,5 +103,5 @@
 .icon-clock:before { content: "⏰"; font-style: normal; }
 .icon-refresh:before { content: "🔄"; font-style: normal; }
 .icon-calendar:before { content: "📅"; font-style: normal; }
-.icon-exclamation:before { content: "⚠️"; font-style: normal; }
+.icon-check:before { content: "✅"; font-style: normal; }
 </style>

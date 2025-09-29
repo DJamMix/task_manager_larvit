@@ -69,7 +69,13 @@ class MyTasksListScreen extends Screen
 
 
         // Статистика для виджетов (остается без изменений)
-        $allTasks = Task::where('executor_id', $userId);
+        $allTasks = Task::where('executor_id', $userId)
+            ->whereNotIn('status', [
+                TaskStatusEnum::COMPLETED->value,
+                TaskStatusEnum::CANCELED->value,
+                TaskStatusEnum::UNPAID->value,
+                TaskStatusEnum::DEMO->value,
+            ]);
         
         $urgentTasks = clone $allTasks;
         $highPriorityTasks = clone $allTasks;
@@ -87,10 +93,12 @@ class MyTasksListScreen extends Screen
                 'high_priority' => $highPriorityTasks->where('priority', TaskPriorityEnum::HIGH->value)->count(),
                 'in_progress' => $inProgressTasks->where('status', TaskStatusEnum::IN_PROGRESS->value)->count(),
                 'today_created' => $todayTasks->whereDate('created_at', today())->count(),
-                'overdue' => $allTasks->where('end_datetime', '<', now())
-                    ->whereNotIn('status', [
+                'completed' => $allTasks
+                    ->whereIn('status', [
                         TaskStatusEnum::COMPLETED->value,
-                        TaskStatusEnum::CANCELED->value
+                        TaskStatusEnum::CANCELED->value,
+                        TaskStatusEnum::UNPAID->value,
+                        TaskStatusEnum::DEMO->value,
                     ])->count(),
             ]
         ];
