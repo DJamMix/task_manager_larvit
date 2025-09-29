@@ -101,11 +101,11 @@ class TaskPresenter extends Presenter implements Searchable
             return route('platform.systems.tasks.edit', $this->entity);
         }
 
-        if ($user->inRole('employee')) {
+        if ($user->hasAccess('platform.systems.my_tasks')) {
             return route('platform.systems.my_tasks.view', $this->entity);
         }
 
-        if ($user->inRole('client') && $this->entity->project) {
+        if ($user->hasAccess('platform.systems.client.project.tasks') && $this->entity->project) {
             return route('platform.systems.client.project.tasks.view', [
                 'project' => $this->entity->project,
                 'task' => $this->entity
