@@ -94,7 +94,7 @@ class TaskPresenter extends Presenter implements Searchable
         $user = auth()->user();
 
         if (!$user) {
-            return '#';
+            return '##';
         }
 
         if ($user->inRole('admin')) {
