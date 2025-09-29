@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Orchid\Filters\Filter;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\DateRange;
+use Carbon\Carbon;
 
 class TaskCreatedAtFilter extends Filter
 {
@@ -30,7 +31,34 @@ class TaskCreatedAtFilter extends Filter
      */
     public function run(Builder $builder): Builder
     {
-        return $builder->whereBetween('created_at', $this->request->get('created_at'));
+        $dates = $this->request->get('created_at');
+        
+        if (empty($dates) || !is_array($dates)) {
+            return $builder;
+        }
+
+        $startDate = $dates['start'] ?? null;
+        $endDate = $dates['end'] ?? null;
+
+        if ($startDate && $endDate) {
+            // Преобразуем в объекты Carbon и устанавливаем время
+            $start = Carbon::parse($startDate)->startOfDay(); // 00:00:00
+            $end = Carbon::parse($endDate)->endOfDay();       // 23:59:59
+            
+            return $builder->whereBetween('created_at', [$start, $end]);
+        }
+
+        if ($startDate) {
+            $start = Carbon::parse($startDate)->startOfDay();
+            return $builder->where('created_at', '>=', $start);
+        }
+
+        if ($endDate) {
+            $end = Carbon::parse($endDate)->endOfDay();
+            return $builder->where('created_at', '<=', $end);
+        }
+
+        return $builder;
     }
 
     /**
