@@ -156,13 +156,9 @@ class TaskPresenter extends Presenter implements Searchable
 
     protected function emptySearch(string $query = null): Builder
     {
-        return new \Laravel\Scout\Builder(
-            $this->entity, 
-            $query,
-            function() {
-                return collect();
-            }
-        );
+        return new Builder($this->entity, $query, function() {
+            return collect();
+        });
     }
 
     /**
