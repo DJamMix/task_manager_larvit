@@ -29,20 +29,7 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function subTitle(): string
     {
-        $parts = [];
-        
-        if ($this->entity->project) {
-            $parts[] = 'Проект: ' . $this->entity->project->name;
-        }
-        
-        if ($this->entity->executor) {
-            $parts[] = 'Исполнитель: ' . $this->entity->executor->name;
-        }
-        
-        $parts[] = 'Статус: ' . $this->entity->status->label();
-        $parts[] = 'Приоритет: ' . $this->entity->priority->label();
-
-        return implode(' | ', $parts);
+        return 'Small descriptions';
     }
 
     /**
