@@ -97,7 +97,7 @@ class TaskPresenter extends Presenter implements Searchable
             return '##';
         }
 
-        if ($user->inRole('admin')) {
+        if ($user->hasAccess('platform.systems.tasks')) {
             return route('platform.systems.tasks.edit', $this->entity);
         }
 
