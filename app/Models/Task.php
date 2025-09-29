@@ -47,6 +47,7 @@ class Task extends Model
         'project' => TaskProjectFilter::class,
         'executor' => TaskExecutorFilter::class,
         'priority' => TaskPriorityFilter::class,
+        'search' => TaskSearchFilter::class,
     ];
 
     /**

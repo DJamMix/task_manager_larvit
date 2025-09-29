@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskPriorityFilter;
 use App\Orchid\Filters\TaskProjectFilter;
+use App\Orchid\Filters\TaskSearchFilter;
 use App\Orchid\Filters\TaskStatusFilter;
 use App\Orchid\Layouts\MyTasks\MyTasksCreateModalLayout;
 use App\Orchid\Layouts\MyTasks\MyTasksListLayout;
@@ -160,32 +161,6 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::rows([
-                \Orchid\Screen\Fields\Group::make([
-                    Input::make('search')
-                        ->type('text')
-                        ->placeholder('Поиск по названию, описанию...')
-                        ->title('Быстрый поиск')
-                        ->value(request('search'))
-                        ->help('Введите текст для поиска')
-                        ->style('flex: 1;'),
-                        
-                    \Orchid\Screen\Actions\Button::make('Найти')
-                        ->method('applySearch')
-                        ->icon('magnifier')
-                        ->class('btn btn-primary')
-                        ->style('margin-top: 23px;'),
-                        
-                    request('search') ? 
-                    \Orchid\Screen\Actions\Link::make('Сбросить')
-                        ->href(route('platform.systems.my_tasks'))
-                        ->icon('close')
-                        ->class('btn btn-secondary')
-                        ->style('margin-top: 23px;')
-                        : null,
-                ])->alignEnd()->fullWidth(),
-            ]),
-
             Layout::view('orchid.layouts.task-stats'),
 
             Layout::selection([
@@ -193,6 +168,7 @@ class MyTasksListScreen extends Screen
                 TaskStatusFilter::class,
                 TaskProjectFilter::class,
                 TaskPriorityFilter::class,
+                TaskSearchFilter::class,
             ]),
 
             MyTasksListLayout::class,
@@ -203,15 +179,5 @@ class MyTasksListScreen extends Screen
             ->title('Создание задачи')
             ->applyButton('Создать'),
         ];
-    }
-
-    // Добавьте метод для обработки поиска
-    public function applySearch(Request $request)
-    {
-        $search = $request->get('search');
-        
-        return redirect()->route('platform.systems.my_tasks', [
-            'search' => $search
-        ]);
     }
 }
