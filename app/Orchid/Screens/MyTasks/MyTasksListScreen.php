@@ -197,8 +197,8 @@ class MyTasksListScreen extends Screen
     // Добавьте метод для обработки поиска
     public function searchTasks(Request $request)
     {
-        // Просто редирект с параметром search
-        return redirect()->route('platform.mytasks', [
+        // Используем правильное имя роута
+        return redirect()->route('platform.systems.my_tasks', [
             'search' => $request->get('search')
         ]);
     }
