@@ -160,7 +160,17 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::view('orchid.layouts.my-tasks-search'),
+            Layout::rows([
+                \Orchid\Screen\Fields\Group::make([
+                    Input::make('search')
+                        ->type('text')
+                        ->placeholder('Поиск по названию, описанию...')
+                        ->title('Быстрый поиск')
+                        ->value(request('search'))
+                        ->help('Введите текст и нажмите Enter')
+                        ->style('flex: 1;'),
+                ])->alignEnd()->fullWidth(),
+            ]),
 
             Layout::view('orchid.layouts.task-stats'),
 
