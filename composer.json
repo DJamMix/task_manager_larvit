@@ -8,10 +8,12 @@
     "require": {
         "php": "^8.2",
         "djammix/ebot": "v0.0.4.x-dev",
+        "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/scout": "^10.19",
         "laravel/tinker": "^2.10.1",
+        "meilisearch/meilisearch-php": "^1.16",
         "orchid/platform": "^14.48",
         "spatie/laravel-permission": "^6.16"
     },

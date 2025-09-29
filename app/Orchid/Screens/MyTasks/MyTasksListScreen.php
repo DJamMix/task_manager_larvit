@@ -31,29 +31,49 @@ class MyTasksListScreen extends Screen
     {
         $userId = auth()->id();
 
-        $tasks = Task::where('executor_id', $userId)
-            ->filters()
-            ->whereNotIn('status', [
-                TaskStatusEnum::COMPLETED->value,
-                TaskStatusEnum::CANCELED->value,
-                TaskStatusEnum::UNPAID->value,
-                TaskStatusEnum::DEMO->value,
-            ]);
-
-        // Используем Scout для поиска
+        // Используем Scout для поиска, если есть поисковый запрос
         if (request()->has('search') && !empty(request('search'))) {
             $searchTerm = request('search');
+            
+            // Получаем ID задач через Scout
             $taskIds = Task::search($searchTerm)
                 ->where('executor_id', $userId)
-                ->get()
-                ->pluck('id');
-
-            $tasks->whereIn('id', $taskIds);
+                ->take(1000) // Ограничиваем количество результатов
+                ->keys()
+                ->toArray();
+            
+            // Если есть результаты поиска - фильтруем по ID, иначе возвращаем пустой результат
+            if (!empty($taskIds)) {
+                $tasks = Task::where('executor_id', $userId)
+                    ->whereIn('id', $taskIds)
+                    ->filters()
+                    ->whereNotIn('status', [
+                        TaskStatusEnum::COMPLETED->value,
+                        TaskStatusEnum::CANCELED->value,
+                        TaskStatusEnum::UNPAID->value,
+                        TaskStatusEnum::DEMO->value,
+                    ])
+                    ->orderBy('created_at', 'desc')
+                    ->paginate(15);
+            } else {
+                // Если поиск не дал результатов - возвращаем пустую коллекцию
+                $tasks = Task::where('id', 0)->paginate(15);
+            }
+        } else {
+            // Обычный запрос без поиска
+            $tasks = Task::where('executor_id', $userId)
+                ->filters()
+                ->whereNotIn('status', [
+                    TaskStatusEnum::COMPLETED->value,
+                    TaskStatusEnum::CANCELED->value,
+                    TaskStatusEnum::UNPAID->value,
+                    TaskStatusEnum::DEMO->value,
+                ])
+                ->orderBy('created_at', 'desc')
+                ->paginate(15);
         }
 
-        $tasks = $tasks->orderBy('created_at', 'desc')->paginate(15);
-
-        // Статистика для виджетов
+        // Статистика для виджетов (остается без изменений)
         $allTasks = Task::where('executor_id', $userId);
         
         $urgentTasks = clone $allTasks;
