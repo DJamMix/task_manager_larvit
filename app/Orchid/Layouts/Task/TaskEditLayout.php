@@ -97,7 +97,6 @@ class TaskEditLayout extends Rows
                     ->title('Тип задачи')
                     ->required()
                     ->help('Выберите тип задачи')
-                    ->value(TaskTypeEnum::DEFAULT->value)
                     ->width('50%'),
             ])->fullWidth(),
 
