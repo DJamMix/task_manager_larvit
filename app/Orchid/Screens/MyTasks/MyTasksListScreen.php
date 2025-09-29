@@ -93,7 +93,7 @@ class MyTasksListScreen extends Screen
                 'high_priority' => $highPriorityTasks->where('priority', TaskPriorityEnum::HIGH->value)->count(),
                 'in_progress' => $inProgressTasks->where('status', TaskStatusEnum::IN_PROGRESS->value)->count(),
                 'today_created' => $todayTasks->whereDate('created_at', today())->count(),
-                'completed' => $allTasks
+                'completed' => Task::where('executor_id', $userId)
                     ->whereIn('status', [
                         TaskStatusEnum::COMPLETED->value,
                         TaskStatusEnum::CANCELED->value,
