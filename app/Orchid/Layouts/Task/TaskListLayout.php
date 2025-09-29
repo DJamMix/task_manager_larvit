@@ -3,6 +3,7 @@
 namespace App\Orchid\Layouts\Task;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
+use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\Carbon;
@@ -42,6 +43,33 @@ class TaskListLayout extends Table
 
             TD::make('creator_id', __('task.creator_id'))
                 ->render(fn (Task $task) => $task->creator->name ?? 'Неизвестен'),
+
+            TD::make('type_task', 'Тип задачи')
+                ->render(function (Task $task) {
+                    $type = TaskTypeEnum::tryFrom($task->type_task);
+                    if (!$type) {
+                        return 'N/A';
+                    }
+                    
+                    $icon = match($type) {
+                        TaskTypeEnum::DEFAULT => '📝',
+                        TaskTypeEnum::BUG => '🐛',
+                    };
+                    
+                    $badgeClass = match($type) {
+                        TaskTypeEnum::DEFAULT => 'bg-primary',
+                        TaskTypeEnum::BUG => 'bg-danger',
+                    };
+                    
+                    return sprintf(
+                        '<span class="badge %s">%s %s</span>',
+                        $badgeClass,
+                        $icon,
+                        $type->label()
+                    );
+                })
+                ->align(TD::ALIGN_CENTER)
+                ->width('140px'),
 
             TD::make('status', __('task.status.label'))
                 ->width('100px')
