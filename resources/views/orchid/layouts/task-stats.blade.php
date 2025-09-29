@@ -55,7 +55,7 @@
 
         <!-- Сегодня создано -->
         <div class="col-md-4 col-lg-2 mb-3">
-            <a href="?today=1" class="card text-decoration-none bg-white rounded-3">
+            <a href="?created_at[start]={{ today()->format('Y-m-d') }}&created_at[end]={{ today()->format('Y-m-d') }}" class="card text-decoration-none bg-white rounded-3">
                 <div class="card-body text-center p-4">
                     <div class="text-success mb-2">
                         <i class="icon-calendar" style="font-size: 2rem;"></i>
