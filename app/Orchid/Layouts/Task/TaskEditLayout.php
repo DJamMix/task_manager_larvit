@@ -100,6 +100,17 @@ class TaskEditLayout extends Rows
                     ->width('50%'),
             ])->fullWidth(),
 
+            Group::make([
+                Input::make('task.estimation_hours')
+                    ->type('number')
+                    ->title('Оценка в часах')
+                    ->step('0.5')
+                    ->min(0)
+                    ->help('Плановое время на выполнение задачи')
+                    ->readonly()
+                    ->width('50%'),
+            ])->fullWidth(),
+
             // DateTimer::make('task.start_datetime')
             //     ->title(__('task.start_datetime'))
             //     ->serverFormat('Y-m-d H:i:s')
