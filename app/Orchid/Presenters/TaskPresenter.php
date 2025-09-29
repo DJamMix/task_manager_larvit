@@ -2,6 +2,8 @@
 
 namespace App\Orchid\Presenters;
 
+use App\CoreLayer\Enums\TaskPriorityEnum;
+use App\CoreLayer\Enums\TaskStatusEnum;
 use Laravel\Scout\Builder;
 use Orchid\Screen\Contracts\Searchable;
 use Orchid\Support\Presenter;
@@ -47,16 +49,41 @@ class TaskPresenter extends Presenter implements Searchable
         }
         
         if ($this->entity->status) {
-            $parts[] = 'Статус: ' . $this->entity->status->label();
+            $statusEnum = TaskStatusEnum::tryFrom($this->entity->status);
+            if ($statusEnum) {
+                $statusIcon = $this->getStatusIcon($statusEnum);
+                $parts[] = $statusIcon . ' ' . $statusEnum->label();
+            }
         }
         
         if ($this->entity->priority) {
-            $parts[] = 'Приоритет: ' . $this->entity->priority->label();
+            $priorityEnum = TaskPriorityEnum::tryFrom($this->entity->priority);
+            if ($priorityEnum) {
+                $parts[] = $priorityEnum->icon() . ' ' . $priorityEnum->label();
+            }
         }
         
         $additionalInfo = implode(' | ', $parts);
         
         return $cleanDescription . ($additionalInfo ? " | " . $additionalInfo : "");
+    }
+
+    protected function getStatusIcon(TaskStatusEnum $status): string
+    {
+        return match ($status) {
+            TaskStatusEnum::DRAFT => '📝',
+            TaskStatusEnum::APPROVED => '✅',
+            TaskStatusEnum::ESTIMATION => '⏱️',
+            TaskStatusEnum::ESTIMATION_REVIEW => '👀',
+            TaskStatusEnum::NEW => '🆕',
+            TaskStatusEnum::IN_PROGRESS => '🔄',
+            TaskStatusEnum::TESTING_STAGE => '🧪',
+            TaskStatusEnum::TESTING_PROD => '🚀',
+            TaskStatusEnum::DEMO => '📊',
+            TaskStatusEnum::UNPAID => '💳',
+            TaskStatusEnum::COMPLETED => '🏁',
+            TaskStatusEnum::CANCELED => '❌',
+        };
     }
 
     /**
