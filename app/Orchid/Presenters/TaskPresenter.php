@@ -132,10 +132,6 @@ class TaskPresenter extends Presenter implements Searchable
     {
         $user = auth()->user();
 
-        if (!$user || !$this->userHasSearchAccess($user)) {
-            return $this->emptySearch($query);
-        }
-
         if ($user->inRole('admin')) {
             return $this->entity->search($query);
         } else if ($user->inRole('employee')) {
