@@ -92,7 +92,7 @@ class TaskEditLayout extends Rows
                     ->value(TaskPriorityEnum::MEDIUM->value)
                     ->width('50%'),
 
-                Select::make('task.type')
+                Select::make('task.type_task')
                     ->options(TaskTypeEnum::options())
                     ->title('Тип задачи')
                     ->required()

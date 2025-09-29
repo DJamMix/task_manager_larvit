@@ -47,7 +47,7 @@ class MyTasksCreateModalLayout extends Rows
                 ->title(__('task.task_category_id'))
                 ->required(),
 
-            Select::make('task.type')
+            Select::make('task.type_task')
                 ->options(TaskTypeEnum::options())
                 ->title('Тип задачи')
                 ->required()

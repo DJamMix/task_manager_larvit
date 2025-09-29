@@ -239,7 +239,7 @@ class ClientViewTaskScreen extends Screen
             'task.name' => 'required|string|max:255',
             'task.description' => 'required|string',
             'task.task_category_id' => 'required|exists:task_categories,id',
-            'task.type' => 'required|string',
+            'task.type_task' => 'required|string',
             'task.priority' => 'required|string',
         ]);
 
