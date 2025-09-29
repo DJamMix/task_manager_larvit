@@ -87,15 +87,20 @@ class TaskPresenter extends Presenter implements Searchable
         }
 
         try {
-            // Ищем задачи где пользователь является исполнителем ИЛИ создателем
+            // Для Meilisearch используем простой фильтр, а сложную логику в Eloquent
             return $this->entity->search($query)
-                ->where('executor_id', $userId)
-                ->orWhere('creator_id', $userId)
-                ->query(function ($builder) use ($userId) {
+                ->query(function ($builder) use ($userId, $query) {
                     $builder->where(function($q) use ($userId) {
                         $q->where('executor_id', $userId)
                         ->orWhere('creator_id', $userId);
-                    })->with(['project', 'executor', 'category']);
+                    })
+                    ->where(function($q) use ($query) {
+                        $q->where('name', 'like', "%{$query}%")
+                        ->orWhere('description', 'like', "%{$query}%");
+                    })
+                    ->with(['project', 'executor', 'category'])
+                    ->orderBy('created_at', 'desc')
+                    ->limit($this->perSearchShow());
                 });
                 
         } catch (\Exception $e) {
