@@ -160,33 +160,7 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::rows([
-                \Orchid\Screen\Fields\Group::make([
-                    Input::make('search')
-                        ->type('text')
-                        ->placeholder('Введите название задачи, описание...')
-                        ->title('')
-                        ->value(request('search'))
-                        ->help('Поиск по названию, описанию задачи или статусу')
-                        ->style('border-radius: 8px 0 0 8px; border-right: none;')
-                        ->width('70%'),
-                        
-                    \Orchid\Screen\Actions\Button::make('Найти')
-                        ->method('searchTasks')
-                        ->icon('magnifier')
-                        ->class('btn btn-primary')
-                        ->style('border-radius: 0 8px 8px 0; margin-top: 23px; height: 40px;'),
-                        
-                    request('search') ? 
-                    \Orchid\Screen\Actions\Link::make('Сбросить')
-                        ->href(route('platform.systems.my_tasks'))
-                        ->icon('close')
-                        ->class('btn btn-outline-secondary')
-                        ->style('border-radius: 8px; margin-top: 23px; height: 40px; margin-left: 10px;')
-                        : null,
-                ])->alignEnd()->fullWidth(),
-            ])->title('Быстрый поиск задач')
-            ->description('Ищите задачи по названию, описанию или статусу'),
+            Layout::view('orchid.layouts.my-tasks-search'),
 
             Layout::view('orchid.layouts.task-stats'),
 
