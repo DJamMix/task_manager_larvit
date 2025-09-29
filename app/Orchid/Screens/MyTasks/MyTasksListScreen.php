@@ -160,9 +160,30 @@ class MyTasksListScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::wrapper('orchid.layouts.search-form', [
-                'search' => request('search'),
-                'route' => route('platform.systems.my_tasks')
+            Layout::rows([
+                \Orchid\Screen\Fields\Group::make([
+                    Input::make('search')
+                        ->type('text')
+                        ->placeholder('Поиск по названию, описанию...')
+                        ->title('Быстрый поиск')
+                        ->value(request('search'))
+                        ->help('Введите текст для поиска')
+                        ->style('flex: 1;'),
+                        
+                    \Orchid\Screen\Actions\Button::make('Найти')
+                        ->method('applySearch')
+                        ->icon('magnifier')
+                        ->class('btn btn-primary')
+                        ->style('margin-top: 23px;'),
+                        
+                    request('search') ? 
+                    \Orchid\Screen\Actions\Link::make('Сбросить')
+                        ->href(route('platform.systems.my_tasks'))
+                        ->icon('close')
+                        ->class('btn btn-secondary')
+                        ->style('margin-top: 23px;')
+                        : null,
+                ])->alignEnd()->fullWidth(),
             ]),
 
             Layout::view('orchid.layouts.task-stats'),
@@ -185,11 +206,12 @@ class MyTasksListScreen extends Screen
     }
 
     // Добавьте метод для обработки поиска
-    public function searchTasks(Request $request)
+    public function applySearch(Request $request)
     {
-        // Используем правильное имя роута
+        $search = $request->get('search');
+        
         return redirect()->route('platform.systems.my_tasks', [
-            'search' => $request->get('search')
+            'search' => $search
         ]);
     }
 }
