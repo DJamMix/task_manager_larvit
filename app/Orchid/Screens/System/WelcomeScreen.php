@@ -56,11 +56,13 @@ class WelcomeScreen extends Screen
                     TaskStatusEnum::COMPLETED->value,
                     TaskStatusEnum::CANCELED->value,
                     TaskStatusEnum::UNPAID->value,
+                    TaskStatusEnum::DEMO->value,
                 ])->count(),
                 'completed_tasks' => $user->assignedTasks()->whereIn('status', [
                     TaskStatusEnum::COMPLETED->value,
                     TaskStatusEnum::CANCELED->value,
                     TaskStatusEnum::UNPAID->value,
+                    TaskStatusEnum::DEMO->value,
                 ])->count(),
             ],
             'projects' => $projects,

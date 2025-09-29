@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskCreatedAtFilter;
 use App\Orchid\Filters\TaskExecutorFilter;
 use App\Orchid\Filters\TaskPriorityFilter;
 use App\Orchid\Filters\TaskProjectFilter;
@@ -49,6 +50,7 @@ class Task extends Model
         'executor' => TaskExecutorFilter::class,
         'priority' => TaskPriorityFilter::class,
         'search' => TaskSearchFilter::class,
+        'created_at' => TaskCreatedAtFilter::class,
     ];
 
     /**

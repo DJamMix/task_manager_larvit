@@ -7,6 +7,7 @@ use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
 use App\Orchid\Filters\TaskCategoryFilter;
+use App\Orchid\Filters\TaskCreatedAtFilter;
 use App\Orchid\Filters\TaskPriorityFilter;
 use App\Orchid\Filters\TaskProjectFilter;
 use App\Orchid\Filters\TaskSearchFilter;
@@ -177,6 +178,7 @@ class MyTasksListScreen extends Screen
                 TaskStatusFilter::class,
                 TaskProjectFilter::class,
                 TaskPriorityFilter::class,
+                TaskCreatedAtFilter::class,
             ]),
 
             MyTasksListLayout::class,
