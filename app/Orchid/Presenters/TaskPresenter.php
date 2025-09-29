@@ -68,81 +68,9 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function searchQuery(string $query = null): Builder
     {
-        $userId = auth()->id();
-        
-        \Log::debug('Task search called', [
-            'query' => $query,
-            'user_id' => $userId,
-            'authenticated' => auth()->check()
-        ]);
-
-        if (!$userId) {
-            return new \Laravel\Scout\Builder($this->entity, $query, function() {
-                return collect();
-            });
-        }
-
-        if (empty($query)) {
-            return $this->fallbackSearch($query);
-        }
-
-        try {
-            // Для Meilisearch используем простой фильтр, а сложную логику в Eloquent
-            return $this->entity->search($query)
-                ->query(function ($builder) use ($userId, $query) {
-                    $builder->where(function($q) use ($userId) {
-                        $q->where('executor_id', $userId)
-                        ->orWhere('creator_id', $userId);
-                    })
-                    ->where(function($q) use ($query) {
-                        $q->where('name', 'like', "%{$query}%")
-                        ->orWhere('description', 'like', "%{$query}%");
-                    })
-                    ->with(['project', 'executor', 'category'])
-                    ->orderBy('created_at', 'desc')
-                    ->limit($this->perSearchShow());
-                });
-                
-        } catch (\Exception $e) {
-            \Log::error('Scout search failed', [
-                'error' => $e->getMessage(),
-                'query' => $query,
-                'user_id' => $userId
-            ]);
-            
-            return $this->fallbackSearch($query);
-        }
+        return $this->entity->search($query)->where('active', true);
     }
 
-    /**
-     * Fallback поиск через Eloquent
-     */
-    protected function fallbackSearch(?string $query): Builder
-    {
-        $userId = auth()->id();
-        $model = $this->entity;
-        
-        $builder = $model->where(function($q) use ($userId) {
-            $q->where('executor_id', $userId)
-            ->orWhere('creator_id', $userId);
-        });
-        
-        if (!empty($query)) {
-            $builder->where(function($q) use ($query) {
-                $q->where('name', 'like', "%{$query}%")
-                ->orWhere('description', 'like', "%{$query}%");
-            });
-        }
-        
-        $builder->with(['project', 'executor', 'category'])
-                ->orderBy('created_at', 'desc')
-                ->limit($this->perSearchShow());
-
-        return new \Laravel\Scout\Builder($model, $query, function() use ($builder) {
-            return $builder->get();
-        });
-    }
-    
     /**
      * @return int
      */
