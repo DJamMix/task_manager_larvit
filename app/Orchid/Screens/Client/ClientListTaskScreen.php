@@ -122,15 +122,6 @@ class ClientListTaskScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::rows([
-                Input::make('search')
-                    ->type('text')
-                    ->placeholder('Поиск временно недоступен')
-                    ->title('Быстрый поиск')
-                    ->disabled()
-                    ->help('Данная функция находится в разработке и будет доступна в следующем обновлении системы'),
-            ]),
-
             Layout::selection([
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
