@@ -68,9 +68,55 @@ class TaskPresenter extends Presenter implements Searchable
      */
     public function searchQuery(string $query = null): Builder
     {
-        // Ограничиваем поиск только задачами пользователя
-        return $this->entity->search($query)
-            ->where('executor_id', auth()->id());
+        // Для отладки - логируем запрос
+        \Log::debug('Task search', [
+            'query' => $query,
+            'user_id' => auth()->id(),
+            'scout_driver' => config('scout.driver')
+        ]);
+
+        // Если Scout не настроен, используем fallback
+        if (config('scout.driver') === 'null' || empty($query)) {
+            return $this->fallbackSearch($query);
+        }
+
+        try {
+            return $this->entity->search($query)
+                ->where('executor_id', auth()->id())
+                ->query(function ($builder) {
+                    $builder->with(['project', 'executor', 'category']);
+                });
+        } catch (\Exception $e) {
+            \Log::error('Scout search failed: ' . $e->getMessage());
+            return $this->fallbackSearch($query);
+        }
+    }
+
+    /**
+     * Fallback поиск через Eloquent
+     */
+    protected function fallbackSearch(?string $query): Builder
+    {
+        $model = $this->entity;
+        
+        // Создаем mock Builder для совместимости
+        $builder = $model->where('executor_id', auth()->id());
+        
+        if (!empty($query)) {
+            $builder->where(function($q) use ($query) {
+                $q->where('name', 'like', "%{$query}%")
+                  ->orWhere('description', 'like', "%{$query}%");
+            });
+        }
+        
+        $builder->with(['project', 'executor', 'category'])
+                ->orderBy('created_at', 'desc')
+                ->limit($this->perSearchShow());
+
+        // Возвращаем как Scout Builder для совместимости
+        return new \Laravel\Scout\Builder($model, $query, function($model, $query) use ($builder) {
+            return $builder->get();
+        });
     }
     
     /**
