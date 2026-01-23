@@ -153,12 +153,12 @@ class TaskEditLayout extends Rows
             Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])
                 ->title(__('task.description')),
 
-            Upload::make('task.attachments')
-                ->title('Прикрепленные файлы')
-                ->acceptedFiles('image/*,application/pdf,.psd')
-                ->storage('public')
-                ->maxFileSize(1024)
-                ->help('Допустимые форматы: JPG, PNG, PDF, PSD. Макс. размер: 1 ГБ'),
+            // Upload::make('task.attachments')
+            //     ->title('Прикрепленные файлы')
+            //     ->acceptedFiles('image/*,application/pdf,.psd')
+            //     ->storage('public')
+            //     ->maxFileSize(1048576)
+            //     ->help('Допустимые форматы: JPG, PNG, PDF, PSD. Макс. размер: 1 ГБ'),
         ];
     }
 }

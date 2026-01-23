@@ -157,4 +157,24 @@ class Task extends Model
     // {
     //     return $this->hasMany(TaskAttachment::class);
     // }
+
+    // Связь Актов и Задач
+
+    public function acts()
+    {
+        return $this->belongsToMany(Act::class, 'act_task')
+            ->withPivot('hours', 'included_at')
+            ->withTimestamps()
+            ->orderByDesc('acts.date');
+    }
+
+    public function isInAct(): bool
+    {
+        return $this->acts()->exists();
+    }
+
+    public function getActNumbersAttribute(): string
+    {
+        return $this->acts->pluck('number')->implode(', ');
+    }
 }
