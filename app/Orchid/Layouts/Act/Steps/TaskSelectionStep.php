@@ -2,6 +2,7 @@
 
 namespace App\Orchid\Layouts\Act\Steps;
 
+use App\CoreLayer\Enums\TaskStatusEnum;
 use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
@@ -106,6 +107,12 @@ class TaskSelectionStep
         
         $isSelected = $task['selected'] ?? false;
         
+        // Получаем статус задачи
+        $status = $task['status'] ?? 'new';
+        $statusEnum = TaskStatusEnum::tryFrom($status);
+        $statusLabel = $statusEnum?->label() ?? 'Неизвестно';
+        $statusColor = $statusEnum?->color() ?? '#6c757d';
+        
         $rowFields = [
             Group::make([
                 CheckBox::make("tasks[{$index}][selected]")
@@ -123,6 +130,13 @@ class TaskSelectionStep
                     ->value($task['title'] ?? '')
                     ->readonly()
                     ->style('flex: 3; border: none; background: transparent; box-shadow: none; color: #000000; font-weight: 500;'),
+                    
+                // Столбец статуса
+                Input::make('')
+                    ->type('text')
+                    ->value($statusLabel)
+                    ->readonly()
+                    ->style('flex: 1; border: none; background: transparent; box-shadow: none; color: ' . $statusColor . '; font-weight: 500;'),
                     
                 Input::make('')
                     ->type('text')

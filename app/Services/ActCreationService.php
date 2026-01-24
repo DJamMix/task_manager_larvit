@@ -91,6 +91,7 @@ class ActCreationService
                     'id' => $task->id,
                     'title' => $task->name,
                     'name' => $task->name,
+                    'status' => $task->status,
                     'estimation_hours' => $estimationHours,
                     'hours' => $estimationHours,
                     'project' => $projectName,

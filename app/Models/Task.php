@@ -150,17 +150,17 @@ class Task extends Model
         return $this->hasMany(TrackingTime::class);
     }
 
-    // /**
-    //  * Связь с прикрепленными файлами
-    //  */
-    public function attachments()
-    {
-        return $this->hasMany(TaskAttachment::class);
-    }
+    /**
+     * Связь с прикрепленными файлами
+     */
+    // public function attachments()
+    // {
+    //     return $this->hasMany(TaskAttachment::class);
+    // }
 
-    // /**
-    // * Связь актов и задач
-    // */
+    /**
+    * Связь актов и задач
+    */
     public function acts()
     {
         return $this->belongsToMany(Act::class, 'act_task')
@@ -169,18 +169,18 @@ class Task extends Model
             ->orderByDesc('acts.date');
     }
 
-    // /**
-    // * Проверка наличия связанных актов
-    // */
+    /**
+    * Проверка наличия связанных актов
+    */
 
     public function isInAct(): bool
     {
         return $this->acts()->exists();
     }
 
-    // /**
-    // * Аксессор для получения номеров актов строкой (например: "123, 456, 789")
-    // */
+    /**
+    * Аксессор для получения номеров актов строкой (например: "123, 456, 789")
+    */
 
     public function getActNumbersAttribute(): string
     {
