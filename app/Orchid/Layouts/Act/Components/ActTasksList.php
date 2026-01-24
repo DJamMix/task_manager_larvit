@@ -59,9 +59,7 @@ class ActTasksList
             $isSelected = $task['selected'] ?? true;
         }
         
-        if ($hours < 0.25) {
-            $hours = 0.25;
-        }
+        $hours = max($hours, 0.25);
         
         $hoursField = $isEditable 
             ? Input::make("tasks[{$index}][hours]")
