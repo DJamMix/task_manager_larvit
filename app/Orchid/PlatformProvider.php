@@ -86,6 +86,11 @@ class PlatformProvider extends OrchidServiceProvider
                 ->route('platform.systems.roles')
                 ->permission('platform.systems.roles'),
 
+            Menu::make(__('adminpanel.Acts'))
+                ->icon('bs.journal-text')
+                ->route('platform.systems.acts')
+                ->permission('platform.systems.acts'),
+
             Menu::make(__('adminpanel.Tasks'))
                 ->icon('bs.card-checklist')
                 ->route('platform.systems.tasks')
@@ -139,6 +144,9 @@ class PlatformProvider extends OrchidServiceProvider
                 ->addPermission('platform.systems.client.project.tasks', 'Просмотр списка задач')
                 ->addPermission('platform.systems.client.projects', 'Проекты клиента')
                 ->addPermission('platform.systems.client.project.tasks.view', 'Просмотр задач'),
+            
+            ItemPermission::group('Менеджер')
+                ->addPermission('platform.systems.acts', __('adminpanel.Acts'))
         ];
     }
 }

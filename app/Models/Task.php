@@ -153,8 +153,37 @@ class Task extends Model
     // /**
     //  * Связь с прикрепленными файлами
     //  */
-    // public function attachments()
-    // {
-    //     return $this->hasMany(TaskAttachment::class);
-    // }
+    public function attachments()
+    {
+        return $this->hasMany(TaskAttachment::class);
+    }
+
+    // /**
+    // * Связь актов и задач
+    // */
+    public function acts()
+    {
+        return $this->belongsToMany(Act::class, 'act_task')
+            ->withPivot('hours', 'included_at')
+            ->withTimestamps()
+            ->orderByDesc('acts.date');
+    }
+
+    // /**
+    // * Проверка наличия связанных актов
+    // */
+
+    public function isInAct(): bool
+    {
+        return $this->acts()->exists();
+    }
+
+    // /**
+    // * Аксессор для получения номеров актов строкой (например: "123, 456, 789")
+    // */
+
+    public function getActNumbersAttribute(): string
+    {
+        return $this->acts->pluck('number')->implode(', ');
+    }
 }

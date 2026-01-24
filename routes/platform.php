@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\TaskAttachment;
 use App\Orchid\Layouts\Client\ClientTaskViewLayout;
+use App\Orchid\Screens\Acts\ActEditScreen;
+use App\Orchid\Screens\Acts\ActListScreen;
 use App\Orchid\Screens\Client\ClientListProjectScreen;
 use App\Orchid\Screens\Client\ClientListTaskScreen;
 use App\Orchid\Screens\Client\ClientViewTaskScreen;
@@ -130,6 +132,31 @@ Route::screen('tasks/create', TaskEditScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.systems.tasks')
         ->push(__('project.add'), route('platform.systems.tasks.create')));
+
+// Platform > System > Acts
+Route::screen('acts', ActListScreen::class)
+    ->name('platform.systems.acts')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push(__('adminpanel.Acts'), route('platform.systems.acts')));
+
+// Platform > System > Acts > Act 
+Route::screen('acts/{act}/edit', ActEditScreen::class)
+    ->name('platform.systems.acts.edit')
+    ->breadcrumbs(fn (Trail $trail, $act) => $trail
+        ->parent('platform.systems.acts')
+        ->push($act->number, route('platform.systems.acts.edit', $act)));
+
+// Platform > System > Acts > Create
+Route::screen('acts/create', ActEditScreen::class)
+    ->name('platform.systems.acts.create')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.systems.acts')
+        ->push(__('act.add'), route('platform.systems.acts.create')));
+
+//Platform > System > Acts > Download
+Route::get('acts/{act}/download', [ActEditScreen::class, 'downloadWord'])
+    ->name('platform.systems.acts.download');
 
 // Platform > System > Roles > Role
 Route::screen('roles/{role}/edit', RoleEditScreen::class)

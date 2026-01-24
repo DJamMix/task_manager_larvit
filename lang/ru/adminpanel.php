@@ -4,6 +4,7 @@ return [
     'access_controls' => 'Администрирование',
     'Users' => 'Пользователи',
     'Roles' => 'Роли',
+    'Acts' => 'Акты',
     'Tasks' => 'Задачи',
     'Projects' => 'Проекты',
     'TaskCategories' => 'Категории задач',
