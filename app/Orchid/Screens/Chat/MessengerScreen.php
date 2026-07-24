@@ -3,7 +3,7 @@
 namespace App\Orchid\Screens\Chat;
 
 use App\Models\Chat;
-use App\Orchid\Layouts\Chat\ChatComposerLayout;
+use App\Models\Task;
 use App\Orchid\Layouts\Chat\ChatCreateLayout;
 use App\Orchid\Layouts\Chat\ChatMembersLayout;
 use App\Services\ChatService;
@@ -57,6 +57,18 @@ class MessengerScreen extends Screen
                 ->get()
             : collect();
 
+        $composerMembers = $resolved?->members
+            ?->reject(fn ($u) => (int) $u->id === (int) $user->id)
+            ->mapWithKeys(fn ($u) => [$u->id => $u->displayName()])
+            ->all() ?? [];
+
+        $composerTasks = Task::query()
+            ->orderByDesc('id')
+            ->limit(80)
+            ->get()
+            ->mapWithKeys(fn (Task $t) => [$t->id => "#{$t->id} · {$t->name}"])
+            ->all();
+
         return [
             'chats' => $list,
             'chat' => $resolved,
@@ -64,6 +76,8 @@ class MessengerScreen extends Screen
             'can_create' => $chats->canCreate($user),
             'staff_options' => $chats->staffUserOptions($user->id),
             'active_chat_id' => $resolved?->id,
+            'composer_members' => $composerMembers,
+            'composer_tasks' => $composerTasks,
         ];
     }
 
@@ -112,39 +126,30 @@ class MessengerScreen extends Screen
 
     public function layout(): iterable
     {
-        $layouts = [
+        return [
             Layout::view('orchid.layouts.messenger'),
+
+            Layout::modal('createChatModal', [ChatCreateLayout::class])
+                ->title('Новый групповой чат')
+                ->size(Modal::SIZE_LG)
+                ->applyButton('Создать'),
+
+            Layout::modal('createDirectModal', [
+                Layout::rows([
+                    \Orchid\Screen\Fields\Select::make('direct.user_id')
+                        ->options($this->staff_options ?: app(ChatService::class)->staffUserOptions(auth()->id()))
+                        ->title('Сотрудник')
+                        ->required()
+                        ->empty('Выберите'),
+                ]),
+            ])
+                ->title('Личный чат')
+                ->applyButton('Открыть'),
+
+            Layout::modal('membersModal', [ChatMembersLayout::class])
+                ->title('Участники')
+                ->applyButton('Сохранить'),
         ];
-
-        if ($this->chat?->exists) {
-            $layouts[] = Layout::view('orchid.layouts.composer-anchor');
-            $layouts[] = Layout::wrapper('orchid.layouts.composer-shell', [
-                'composer' => ChatComposerLayout::class,
-            ]);
-        }
-
-        $layouts[] = Layout::modal('createChatModal', [ChatCreateLayout::class])
-            ->title('Новый групповой чат')
-            ->size(Modal::SIZE_LG)
-            ->applyButton('Создать');
-
-        $layouts[] = Layout::modal('createDirectModal', [
-            Layout::rows([
-                \Orchid\Screen\Fields\Select::make('direct.user_id')
-                    ->options($this->staff_options ?: app(ChatService::class)->staffUserOptions(auth()->id()))
-                    ->title('Сотрудник')
-                    ->required()
-                    ->empty('Выберите'),
-            ]),
-        ])
-            ->title('Личный чат')
-            ->applyButton('Открыть');
-
-        $layouts[] = Layout::modal('membersModal', [ChatMembersLayout::class])
-            ->title('Участники')
-            ->applyButton('Сохранить');
-
-        return $layouts;
     }
 
     public function createGroup(Request $request, ChatService $chats)

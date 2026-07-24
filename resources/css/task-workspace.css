@@ -359,7 +359,7 @@
     font-size: 0.92rem;
 }
 
-/* Файлы + уведомить в одну полоску */
+/* ????? + ????????? ? ???? ??????? */
 .tw-composer-shell .row {
     --bs-gutter-x: 0.75rem;
     align-items: flex-start;
@@ -396,7 +396,7 @@
     }
 }
 
-/* Create / edit task modal — modern dense form */
+/* Create / edit task modal ? modern dense form */
 #screen-modal-createTaskModal .modal-dialog,
 #screen-modal-editTaskModal .modal-dialog {
     max-width: min(820px, 94vw);
@@ -582,7 +582,7 @@
     transition: border-color .15s ease, box-shadow .15s ease;
 }
 
-/* Дедлайн (DateTimer / input-group) — как соседние селекты */
+/* ??????? (DateTimer / input-group) ? ??? ???????? ??????? */
 .tc-modal .row .input-group {
     display: flex;
     flex-wrap: nowrap;
@@ -644,7 +644,7 @@
     min-height: 34px;
 }
 
-/* —— Tom Select: closed —— */
+/* ?? Tom Select: closed ?? */
 .tc-modal .ts-wrapper {
     position: relative;
     z-index: 1;
@@ -683,7 +683,7 @@
     margin-top: 2px;
 }
 
-/* —— Tom Select: open dropdown —— */
+/* ?? Tom Select: open dropdown ?? */
 .tc-modal .ts-dropdown,
 #screen-modal-createTaskModal .ts-dropdown,
 #screen-modal-editTaskModal .ts-dropdown,
@@ -848,7 +848,7 @@
     }
 }
 
-/* �� Messenger (Bitrix-like) �� */
+/* ?? Messenger (Bitrix-like) ?? */
 .bx-messenger {
     display: grid;
     grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
@@ -935,11 +935,13 @@
     flex-direction: column;
     min-width: 0;
     background: #fff;
+    min-height: min(72vh, 720px);
 }
 
 .bx-messenger__header {
     padding: 0.85rem 1rem;
     border-bottom: 1px solid #e6eaf0;
+    flex-shrink: 0;
 }
 
 .bx-messenger__feed {
@@ -950,7 +952,8 @@
     flex-direction: column;
     gap: 0.65rem;
     background: linear-gradient(180deg, #fbfcfd, #f5f7fa);
-    max-height: min(52vh, 520px);
+    max-height: none;
+    min-height: 280px;
 }
 
 .bx-messenger__empty {
@@ -1002,6 +1005,17 @@
 
 .bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
 
+.bx-msg__reply-btn {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.78rem;
+    padding: 0.15rem 0 0;
+    cursor: pointer;
+}
+
+.bx-msg__reply-btn:hover { color: #2563eb; }
+
 .bx-task-card {
     display: flex;
     gap: 0.5rem;
@@ -1023,7 +1037,167 @@
 
 .bx-task-card__name { font-size: 0.85rem; }
 
-/* Code blocks � dark readable */
+/* Custom chat composer */
+.bx-composer {
+    flex-shrink: 0;
+    border-top: 1px solid #e6eaf0;
+    background: #fff;
+    padding: 0.65rem 0.85rem 0.8rem;
+}
+
+.bx-composer__reply {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    background: #eff4ff;
+    border: 1px solid #cfe0ff;
+    border-radius: 10px;
+    padding: 0.4rem 0.65rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+}
+
+.bx-composer__box {
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #f8fafc;
+    padding: 0.45rem 0.55rem 0.4rem;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.bx-composer__box:focus-within {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    background: #fff;
+}
+
+.bx-composer__input {
+    width: 100%;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    resize: none;
+    min-height: 40px;
+    max-height: 160px;
+    padding: 0.35rem 0.35rem 0.45rem;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: #0f172a;
+}
+
+.bx-composer__toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.15rem;
+}
+
+.bx-composer__tools {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    position: relative;
+}
+
+.bx-composer__tool,
+.bx-composer__icon-btn {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.bx-composer__tool:hover,
+.bx-composer__icon-btn:hover {
+    background: #e8eef7;
+    color: #1e293b;
+}
+
+.bx-composer__right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bx-composer__files-label {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.bx-composer__send {
+    border: 0;
+    background: #2563eb;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border-radius: 999px;
+    padding: 0.4rem 0.95rem;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+
+.bx-composer__send:hover {
+    background: #1d4ed8;
+}
+
+.bx-composer__dropdown {
+    position: relative;
+}
+
+.bx-composer__menu {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 240px;
+    max-width: 320px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    padding: 0.55rem;
+    z-index: 20;
+}
+
+.bx-composer__menu.is-open { display: block; }
+
+.bx-composer__menu-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.bx-composer__select {
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    padding: 0.35rem 0.45rem;
+    background: #fff;
+}
+
+.bx-composer__hint {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 0.3rem;
+}
+
+/* Code blocks - dark readable */
 .tw-codeblock {
     margin: 0.55rem 0;
     border-radius: 10px;

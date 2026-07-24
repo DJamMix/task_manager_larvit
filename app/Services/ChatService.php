@@ -182,8 +182,11 @@ class ChatService
             abort(403);
         }
 
-        $quill = $this->comments->normalizeQuill($request->input('message.text'));
-        $plain = $this->comments->extractPlainText($quill);
+        $rawText = $request->input('message.text');
+        $quill = $this->comments->normalizeQuill($rawText);
+        $plain = is_string($rawText)
+            ? trim($rawText)
+            : $this->comments->extractPlainText($quill);
 
         $taskId = $request->input('message.task_id');
         $task = null;
@@ -191,12 +194,24 @@ class ChatService
             $task = Task::query()->find($taskId);
         }
 
-        // Авто-привязка задачи по ссылке в тексте
-        if (!$task && preg_match('/(?:tasks\/|my-tasks\/|tasks\/)(\d+)/', $plain, $m)) {
+        if (!$task && preg_match('/(?:tasks\/|my-tasks\/)(\d+)/', $plain, $m)) {
             $task = Task::query()->find((int) $m[1]);
         }
 
-        if (trim($plain) === '' && empty($request->input('message.attachments')) && !$task) {
+        $attachmentIds = collect($request->input('message.attachments', []))->filter();
+
+        if ($request->hasFile('message_files')) {
+            foreach ((array) $request->file('message_files') as $uploaded) {
+                if (!$uploaded || !$uploaded->isValid()) {
+                    continue;
+                }
+                $file = new \Orchid\Attachment\File($uploaded, 'public');
+                $attachment = $file->load();
+                $attachmentIds->push($attachment->id);
+            }
+        }
+
+        if ($plain === '' && $attachmentIds->isEmpty() && !$task) {
             abort(422, 'Напишите сообщение, прикрепите файл или задачу');
         }
 
@@ -229,9 +244,8 @@ class ChatService
             'is_system' => false,
         ]);
 
-        $attachments = $request->input('message.attachments', []);
-        if (!empty($attachments)) {
-            $message->attachment()->syncWithoutDetaching($attachments);
+        if ($attachmentIds->isNotEmpty()) {
+            $message->attachment()->syncWithoutDetaching($attachmentIds->all());
         }
 
         $chat->touch();

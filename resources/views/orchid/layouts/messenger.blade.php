@@ -4,6 +4,8 @@
         $active = $chat ?? null;
         $feed = $messages ?? collect();
         $activeId = $active_chat_id ?? $active?->id;
+        $taskOptions = $composer_tasks ?? [];
+        $notifyOptions = $composer_members ?? [];
     @endphp
 
     <aside class="bx-messenger__sidebar">
@@ -104,7 +106,7 @@
 
                         @unless($message->is_system)
                             <button type="button"
-                                    class="btn btn-link btn-sm px-0 bx-reply-btn"
+                                    class="bx-msg__reply-btn"
                                     data-parent-id="{{ $message->id }}"
                                     data-author="{{ $message->user?->displayName() ?? 'участник' }}">
                                 Ответить
@@ -114,6 +116,86 @@
                 @empty
                     <div class="text-muted text-center py-5">Начните переписку</div>
                 @endforelse
+            </div>
+
+            {{-- Кастомный композер в стиле мессенджера (поля уходят в #post-form Orchid) --}}
+            <div class="bx-composer" id="bx-composer">
+                <input type="hidden" name="message[parent_id]" id="chat-message-parent-id" value="">
+
+                <div id="bx-reply-banner" class="bx-composer__reply d-none">
+                    <div>
+                        Ответ для <strong id="bx-reply-author"></strong>
+                    </div>
+                    <button type="button" class="bx-composer__icon-btn" id="bx-reply-cancel" title="Отмена">×</button>
+                </div>
+
+                <div class="bx-composer__box">
+                    <textarea name="message[text]"
+                              id="bx-composer-input"
+                              class="bx-composer__input"
+                              rows="1"
+                              placeholder="Написать сообщение… Enter — отправить, Shift+Enter — новая строка"></textarea>
+
+                    <div class="bx-composer__toolbar">
+                        <div class="bx-composer__tools">
+                            <button type="button" class="bx-composer__tool" id="bx-tool-code" title="Блок кода">
+                                &lt;/&gt;
+                            </button>
+
+                            <label class="bx-composer__tool" title="Файл">
+                                📎
+                                <input type="file"
+                                       name="message_files[]"
+                                       id="bx-composer-files"
+                                       class="d-none"
+                                       multiple
+                                       accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css">
+                            </label>
+
+                            <div class="bx-composer__dropdown">
+                                <button type="button" class="bx-composer__tool" data-bx-drop="task" title="Задача">
+                                    ✅
+                                </button>
+                                <div class="bx-composer__menu" data-bx-menu="task">
+                                    <div class="bx-composer__menu-title">Прикрепить задачу</div>
+                                    <select name="message[task_id]" class="bx-composer__select">
+                                        <option value="">Без задачи</option>
+                                        @foreach($taskOptions as $id => $label)
+                                            <option value="{{ $id }}">{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
+                            @if(count($notifyOptions))
+                                <div class="bx-composer__dropdown">
+                                    <button type="button" class="bx-composer__tool" data-bx-drop="notify" title="Уведомить">
+                                        🔔
+                                    </button>
+                                    <div class="bx-composer__menu" data-bx-menu="notify">
+                                        <div class="bx-composer__menu-title">Уведомить</div>
+                                        <select name="message[notify_user_ids][]" class="bx-composer__select" multiple size="5">
+                                            @foreach($notifyOptions as $id => $label)
+                                                <option value="{{ $id }}">{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                        <div class="bx-composer__hint">Пусто = все участники</div>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="bx-composer__right">
+                            <span class="bx-composer__files-label d-none" id="bx-files-label"></span>
+                            <button type="submit"
+                                    class="bx-composer__send"
+                                    formaction="{{ url()->current() }}/sendMessage"
+                                    form="post-form">
+                                Отправить
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         @else
             <div class="bx-messenger__empty">
@@ -128,41 +210,100 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 (() => {
-    const highlightAll = () => {
-        if (!window.hljs) return;
-        document.querySelectorAll('.tw-codeblock code, pre code.hljs').forEach((el) => {
+    if (window.hljs) {
+        document.querySelectorAll('.tw-codeblock code').forEach((el) => {
             try { window.hljs.highlightElement(el); } catch (e) {}
         });
-    };
-    highlightAll();
+    }
 
     const feed = document.getElementById('chat-feed');
     if (feed) feed.scrollTop = feed.scrollHeight;
 
+    const input = document.getElementById('bx-composer-input');
+    const parentInput = document.getElementById('chat-message-parent-id');
+    const replyBanner = document.getElementById('bx-reply-banner');
+    const replyAuthor = document.getElementById('bx-reply-author');
+    const filesInput = document.getElementById('bx-composer-files');
+    const filesLabel = document.getElementById('bx-files-label');
+
+    const autosize = () => {
+        if (!input) return;
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+    };
+    input?.addEventListener('input', autosize);
+
+    input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.querySelector('.bx-composer__send')?.click();
+        }
+    });
+
+    document.getElementById('bx-tool-code')?.addEventListener('click', () => {
+        if (!input) return;
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        const selected = input.value.slice(start, end) || 'код';
+        const block = '```\n' + selected + '\n```';
+        input.value = input.value.slice(0, start) + block + input.value.slice(end);
+        input.focus();
+        autosize();
+    });
+
+    filesInput?.addEventListener('change', () => {
+        const n = filesInput.files?.length || 0;
+        if (!filesLabel) return;
+        if (n > 0) {
+            filesLabel.textContent = n + ' файл(ов)';
+            filesLabel.classList.remove('d-none');
+        } else {
+            filesLabel.classList.add('d-none');
+        }
+    });
+
+    document.querySelectorAll('[data-bx-drop]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.getAttribute('data-bx-drop');
+            document.querySelectorAll('[data-bx-menu]').forEach((menu) => {
+                if (menu.getAttribute('data-bx-menu') === key) {
+                    menu.classList.toggle('is-open');
+                } else {
+                    menu.classList.remove('is-open');
+                }
+            });
+        });
+    });
+
     document.addEventListener('click', (e) => {
-        const reply = e.target.closest?.('.bx-reply-btn');
+        if (!e.target.closest?.('.bx-composer__dropdown')) {
+            document.querySelectorAll('[data-bx-menu]').forEach((m) => m.classList.remove('is-open'));
+        }
+
+        const reply = e.target.closest?.('.bx-msg__reply-btn');
         if (reply) {
-            const input = document.getElementById('chat-message-parent-id');
-            if (input) input.value = reply.getAttribute('data-parent-id') || '';
-            const banner = document.getElementById('reply-banner');
-            const author = document.getElementById('reply-author');
-            banner?.classList.remove('d-none');
-            if (author) author.textContent = reply.getAttribute('data-author') || 'участник';
-            document.getElementById('task-composer-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            setTimeout(() => document.querySelector('.ql-editor')?.focus(), 150);
+            if (parentInput) parentInput.value = reply.getAttribute('data-parent-id') || '';
+            replyBanner?.classList.remove('d-none');
+            if (replyAuthor) replyAuthor.textContent = reply.getAttribute('data-author') || 'участник';
+            input?.focus();
         }
 
         const copyBtn = e.target.closest?.('.tw-code-copy');
         if (copyBtn) {
             const code = copyBtn.closest('.tw-codeblock')?.querySelector('code')?.innerText || '';
             if (!code) return;
-            const done = () => {
+            navigator.clipboard?.writeText(code).then(() => {
                 const prev = copyBtn.textContent;
                 copyBtn.textContent = 'Скопировано';
                 setTimeout(() => copyBtn.textContent = prev || 'Копировать', 1200);
-            };
-            navigator.clipboard?.writeText(code).then(done).catch(() => {});
+            }).catch(() => {});
         }
+    });
+
+    document.getElementById('bx-reply-cancel')?.addEventListener('click', () => {
+        if (parentInput) parentInput.value = '';
+        replyBanner?.classList.add('d-none');
     });
 })();
 </script>

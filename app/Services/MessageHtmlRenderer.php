@@ -12,6 +12,11 @@ final class MessageHtmlRenderer
 {
     public function render(mixed $payload, ?string $plainText = null): string
     {
+        // Markdown fence из textarea чата
+        if (is_string($plainText) && str_contains($plainText, '```')) {
+            return $this->enhance($this->plainToHtml($plainText));
+        }
+
         if (is_string($payload) && $payload !== '') {
             if ($this->looksLikeHtml($payload)) {
                 return $this->enhance($this->sanitizeHtml($payload));
