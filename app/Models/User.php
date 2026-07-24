@@ -144,25 +144,40 @@ class User extends Authenticatable
     public function avatarUrl(): string
     {
         if (!empty($this->avatar_path)) {
-            $path = (string) $this->avatar_path;
-            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-                return $path;
-            }
-            if (str_starts_with($path, '/')) {
-                return url($path);
-            }
-
-            return asset('storage/' . ltrim($path, '/'));
+            return $this->resolveAvatarPath((string) $this->avatar_path);
         }
 
-        $email = strtolower(trim((string) $this->email));
-        if ($email === '') {
+        // Без внешних fallback (Gravatar d=404 мигал: load → 404 → initials).
+        // Нет загруженного фото — только стабильные инициалы.
+        return '';
+    }
+
+    public static function resolveStoredAvatarPath(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '') {
             return '';
         }
 
-        $hash = md5($email);
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
 
-        return "https://www.gravatar.com/avatar/{$hash}?s=80&d=404";
+        if (str_starts_with($path, '/')) {
+            return url($path);
+        }
+
+        // Orchid Picture иногда кладёт "storage/..." уже с префиксом
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . ltrim($path, '/'));
+    }
+
+    private function resolveAvatarPath(string $path): string
+    {
+        return static::resolveStoredAvatarPath($path);
     }
 
     public function roleLabels(): string

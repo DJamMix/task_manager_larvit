@@ -60,6 +60,12 @@ class WelcomeScreen extends Screen
                 ->route('platform.systems.inbox');
         }
 
+        if ($user?->hasAccess('platform.systems.contact.tasks')) {
+            $buttons[] = Link::make('Наблюдаемые задачи')
+                ->icon('bs.eye')
+                ->route('platform.systems.contact.tasks');
+        }
+
         if ($user?->hasAccess('platform.systems.tasks')) {
             $buttons[] = Link::make('Все задачи')
                 ->icon('bs.card-checklist')
@@ -178,6 +184,10 @@ class WelcomeScreen extends Screen
 
         if ($user?->hasAccess('platform.systems.tasks')) {
             return (string) Link::make($task->name)->route('platform.systems.tasks.edit', $task);
+        }
+
+        if ($user?->hasAccess('platform.systems.contact.tasks') && $task->canView((int) $user->id)) {
+            return (string) Link::make($task->name)->route('platform.systems.contact.tasks.view', $task);
         }
 
         if ($user?->hasAccess('platform.systems.my_tasks') && (int) $task->executor_id === (int) $user->id) {

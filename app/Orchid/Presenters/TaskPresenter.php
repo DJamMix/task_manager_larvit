@@ -101,6 +101,10 @@ class TaskPresenter extends Presenter implements Searchable
             return route('platform.systems.tasks.edit', $this->entity);
         }
 
+        if ($user->hasAccess('platform.systems.contact.tasks')) {
+            return route('platform.systems.contact.tasks.view', $this->entity);
+        }
+
         if ($user->hasAccess('platform.systems.my_tasks')) {
             return route('platform.systems.my_tasks.view', $this->entity);
         }
@@ -138,6 +142,13 @@ class TaskPresenter extends Presenter implements Searchable
 
         if($user->hasAccess('platform.systems.tasks')) {
             return $this->entity->search($query);
+        } else if ($user->hasAccess('platform.systems.contact.tasks') && $user->isClientContact()) {
+            $uid = (int) $user->id;
+            $projectIds = $user->projects()->pluck('projects.id');
+
+            return $this->entity->search($query)
+                ->whereIn('project_id', $projectIds)
+                ->whereRaw('JSON_CONTAINS(COALESCE(observers_ids, "[]"), ?)', [json_encode($uid)]);
         } else if ($user->hasAccess('platform.systems.my_tasks')) {
             return $this->entity->search($query)->where('executor_id', $user->id)
                 ->whereNotIn('status', [

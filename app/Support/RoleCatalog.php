@@ -36,6 +36,7 @@ final class RoleCatalog
             'platform.systems.client.projects',
             'platform.systems.client.project.tasks',
             'platform.systems.client.project.tasks.view',
+            'platform.systems.contact.tasks',
             'platform.systems.acts',
         ];
 
@@ -69,8 +70,7 @@ final class RoleCatalog
         $clientContact = [
             'platform.systems.attachment',
             'platform.systems.chats',
-            // Наблюдение за задачами, куда добавили наблюдателем
-            'platform.systems.my_tasks',
+            'platform.systems.contact.tasks',
         ];
 
         return [
@@ -106,7 +106,7 @@ final class RoleCatalog
             ],
             'client_contact' => [
                 'name' => 'Контакт клиента',
-                'description' => 'Чаты + наблюдение только за задачами, куда добавлен наблюдателем (в своих проектах)',
+                'description' => 'Чаты + просмотр задач, где добавлен наблюдателем (отдельный раздел)',
                 'permissions' => $clientContact,
             ],
         ];

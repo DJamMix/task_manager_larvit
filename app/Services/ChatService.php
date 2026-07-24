@@ -277,6 +277,7 @@ class ChatService
                 ->where('id', '>', $sinceMessageId)
                 ->whereIn('chat_id', $chatIds)
                 ->when($mutedIds !== [], fn ($q) => $q->whereNotIn('chat_id', $mutedIds))
+                ->when($activeChatId, fn ($q) => $q->where('chat_id', '!=', $activeChatId))
                 ->exists();
         }
 

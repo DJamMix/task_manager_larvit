@@ -52,6 +52,14 @@ class PlatformProvider extends OrchidServiceProvider
                 ->badge(fn () => $this->chatsBadgeCount())
                 ->divider(),
 
+            Menu::make('Наблюдаемые задачи')
+                ->icon('bs.eye')
+                ->route('platform.systems.contact.tasks')
+                ->permission('platform.systems.contact.tasks')
+                ->canSee(fn () => (bool) auth()->user()?->isClientContact())
+                ->title('Контакт клиента')
+                ->divider(),
+
             Menu::make('Мои проекты')
                 ->icon('bs.briefcase-fill')
                 ->route('platform.systems.client.projects')
@@ -164,7 +172,8 @@ class PlatformProvider extends OrchidServiceProvider
             ItemPermission::group('Клиент / Заказчик')
                 ->addPermission('platform.systems.client.projects', 'Мои проекты')
                 ->addPermission('platform.systems.client.project.tasks', 'Список задач проекта')
-                ->addPermission('platform.systems.client.project.tasks.view', 'Карточка задачи'),
+                ->addPermission('platform.systems.client.project.tasks.view', 'Карточка задачи')
+                ->addPermission('platform.systems.contact.tasks', 'Контакт: наблюдаемые задачи'),
         ];
     }
 }

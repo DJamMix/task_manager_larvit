@@ -31,7 +31,6 @@ class MyTasksListScreen extends Screen
     public function query(ProjectContext $context): iterable
     {
         $userId = auth()->id();
-        $user = auth()->user();
 
         $query = Task::query()
             ->where(function ($q) use ($userId) {
@@ -44,11 +43,6 @@ class MyTasksListScreen extends Screen
                 TaskStatusEnum::UNPAID->value,
                 TaskStatusEnum::DEMO->value,
             ]);
-
-        // Контакт клиента — только свои проекты
-        if ($user?->isClientContact()) {
-            $query->whereIn('project_id', $user->projects()->pluck('projects.id'));
-        }
 
         $context->applyToTaskQuery($query);
 
@@ -92,9 +86,6 @@ class MyTasksListScreen extends Screen
                 TaskStatusEnum::UNPAID->value,
                 TaskStatusEnum::DEMO->value,
             ]);
-        if ($user?->isClientContact()) {
-            $allTasks->whereIn('project_id', $user->projects()->pluck('projects.id'));
-        }
         $context->applyToTaskQuery($allTasks);
 
         $urgentTasks = clone $allTasks;

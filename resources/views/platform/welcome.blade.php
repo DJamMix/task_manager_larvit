@@ -57,6 +57,15 @@
                             Мои задачи
                         </a>
                     </div>
+                @elseif($user->hasAccess('platform.systems.contact.tasks'))
+                    <div class="crewdev-client-section">
+                        <h3 class="crewdev-section-title">Наблюдаемые задачи</h3>
+                        <p class="crewdev-card-text">Задачи, где вас добавили наблюдателем — просмотр и обсуждение.</p>
+                        <a href="{{ route('platform.systems.contact.tasks') }}" class="crewdev-primary-btn">
+                            <x-orchid-icon path="eye" class="crewdev-btn-icon"/>
+                            Открыть список
+                        </a>
+                    </div>
                 @else
                     <!-- Клиент -->
                     <div class="crewdev-client-section">

@@ -57,6 +57,10 @@ class DashboardNotifier
 
     public function taskUrlFor(User $user, Task $task): string
     {
+        if ($user->hasAccess('platform.systems.contact.tasks') && $task->canView((int) $user->id)) {
+            return URL::route('platform.systems.contact.tasks.view', $task->id);
+        }
+
         if ($user->hasAccess('platform.systems.my_tasks')
             && ((int) $task->executor_id === (int) $user->id || $task->isObserver((int) $user->id))) {
             return URL::route('platform.systems.my_tasks.view', $task->id);

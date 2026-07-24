@@ -10,6 +10,8 @@ use App\Orchid\Screens\Acts\ActListScreen;
 use App\Orchid\Screens\Client\ClientListProjectScreen;
 use App\Orchid\Screens\Client\ClientListTaskScreen;
 use App\Orchid\Screens\Client\ClientViewTaskScreen;
+use App\Orchid\Screens\Contact\ContactTasksListScreen;
+use App\Orchid\Screens\Contact\ContactTaskViewScreen;
 use App\Orchid\Screens\Examples\ExampleActionsScreen;
 use App\Orchid\Screens\Examples\ExampleCardsScreen;
 use App\Orchid\Screens\Examples\ExampleChartsScreen;
@@ -99,6 +101,25 @@ Route::screen('client/projects', ClientListProjectScreen::class)
 
 Route::screen('client/projects/{project}/tasks/{task}', ClientViewTaskScreen::class)
     ->name('platform.systems.client.project.tasks.view');
+
+Route::screen('contact/tasks', ContactTasksListScreen::class)
+    ->name('platform.systems.contact.tasks')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Наблюдаемые задачи', route('platform.systems.contact.tasks')));
+
+Route::screen('contact/tasks/{task}', ContactTaskViewScreen::class)
+    ->name('platform.systems.contact.tasks.view')
+    ->breadcrumbs(function (Trail $trail, $task) {
+        $model = $task instanceof \App\Models\Task
+            ? $task
+            : \App\Models\Task::query()->find($task);
+        $title = $model?->name ?? ('Задача #' . (string) $task);
+
+        return $trail
+            ->parent('platform.systems.contact.tasks')
+            ->push($title, route('platform.systems.contact.tasks.view', $task));
+    });
 
 Route::screen('telegram/connect', TelegramConnectScreen::class)
     ->name('platform.telegram.connect');

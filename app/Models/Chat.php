@@ -79,15 +79,7 @@ class Chat extends Model
         }
 
         if (!empty($this->avatar_path)) {
-            $path = (string) $this->avatar_path;
-            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-                return $path;
-            }
-            if (str_starts_with($path, '/')) {
-                return url($path);
-            }
-
-            return asset('storage/' . ltrim($path, '/'));
+            return User::resolveStoredAvatarPath((string) $this->avatar_path);
         }
 
         return '';
@@ -127,7 +119,11 @@ class Chat extends Model
 
         $viewerId = $viewerId ?? auth()->id();
 
-        return $this->members->first(fn (User $u) => (int) $u->id !== (int) $viewerId);
+        // Стабильный выбор: минимальный id среди «не я» (не зависит от порядка eager load)
+        return $this->members
+            ->filter(fn (User $u) => (int) $u->id !== (int) $viewerId)
+            ->sortBy('id')
+            ->first();
     }
 
     /**

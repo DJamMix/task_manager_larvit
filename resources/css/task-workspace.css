@@ -1162,6 +1162,8 @@
     overflow: hidden;
     user-select: none;
 }
+.bx-avatar--round { border-radius: 50%; }
+.bx-avatar--square { border-radius: 10px; }
 .bx-avatar--xs { width: 22px; height: 22px; font-size: 0.58rem; }
 .bx-avatar--sm { width: 34px; height: 34px; font-size: 0.72rem; }
 .bx-avatar--md { width: 40px; height: 40px; font-size: 0.82rem; }

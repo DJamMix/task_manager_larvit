@@ -24,9 +24,17 @@
                 <a href="{{ route('platform.systems.chats.view', $item) }}"
                    class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}">
                     @if($item->type === 'direct')
-                        @include('orchid.layouts.partials.bx-avatar', ['user' => $item->otherMember(), 'size' => 'md'])
+                        @include('orchid.layouts.partials.bx-avatar', [
+                            'user' => $item->otherMember(),
+                            'size' => 'md',
+                            'shape' => 'round',
+                        ])
                     @else
-                        @include('orchid.layouts.partials.bx-avatar', ['chat' => $item, 'size' => 'md'])
+                        @include('orchid.layouts.partials.bx-avatar', [
+                            'chat' => $item,
+                            'size' => 'md',
+                            'shape' => 'square',
+                        ])
                     @endif
                     <div class="bx-chat-item__body">
                         <div class="bx-chat-item__top">
@@ -59,9 +67,17 @@
             <div class="bx-messenger__header">
                 <div class="bx-messenger__header-main">
                     @if($active->type === 'direct')
-                        @include('orchid.layouts.partials.bx-avatar', ['user' => $active->otherMember(), 'size' => 'lg'])
+                        @include('orchid.layouts.partials.bx-avatar', [
+                            'user' => $active->otherMember(),
+                            'size' => 'lg',
+                            'shape' => 'round',
+                        ])
                     @else
-                        @include('orchid.layouts.partials.bx-avatar', ['chat' => $active, 'size' => 'lg'])
+                        @include('orchid.layouts.partials.bx-avatar', [
+                            'chat' => $active,
+                            'size' => 'lg',
+                            'shape' => 'square',
+                        ])
                     @endif
                     <div>
                         <h2 class="h5 mb-0">{{ $active->displayTitle() }}</h2>
@@ -644,13 +660,23 @@
 
     autosize();
 
-    /* Sound notifications — poll like Bitrix / modern messengers */
+    /* Sound notifications — short click, once per new max_id */
     const pollUrl = root?.getAttribute('data-poll-url');
     const storageKey = 'bx_chat_poll_since';
     let since = parseInt(localStorage.getItem(storageKey) || '0', 10) || 0;
     let soundUnlocked = false;
+    let audioCtx = null;
+    let lastBeepMaxId = since;
 
-    const unlockSound = () => { soundUnlocked = true; };
+    const unlockSound = () => {
+        soundUnlocked = true;
+        try {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return;
+            audioCtx = audioCtx || new Ctx();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        } catch (e) {}
+    };
     document.addEventListener('click', unlockSound, { once: true });
     document.addEventListener('keydown', unlockSound, { once: true });
 
@@ -659,20 +685,19 @@
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) return;
-            const ctx = new Ctx();
-            const o = ctx.createOscillator();
-            const g = ctx.createGain();
+            audioCtx = audioCtx || new Ctx();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
             o.type = 'sine';
-            o.frequency.setValueAtTime(880, ctx.currentTime);
-            o.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.12);
-            g.gain.setValueAtTime(0.0001, ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
-            g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.28);
+            o.frequency.value = 1400;
+            g.gain.setValueAtTime(0.1, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
             o.connect(g);
-            g.connect(ctx.destination);
-            o.start();
-            o.stop(ctx.currentTime + 0.3);
-            setTimeout(() => ctx.close().catch(() => {}), 400);
+            g.connect(audioCtx.destination);
+            o.start(t);
+            o.stop(t + 0.055);
         } catch (e) {}
     };
 
@@ -691,9 +716,13 @@
             });
             if (!res.ok) return;
             const data = await res.json();
-            if (data.sound) playNotifySound();
-            if (data.max_id && data.max_id > since) {
-                since = data.max_id;
+            const maxId = parseInt(data.max_id || '0', 10) || 0;
+            if (data.sound && maxId > lastBeepMaxId) {
+                playNotifySound();
+                lastBeepMaxId = maxId;
+            }
+            if (maxId > since) {
+                since = maxId;
                 localStorage.setItem(storageKey, String(since));
             }
             (data.chats || []).forEach((c) => {
