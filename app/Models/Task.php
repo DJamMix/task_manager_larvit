@@ -44,6 +44,15 @@ class Task extends Model
         'priority',
     ];
 
+    protected $casts = [
+        'start_datetime' => 'datetime',
+        'end_datetime' => 'datetime',
+        'pay_status' => 'boolean',
+        'hours_spent' => 'float',
+        'estimation_hours' => 'float',
+        'observers_ids' => 'array',
+    ];
+
     protected $allowedFilters = [
         'task_category_id' => TaskCategoryFilter::class,
         'status' => TaskStatusFilter::class,

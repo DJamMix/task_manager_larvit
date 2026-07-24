@@ -2,112 +2,196 @@
 
 namespace App\Orchid\Screens\System;
 
+use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskStatusEnum;
+use App\Models\Task;
+use App\Orchid\Layouts\Dashboard\HoursLineChart;
+use App\Orchid\Layouts\Dashboard\PriorityBarChart;
+use App\Orchid\Layouts\Dashboard\ProjectHoursBarChart;
+use App\Orchid\Layouts\Dashboard\StatusPieChart;
+use App\Orchid\Layouts\Dashboard\ThroughputLineChart;
+use App\Orchid\Layouts\Dashboard\WorkloadBarChart;
+use App\Services\DashboardAnalyticsService;
+use App\Services\ProjectContext;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
+use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 
 class WelcomeScreen extends Screen
 {
-    /**
-     * Fetch data to be displayed on the screen.
-     *
-     * @return array
-     */
-    public function query(): iterable
+    public function query(DashboardAnalyticsService $analytics, ProjectContext $context): iterable
     {
         $user = auth()->user();
-        $projects = collect([]);
+        $data = $analytics->forUser($user);
 
-        if (auth()->check()) {
-            $projects = $user->projects()
-                ->limit(3)
-                ->get()
-                ->map(function ($project) {
-                    $tasks = $project->tasks;
-                    $totalTasks = $tasks->count();
-                    
-                    if ($totalTasks > 0) {
-                        $completedTasks = $tasks->whereIn('status', [
-                            TaskStatusEnum::COMPLETED->value,
-                            TaskStatusEnum::CANCELED->value,
-                            TaskStatusEnum::UNPAID->value,
-                            TaskStatusEnum::DEMO->value,
-                        ])->count();
-                        
-                        $progress = round(($completedTasks / $totalTasks) * 100);
-                    } else {
-                        $progress = 0;
-                    }
-                    
-                    return [
-                        'id' => $project->id,
-                        'name' => $project->name,
-                        'progress' => $progress,
-                        'tasks_count' => $totalTasks,
-                        'completed_tasks_count' => $completedTasks ?? 0
-                    ];
-                });
-        }
-
-        return [
+        return array_merge($data, [
             'user' => $user,
-            'stats' => [
-                'active_tasks' => $user->assignedTasks()->whereNotIn('status', [
-                    TaskStatusEnum::COMPLETED->value,
-                    TaskStatusEnum::CANCELED->value,
-                    TaskStatusEnum::UNPAID->value,
-                    TaskStatusEnum::DEMO->value,
-                ])->count(),
-                'completed_tasks' => $user->assignedTasks()->whereIn('status', [
-                    TaskStatusEnum::COMPLETED->value,
-                    TaskStatusEnum::CANCELED->value,
-                    TaskStatusEnum::UNPAID->value,
-                    TaskStatusEnum::DEMO->value,
-                ])->count(),
-            ],
-            'projects' => $projects,
-            'technologies' => [
-                ['name' => 'Laravel', 'purpose' => 'Backend'],
-                ['name' => 'Vue.js', 'purpose' => 'Frontend'],
-                ['name' => 'Nuxt.js', 'purpose' => 'Frontend'],
-            ]
-        ];
+            'activeProject' => $context->project(),
+            'metrics' => $data['metrics'],
+        ]);
     }
 
-    /**
-     * The name of the screen displayed in the header.
-     *
-     * @return string|null
-     */
     public function name(): ?string
     {
-        return 'CrewDev - Умный менеджер задач';
+        $project = app(ProjectContext::class)->project();
+
+        return $project
+            ? 'Аналитика — ' . $project->name
+            : 'Аналитика';
     }
 
     public function description(): ?string
     {
-        return 'Эффективное управление проектами и задачами';
+        return 'Сводка по задачам, времени, нагрузке и узким местам. Контекст проекта — в меню слева.';
     }
 
-    /**
-     * The screen's action buttons.
-     *
-     * @return \Orchid\Screen\Action[]
-     */
     public function commandBar(): iterable
     {
-        return [];
+        $user = auth()->user();
+        $buttons = [];
+
+        if ($user?->hasAccess('platform.systems.my_tasks')) {
+            $buttons[] = Link::make('Мои задачи')
+                ->icon('bs.journal-check')
+                ->route('platform.systems.my_tasks');
+            $buttons[] = Link::make('Входящие')
+                ->icon('bs.inbox')
+                ->route('platform.systems.inbox');
+        }
+
+        if ($user?->hasAccess('platform.systems.tasks')) {
+            $buttons[] = Link::make('Все задачи')
+                ->icon('bs.card-checklist')
+                ->route('platform.systems.tasks');
+        }
+
+        if ($user?->hasAccess('platform.systems.acts')) {
+            $buttons[] = Link::make('Акты')
+                ->icon('bs.journal-text')
+                ->route('platform.systems.acts');
+        }
+
+        return $buttons;
     }
 
-    /**
-     * The screen's layout elements.
-     *
-     * @return \Orchid\Screen\Layout[]|string[]
-     */
     public function layout(): iterable
     {
-        return [
-            Layout::view('platform.welcome'),
+        $user = auth()->user();
+        $isAdmin = $user?->hasAccess('platform.systems.tasks')
+            || $user?->hasAccess('platform.systems.projects');
+
+        $layouts = [
+            Layout::view('partials.project-context-banner'),
+            Layout::view('orchid.layouts.dashboard-header'),
+
+            Layout::metrics([
+                'Активные' => 'metrics.active',
+                'В работе' => 'metrics.in_progress',
+                'Просрочено' => 'metrics.overdue',
+                'Закрыто за месяц' => 'metrics.completed_month',
+                'Часы за неделю' => 'metrics.hours_week',
+                'Часы за месяц' => 'metrics.hours_month',
+            ]),
+
+            Layout::metrics([
+                'Ждут клиента' => 'metrics.waiting_client',
+                'Ждут команду' => 'metrics.waiting_team',
+                'Проекты' => 'metrics.projects',
+                'Всего задач' => 'metrics.total',
+                'Факт / оценка' => 'metrics.estimate_ratio',
+                'Списано всего' => 'metrics.spent_total',
+            ]),
+
+            Layout::view('orchid.layouts.dashboard-pipeline'),
+
+            Layout::columns([
+                StatusPieChart::make('chart_status', 'Распределение по статусам')
+                    ->description('Текущий пайплайн задач'),
+                PriorityBarChart::make('chart_priority', 'По приоритетам')
+                    ->description('P0–P5: где сосредоточена нагрузка'),
+            ]),
+
+            Layout::columns([
+                HoursLineChart::make('chart_hours', 'Трекинг времени (14 дней)')
+                    ->description('Фактически списанные часы по дням'),
+                ThroughputLineChart::make('chart_throughput', 'Создано vs закрыто (8 недель)')
+                    ->description('Пропускная способность команды'),
+            ]),
         ];
+
+        if ($isAdmin) {
+            $layouts[] = Layout::columns([
+                WorkloadBarChart::make('chart_workload', 'Нагрузка исполнителей')
+                    ->description('Активные задачи по людям'),
+                ProjectHoursBarChart::make('chart_projects_hours', 'Часы по проектам (30 дней)')
+                    ->description('Куда уходит время'),
+            ]);
+        } else {
+            $layouts[] = ProjectHoursBarChart::make('chart_projects_hours', 'Часы по проектам (30 дней)')
+                ->description('Куда уходит время');
+        }
+
+        $layouts[] = Layout::view('orchid.layouts.dashboard-insights');
+
+        $layouts[] = Layout::tabs([
+            'Просроченные' => Layout::table('overdue_tasks', [
+                TD::make('name', 'Задача')
+                    ->render(fn (Task $task) => $this->taskLink($task)),
+                TD::make('project', 'Проект')
+                    ->render(fn (Task $task) => e($task->project?->name ?? '—')),
+                TD::make('executor', 'Исполнитель')
+                    ->render(fn (Task $task) => e($task->executor?->name ?? '—')),
+                TD::make('priority', 'Приоритет')
+                    ->render(function (Task $task) {
+                        $p = TaskPriorityEnum::tryFrom((string) $task->priority);
+
+                        return $p ? $p->badgeHtml() : '—';
+                    }),
+                TD::make('end_datetime', 'Дедлайн')
+                    ->render(fn (Task $task) => $task->end_datetime
+                        ? $task->end_datetime->format('d.m.Y H:i')
+                        : '—'),
+                TD::make('status', 'Статус')
+                    ->render(fn (Task $task) => TaskStatusEnum::tryFrom($task->status)?->label() ?? $task->status),
+            ]),
+            'Недавние изменения' => Layout::table('recent_activity', [
+                TD::make('updated_at', 'Когда')
+                    ->render(fn (Task $task) => $task->updated_at?->format('d.m.Y H:i') ?? '—'),
+                TD::make('name', 'Задача')
+                    ->render(fn (Task $task) => $this->taskLink($task)),
+                TD::make('project', 'Проект')
+                    ->render(fn (Task $task) => e($task->project?->name ?? '—')),
+                TD::make('status', 'Статус')
+                    ->render(fn (Task $task) => TaskStatusEnum::tryFrom($task->status)?->label() ?? $task->status),
+                TD::make('executor', 'Исполнитель')
+                    ->render(fn (Task $task) => e($task->executor?->name ?? '—')),
+            ]),
+        ]);
+
+        return $layouts;
+    }
+
+    private function taskLink(Task $task): string
+    {
+        $user = auth()->user();
+
+        if ($user?->hasAccess('platform.systems.tasks')) {
+            return (string) Link::make($task->name)->route('platform.systems.tasks.edit', $task);
+        }
+
+        if ($user?->hasAccess('platform.systems.my_tasks') && (int) $task->executor_id === (int) $user->id) {
+            return (string) Link::make($task->name)->route('platform.systems.my_tasks.view', $task);
+        }
+
+        if ($user?->hasAccess('platform.systems.client.project.tasks.view') && $task->project_id) {
+            return (string) Link::make($task->name)
+                ->route('platform.systems.client.project.tasks.view', [
+                    'project' => $task->project_id,
+                    'task' => $task->id,
+                ]);
+        }
+
+        return e($task->name);
     }
 }
