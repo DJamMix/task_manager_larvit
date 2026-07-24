@@ -145,9 +145,8 @@ return [
      |
      */
 
-    'vite' => [
-        'resources/css/project-switcher.css',
-    ],
+    // Не через Vite: стили уже в public/css (см. resource.stylesheets выше)
+    'vite' => [],
 
     /*
      |--------------------------------------------------------------------------

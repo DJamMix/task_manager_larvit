@@ -10,6 +10,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/css/custom-styles.css',
                 'resources/css/welcome.css',
+                'resources/css/project-switcher.css',
                 'resources/js/welcome.js'
             ],
             refresh: true,
