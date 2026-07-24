@@ -273,6 +273,14 @@ Route::screen('chats', \App\Orchid\Screens\Chat\MessengerScreen::class)
 
 Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
     ->name('platform.systems.chats.view')
-    ->breadcrumbs(fn (Trail $trail, $chat) => $trail
-        ->parent('platform.systems.chats')
-        ->push($chat->displayTitle(), route('platform.systems.chats.view', $chat)));
+    ->breadcrumbs(function (Trail $trail, $chat) {
+        $model = $chat instanceof \App\Models\Chat
+            ? $chat
+            : \App\Models\Chat::query()->find($chat);
+
+        $title = $model?->displayTitle() ?? ('Чат #' . (string) $chat);
+
+        return $trail
+            ->parent('platform.systems.chats')
+            ->push($title, route('platform.systems.chats.view', $chat));
+    });
