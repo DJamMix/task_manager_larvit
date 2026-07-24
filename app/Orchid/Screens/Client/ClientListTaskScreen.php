@@ -18,6 +18,7 @@ use Orchid\Attachment\Models\Attachment;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Layouts\Modal;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
@@ -151,7 +152,9 @@ class ClientListTaskScreen extends Screen
                 ClientTaskCreateModalLayout::class,
             ])
                 ->title('Создание задачи')
-                ->applyButton('Создать'),
+                ->size(Modal::SIZE_XL)
+                ->applyButton('Создать задачу')
+                ->closeButton('Отмена'),
         ];
     }
 }

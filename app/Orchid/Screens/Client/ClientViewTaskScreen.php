@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
+use Orchid\Screen\Layouts\Modal;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
@@ -303,6 +304,7 @@ class ClientViewTaskScreen extends Screen
                 ClientTaskCreateModalLayout::class,
             ])
                 ->title('Редактирование задачи')
+                ->size(Modal::SIZE_XL)
                 ->applyButton('Сохранить')
                 ->closeButton('Отмена'),
 

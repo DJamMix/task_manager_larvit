@@ -17,6 +17,7 @@ use App\Services\ProjectContext;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Screen;
+use Orchid\Screen\Layouts\Modal;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
 
@@ -173,6 +174,10 @@ class MyTasksListScreen extends Screen
 
         $task->save();
 
+        $task->attachments()->syncWithoutDetaching(
+            $request->input('task.attachments', [])
+        );
+
         Toast::info('Задача успешно создана и передана на согласование');
 
         return redirect()->back();
@@ -218,7 +223,9 @@ class MyTasksListScreen extends Screen
                 MyTasksCreateModalLayout::class,
             ])
                 ->title('Создание задачи')
-                ->applyButton('Создать'),
+                ->size(Modal::SIZE_XL)
+                ->applyButton('Создать задачу')
+                ->closeButton('Отмена'),
         ];
     }
 }

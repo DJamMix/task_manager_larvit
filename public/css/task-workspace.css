@@ -395,3 +395,45 @@
         max-height: 360px;
     }
 }
+
+/* Create / edit task modal */
+#screen-modal-createTaskModal .modal-dialog,
+#screen-modal-editTaskModal .modal-dialog {
+    max-width: min(1080px, 96vw);
+    margin: 1.25rem auto;
+}
+
+#screen-modal-createTaskModal .modal-body,
+#screen-modal-editTaskModal .modal-body {
+    max-height: min(75vh, 780px);
+    overflow-y: auto;
+    padding-top: 0.5rem;
+}
+
+#screen-modal-createTaskModal .form-group,
+#screen-modal-editTaskModal .form-group {
+    margin-bottom: 0.85rem !important;
+}
+
+#screen-modal-createTaskModal .ql-container,
+#screen-modal-editTaskModal .ql-container {
+    min-height: 200px !important;
+}
+
+#screen-modal-createTaskModal .ql-editor,
+#screen-modal-editTaskModal .ql-editor {
+    min-height: 180px !important;
+}
+
+#screen-modal-createTaskModal .row,
+#screen-modal-editTaskModal .row {
+    --bs-gutter-x: 1rem;
+    align-items: flex-start;
+}
+
+#screen-modal-createTaskModal .upload-container,
+#screen-modal-createTaskModal .dropzone,
+#screen-modal-editTaskModal .upload-container,
+#screen-modal-editTaskModal .dropzone {
+    min-height: 72px !important;
+}

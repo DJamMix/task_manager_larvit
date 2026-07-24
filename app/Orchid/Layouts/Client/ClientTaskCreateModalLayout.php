@@ -6,7 +6,7 @@ use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\TaskCategory;
 use Orchid\Screen\Field;
-use Orchid\Screen\Fields\Attach;
+use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Quill;
@@ -16,45 +16,34 @@ use Orchid\Screen\Layouts\Rows;
 
 class ClientTaskCreateModalLayout extends Rows
 {
-    /**
-     * Used to create the title of a group of form elements.
-     *
-     * @var string|null
-     */
     protected $title;
 
-    /**
-     * Get the fields elements to be displayed.
-     *
-     * @return Field[]
-     */
     protected function fields(): iterable
     {
         return [
+            Label::make('create_hint')
+                ->value('Опишите задачу понятно для команды. После создания она уйдёт на согласование.'),
+
             Input::make('task.name')
                 ->type('text')
                 ->max(255)
                 ->required()
-                ->title(__('task.name'))
-                ->placeholder(__('task.name')),
+                ->title('Название')
+                ->placeholder('Кратко: что нужно сделать'),
 
-            Select::make('task.task_category_id')
-                ->fromModel(TaskCategory::class, 'name', 'id')
-                ->title(__('task.task_category_id'))
-                ->required(),
+            Group::make([
+                Select::make('task.task_category_id')
+                    ->fromModel(TaskCategory::class, 'name', 'id')
+                    ->title('Категория')
+                    ->required()
+                    ->empty('Выберите'),
 
-            Select::make('task.type_task')
-                ->options(TaskTypeEnum::options())
-                ->title('Тип задачи')
-                ->required()
-                ->help('Выберите тип задачи')
-                ->value(TaskTypeEnum::DEFAULT->value),
-
-            Label::make('priority_help')
-                ->title('Приоритет — что брать первым')
-                ->help(collect(TaskPriorityEnum::orderedCases())
-                    ->map(fn ($p) => "<b>{$p->code()} {$p->label()}:</b> {$p->description()}")
-                    ->join('<br>')),
+                Select::make('task.type_task')
+                    ->options(TaskTypeEnum::options())
+                    ->title('Тип')
+                    ->required()
+                    ->value(TaskTypeEnum::DEFAULT->value),
+            ])->fullWidth(),
 
             Select::make('task.priority')
                 ->options(
@@ -62,21 +51,25 @@ class ClientTaskCreateModalLayout extends Rows
                         ->mapWithKeys(fn ($p) => [$p->value => "{$p->code()} · {$p->label()}"])
                         ->all()
                 )
-                ->title('Приоритет задачи')
+                ->title('Приоритет')
                 ->required()
-                ->help('P0 — критично, P3 — обычная очередь')
-                ->value(TaskPriorityEnum::MEDIUM->value),
+                ->value(TaskPriorityEnum::MEDIUM->value)
+                ->help('P0 — критично, P3 — обычная очередь'),
 
-            Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])
-                ->title(__('task.description'))
+            Quill::make('task.description')
+                ->toolbar(['text', 'list', 'quote', 'format'])
+                ->height('220px')
+                ->title('Описание')
+                ->placeholder('Контекст, шаги, ожидаемый результат. Код — кнопкой </>')
                 ->required(),
 
             Upload::make('task.attachments')
-                ->title('Прикрепленные файлы')
-                ->acceptedFiles('image/*,application/pdf,.psd')
+                ->title('Файлы')
+                ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig')
                 ->storage('public')
-                ->maxFileSize(1024)
-                ->help('Допустимые форматы: JPG, PNG, PDF, PSD. Макс. размер: 1 ГБ'),
+                ->maxFileSize(50)
+                ->maxFiles(10)
+                ->help('Скриншоты, макеты, документы — до 50 МБ'),
         ];
     }
 }
