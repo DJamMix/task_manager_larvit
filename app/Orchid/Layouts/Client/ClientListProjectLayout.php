@@ -9,38 +9,54 @@ use Orchid\Screen\TD;
 
 class ClientListProjectLayout extends Table
 {
-    /**
-     * Data source.
-     *
-     * The name of the key to fetch it from the query.
-     * The results of which will be elements of the table.
-     *
-     * @var string
-     */
     protected $target = 'projects';
 
-    /**
-     * Get the table cells to be displayed.
-     *
-     * @return TD[]
-     */
     protected function columns(): iterable
     {
         return [
             TD::make('name', 'Название проекта')
                 ->render(function (Project $project) {
                     return Link::make($project->name)
+                        ->route('platform.project-context.switch', ['project_id' => $project->id]);
+                }),
+
+            TD::make('progress', 'Прогресс')
+                ->render(function (Project $project) {
+                    $stats = $project->progressStats();
+
+                    return sprintf(
+                        '<div class="progress" style="height: 8px; min-width: 120px;">
+                            <div class="progress-bar" role="progressbar" style="width: %d%%"></div>
+                         </div>
+                         <small class="text-muted">%d%% · %d из %d задач</small>',
+                        $stats['percent'],
+                        $stats['percent'],
+                        $stats['done'],
+                        $stats['total']
+                    );
+                }),
+
+            TD::make('active', 'В работе')
+                ->render(fn (Project $project) => $project->progressStats()['active']),
+
+            TD::make('hours', 'Часы факт / оценка')
+                ->render(function (Project $project) {
+                    $stats = $project->progressStats();
+
+                    return sprintf(
+                        '%s / %s',
+                        number_format($stats['hours_spent'], 1),
+                        $stats['hours_estimated'] > 0
+                            ? number_format($stats['hours_estimated'], 1)
+                            : '—'
+                    );
+                }),
+
+            TD::make('open', 'Открыть')
+                ->render(function (Project $project) {
+                    return Link::make('Задачи')
+                        ->icon('bs.arrow-right')
                         ->route('platform.systems.client.project.tasks', ['project' => $project]);
-                }),
-            
-            TD::make('tasks_count', 'Количество задач')
-                ->render(function (Project $project) {
-                    return $project->tasks()->count();
-                }),
-                
-            TD::make('created_at', 'Дата создания')
-                ->render(function (Project $project) {
-                    return $project->created_at->format('d.m.Y H:i');
                 }),
         ];
     }

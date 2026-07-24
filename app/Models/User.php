@@ -92,15 +92,29 @@ class User extends Authenticatable
     }
 
     /**
-     * Связь многие-ко-многим с проектами
+     * Связь многие-ко-многим с проектами (клиент)
      */
     public function projects()
     {
         return $this->belongsToMany(Project::class, 'client_project');
     }
 
+    /**
+     * Проекты, где пользователь — участник команды
+     */
+    public function memberProjects()
+    {
+        return $this->belongsToMany(Project::class, 'project_members')
+            ->withTimestamps();
+    }
+
     public function comments()
     {
         return $this->hasMany(Comment::class);
+    }
+
+    public function timeEntries()
+    {
+        return $this->hasMany(TrackingTime::class);
     }
 }

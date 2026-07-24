@@ -127,7 +127,8 @@ return [
 
     'resource' => [
         'stylesheets' => [
-            '/css/footer.css'
+            '/css/footer.css',
+            '/css/project-switcher.css',
         ],
         'scripts'     => [],
     ],
@@ -144,7 +145,9 @@ return [
      |
      */
 
-    'vite' => [],
+    'vite' => [
+        'resources/css/project-switcher.css',
+    ],
 
     /*
      |--------------------------------------------------------------------------

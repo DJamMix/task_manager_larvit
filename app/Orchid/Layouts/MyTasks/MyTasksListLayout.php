@@ -34,10 +34,18 @@ class MyTasksListLayout extends Table
         return [
             TD::make('name', __('task.name'))
                 ->render(function (Task $task) {
-                    return Link::make($task->name)
+                    $link = Link::make($task->name)
                         ->route('platform.systems.my_tasks.view', $task->id)
                         ->class('text-truncate d-inline-block')
                         ->style('max-width: 200px; white-space: normal; word-break: break-word;');
+
+                    $html = (string) $link;
+
+                    if ($task->isOverdue()) {
+                        $html .= ' <span class="badge text-bg-danger overdue-badge">просрочено</span>';
+                    }
+
+                    return $html;
                 })
                 ->width('200px')
                 ->style('max-width: 200px'),
@@ -85,12 +93,24 @@ class MyTasksListLayout extends Table
                     if (!$priority) {
                         return 'N/A';
                     }
-                    
+
                     return sprintf(
                         '<span class="me-2">%s</span> %s',
                         $priority->icon(),
                         $priority->label()
                     );
+                }),
+
+            TD::make('hours', 'Факт / оценка')
+                ->align(TD::ALIGN_CENTER)
+                ->width('120px')
+                ->render(function (Task $task) {
+                    $spent = number_format((float) $task->hours_spent, 1);
+                    $est = (float) $task->estimation_hours > 0
+                        ? number_format((float) $task->estimation_hours, 1)
+                        : '—';
+
+                    return "<span title=\"Факт не влияет на оценку\">{$spent} / {$est}</span>";
                 }),
 
             TD::make('actions', 'Действия')

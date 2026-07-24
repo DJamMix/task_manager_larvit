@@ -29,17 +29,25 @@ class TaskEditScreen extends Screen
      */
     public function query(Task $task): iterable
     {
+        if (!$task->exists) {
+            $context = app(\App\Services\ProjectContext::class);
+            if ($context->has()) {
+                $task->project_id = $context->id();
+            }
+        }
+
         return [
             'task' => $task,
-            'comments' => $task->comments()
-                ->with('user')
-                ->latest()
-                ->get()
-                ->map(fn($comment) => $this->transformComment($comment)),
-            'timeEntries' => $task->timeEntries()
-                ->with('user')
-                ->latest()
-                ->get(),
+            'comments' => $task->exists
+                ? $task->comments()
+                    ->with('user')
+                    ->latest()
+                    ->get()
+                    ->map(fn ($comment) => $this->transformComment($comment))
+                : collect(),
+            'timeEntries' => $task->exists
+                ? $task->timeEntries()->with('user')->latest()->get()
+                : collect(),
         ];
     }
 
@@ -128,7 +136,16 @@ class TaskEditScreen extends Screen
      */
     public function save(Request $request, Task $task)
     {
-        $task->fill($request->get('task'));
+        $data = $request->get('task');
+
+        if (!$task->exists && empty($data['project_id'])) {
+            $contextId = app(\App\Services\ProjectContext::class)->id();
+            if ($contextId) {
+                $data['project_id'] = $contextId;
+            }
+        }
+
+        $task->fill($data);
         $task->save();
 
         $task->attachments()->syncWithoutDetaching(

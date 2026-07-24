@@ -172,6 +172,7 @@ class ActCreationService
             $act->customer = $actData['customer'];
             $act->executor = $actData['executor'];
             $act->info = $actData['info'] ?? '';
+            $act->project_id = $actData['project_id'] ?? null;
             $act->total_hours = $selectedTasks['totalHours'];
             $act->total_tasks = $selectedTasks['totalTasks'];
             $act->status = 'generated';
@@ -185,6 +186,7 @@ class ActCreationService
             Log::info('Акт успешно создан', [
                 'act_id' => $act->id,
                 'number' => $act->number,
+                'project_id' => $act->project_id,
                 'total_hours' => $act->total_hours,
             ]);
             

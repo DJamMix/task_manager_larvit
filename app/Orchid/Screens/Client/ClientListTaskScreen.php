@@ -32,13 +32,28 @@ class ClientListTaskScreen extends Screen
      */
     public function query(Project $project, Request $request): iterable
     {
+        // Синхронизируем глобальный контекст с открытым проектом клиента
+        app(\App\Services\ProjectContext::class)->set($project->id);
+
+        // Проверка доступа: проект должен быть привязан к клиенту
+        $user = $request->user();
+        if (
+            $user
+            && !$user->hasAccess('platform.systems.tasks')
+            && !$user->projects()->where('projects.id', $project->id)->exists()
+        ) {
+            abort(403);
+        }
+
         $tasks = $project->tasks()
             ->filters()
+            ->with(['category', 'executor'])
             ->paginate(15);
 
         return [
             'tasks' => $tasks,
             'project' => $project,
+            'project_stats' => $project->progressStats(),
         ];
     }
 
@@ -122,6 +137,8 @@ class ClientListTaskScreen extends Screen
     public function layout(): iterable
     {
         return [
+            Layout::view('partials.project-context-banner'),
+            Layout::view('orchid.layouts.client-project-stats'),
             Layout::selection([
                 TaskCategoryFilter::class,
                 TaskStatusFilter::class,
@@ -131,10 +148,10 @@ class ClientListTaskScreen extends Screen
             ClientListTaskLayout::class,
 
             Layout::modal('createTaskModal', [
-                ClientTaskCreateModalLayout::class
+                ClientTaskCreateModalLayout::class,
             ])
-            ->title('Создание задачи')
-            ->applyButton('Создать'),
+                ->title('Создание задачи')
+                ->applyButton('Создать'),
         ];
     }
 }

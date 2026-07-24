@@ -16,23 +16,15 @@ class ProjectEditScreen extends Screen
      */
     public $project;
 
-    /**
-     * Fetch data to be displayed on the screen.
-     *
-     * @return array
-     */
     public function query(Project $project): iterable
     {
+        $project->load('members');
+
         return [
             'project' => $project,
         ];
     }
 
-    /**
-     * The name of the screen displayed in the header.
-     *
-     * @return string|null
-     */
     public function name(): ?string
     {
         return $this->project->exists ? 'Редактировать' : 'Создать';
@@ -45,11 +37,6 @@ class ProjectEditScreen extends Screen
         ];
     }
 
-    /**
-     * The screen's action buttons.
-     *
-     * @return \Orchid\Screen\Action[]
-     */
     public function commandBar(): iterable
     {
         return [
@@ -65,11 +52,6 @@ class ProjectEditScreen extends Screen
         ];
     }
 
-    /**
-     * The screen's layout elements.
-     *
-     * @return \Orchid\Screen\Layout[]|string[]
-     */
     public function layout(): iterable
     {
         return [
@@ -77,28 +59,31 @@ class ProjectEditScreen extends Screen
         ];
     }
 
-    /**
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function save(Request $request, Project $project)
     {
         $request->validate([
             'project.name' => 'required|string|max:255',
+            'project.description' => 'nullable|string',
+            'project.is_active' => 'nullable|boolean',
         ]);
 
-        $project->fill($request->get('project'));
+        $data = $request->get('project');
+        $memberIds = $data['members'] ?? [];
+        unset($data['members']);
+
+        if (!array_key_exists('is_active', $data)) {
+            $data['is_active'] = true;
+        }
+
+        $project->fill($data);
         $project->save();
+        $project->members()->sync(array_filter((array) $memberIds));
 
         Toast::info(__('model_project.save'));
 
         return redirect()->route('platform.systems.projects');
     }
 
-    /**
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function remove(Project $project)
     {
         $project->delete();

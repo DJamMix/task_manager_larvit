@@ -36,6 +36,21 @@ class TaskEditLayout extends Rows
     protected function fields(): iterable
     {
         $taskStatus = $this->query->get('task.status');
+        $context = app(\App\Services\ProjectContext::class);
+        $task = $this->query->get('task');
+        $isNew = !($task?->exists ?? false);
+
+        $projectField = Select::make('task.project_id')
+            ->fromModel(Project::class, 'name', 'id')
+            ->title(__('task.project_id'))
+            ->required()
+            ->width('50%');
+
+        if ($isNew && $context->has()) {
+            $projectField
+                ->value($context->id())
+                ->help('Подставлено из активного проекта. Можно сменить.');
+        }
 
         return [
             Group::make([
@@ -61,11 +76,7 @@ class TaskEditLayout extends Rows
                     ->empty('Не выбран')
                     ->width('50%'),
 
-                Select::make('task.project_id')
-                    ->fromModel(Project::class, 'name', 'id')
-                    ->title(__('task.project_id'))
-                    ->required()
-                    ->width('50%'),
+                $projectField,
             ])->fullWidth(),
 
             Group::make([
@@ -106,49 +117,17 @@ class TaskEditLayout extends Rows
                     ->title('Оценка в часах')
                     ->step('0.5')
                     ->min(0)
-                    ->help('Плановое время на выполнение задачи')
+                    ->help('Плановое время. Не зависит от фактического трекинга.')
                     ->readonly()
                     ->width('50%'),
+
+                DateTimer::make('task.end_datetime')
+                    ->title('Дедлайн')
+                    ->enableTime()
+                    ->allowInput()
+                    ->help('Срок сдачи задачи')
+                    ->width('50%'),
             ])->fullWidth(),
-
-            // DateTimer::make('task.start_datetime')
-            //     ->title(__('task.start_datetime'))
-            //     ->serverFormat('Y-m-d H:i:s')
-            //     ->enableTime()
-            //     ->allowInput()
-            //     ->withQuickDates([
-            //         'Сегодня'     => now(),
-            //         'Завтра'      => now()->addDay(),
-            //         'Через неделю' => now()->addWeek(),
-            //     ]),
-
-            // DateTimer::make('task.end_datetime')
-            //     ->title(__('task.end_datetime'))
-            //     ->serverFormat('Y-m-d H:i:s')
-            //     ->enableTime()
-            //     ->allowInput()
-            //     ->withQuickDates([
-            //         'Сегодня'     => now(),
-            //         'Завтра'      => now()->addDay(),
-            //         'Через неделю' => now()->addWeek(),
-            //     ]),
-
-            // Input::make('task.cost_estimation')
-            //     ->type('number')
-            //     ->title(__('task.cost_estimation'))
-            //     ->step('0.01')
-            //     ->min(0),
-
-            // CheckBox::make('task.pay_status')
-            //     ->title(__('task.pay_status'))
-            //     ->sendTrueOrFalse(),
-
-            // Input::make('task.hours_spent')
-            //     ->title(__('task.hours_spent'))
-            //     ->type('number')
-            //     ->step('0.01')
-            //     ->min(0)
-            //     ->value(0),
 
             Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])
                 ->title(__('task.description')),

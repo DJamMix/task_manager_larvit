@@ -186,4 +186,50 @@ class Task extends Model
     {
         return $this->acts->pluck('number')->implode(', ');
     }
+
+    /**
+     * Трекинг времени доступен исполнителю сразу после назначения,
+     * независимо от оценки. Оценка живёт отдельно (estimation_hours).
+     */
+    public function canTrackTime(?int $userId = null): bool
+    {
+        $userId = $userId ?? auth()->id();
+
+        if (!$userId || (int) $this->executor_id !== (int) $userId) {
+            return false;
+        }
+
+        return !in_array($this->status, [
+            TaskStatusEnum::DRAFT->value,
+            TaskStatusEnum::CANCELED->value,
+        ], true);
+    }
+
+    public function isOverdue(): bool
+    {
+        if (!$this->end_datetime) {
+            return false;
+        }
+
+        if (in_array($this->status, [
+            TaskStatusEnum::COMPLETED->value,
+            TaskStatusEnum::CANCELED->value,
+            TaskStatusEnum::UNPAID->value,
+        ], true)) {
+            return false;
+        }
+
+        return now()->greaterThan($this->end_datetime);
+    }
+
+    public function spentVsEstimateRatio(): ?float
+    {
+        $estimate = (float) $this->estimation_hours;
+
+        if ($estimate <= 0) {
+            return null;
+        }
+
+        return (float) $this->hours_spent / $estimate;
+    }
 }

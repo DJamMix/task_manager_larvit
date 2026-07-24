@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\ProjectContextController;
 use App\Models\TaskAttachment;
 use App\Orchid\Layouts\Client\ClientTaskViewLayout;
 use App\Orchid\Screens\Acts\ActEditScreen;
@@ -20,6 +21,8 @@ use App\Orchid\Screens\Examples\ExampleScreen;
 use App\Orchid\Screens\Examples\ExampleTextEditorsScreen;
 use App\Orchid\Screens\MyTasks\MyTasksListScreen;
 use App\Orchid\Screens\MyTasks\MyTasksViewScreen;
+use App\Orchid\Screens\MyTasks\MyTimeScreen;
+use App\Orchid\Screens\MyTasks\InboxScreen;
 use App\Orchid\Screens\PlatformScreen;
 use App\Orchid\Screens\Project\ProjectEditScreen;
 use App\Orchid\Screens\Project\ProjectListScreen;
@@ -53,6 +56,9 @@ use Tabuna\Breadcrumbs\Trail;
 // Main
 Route::screen('/welcome', WelcomeScreen::class)
     ->name('platform.welcome');
+
+Route::get('project-context/switch', [ProjectContextController::class, 'switch'])
+    ->name('platform.project-context.switch');
 
 // Platform > Profile
 Route::screen('profile', UserProfileScreen::class)
@@ -246,3 +252,15 @@ Route::screen('my_tasks/{task}/view', MyTasksViewScreen::class)
     ->breadcrumbs(fn (Trail $trail, $task) => $trail
         ->parent('platform.systems.my_tasks')
         ->push($task->name, route('platform.systems.my_tasks.view', $task)));
+
+Route::screen('my_time', MyTimeScreen::class)
+    ->name('platform.systems.my_time')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Моё время', route('platform.systems.my_time')));
+
+Route::screen('inbox', InboxScreen::class)
+    ->name('platform.systems.inbox')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Входящие', route('platform.systems.inbox')));

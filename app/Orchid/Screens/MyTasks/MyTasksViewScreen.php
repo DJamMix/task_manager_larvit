@@ -138,16 +138,12 @@ class MyTasksViewScreen extends Screen
                 ->class('btn btn-warning');
         }
 
-        if(
-            auth()->id() == $task['executor']['id'] &&
-            ($task['status'] === TaskStatusEnum::IN_PROGRESS->value ||
-            $task['status'] === TaskStatusEnum::TESTING_STAGE->value ||
-            $task['status'] === TaskStatusEnum::ESTIMATION->value ||
-            $task['status'] === TaskStatusEnum::TESTING_PROD->value ||
-            $task['status'] === TaskStatusEnum::DEMO->value ||
-            $task['status'] === TaskStatusEnum::UNPAID->value ||
-            $task['status'] === TaskStatusEnum::ESTIMATION_REVIEW->value)
-        ) {
+        // Трекинг доступен сразу после назначения, независимо от статуса/оценки
+        $taskModel = $this->task instanceof Task
+            ? $this->task
+            : Task::find(data_get($this->task, 'id'));
+
+        if ($taskModel && $taskModel->canTrackTime()) {
             $buttons[] = ModalToggle::make('Добавить время')
                 ->modalTitle('Учет рабочего времени')
                 ->modal('timeTrackingModal')
@@ -155,7 +151,7 @@ class MyTasksViewScreen extends Screen
                 ->icon('clock');
         }
 
-        if(
+        if (
             auth()->id() == $task['executor']['id'] &&
             $task['status'] === TaskStatusEnum::NEW->value
         ) {
@@ -185,6 +181,11 @@ class MyTasksViewScreen extends Screen
 
     public function saveTimeEntry(Task $task, Request $request)
     {
+        if (!$task->canTrackTime()) {
+            Toast::error('Нельзя учитывать время по этой задаче');
+            return back();
+        }
+
         $request->validate([
             'tracking.hours_spent' => 'required|numeric|min:0.25|max:24',
             'tracking.work_date' => 'required|date',
@@ -200,9 +201,10 @@ class MyTasksViewScreen extends Screen
         $tracking->user_id = auth()->id();
         $tracking->save();
 
+        // Факт времени не трогает estimation_hours — только hours_spent
         $task->increment('hours_spent', $request->input('tracking.hours_spent'));
 
-        Toast::success('Затраченные часы успешно сохранены!');
+        Toast::success('Время учтено. Оценка задачи не изменилась.');
     }
 
     public function saveEstimation(Task $task, Request $request)
@@ -214,6 +216,8 @@ class MyTasksViewScreen extends Screen
         $task->estimation_hours = $request->input('task.estimation_hours');
         $task->status = TaskStatusEnum::ESTIMATION_REVIEW->value;
         $task->save();
+
+        Toast::success('Оценка отправлена на согласование. Учтённое время не изменилось.');
     }
 
     public function saveHoursSpent(Task $task, Request $request)
@@ -276,6 +280,8 @@ class MyTasksViewScreen extends Screen
         $layouts = [];
 
         $layouts[] = [
+            Layout::view('orchid.layouts.estimate-vs-spent'),
+
             Layout::tabs([
                 'Основная информация' => [
                     StatusSwitcherLayout::class,
@@ -289,28 +295,28 @@ class MyTasksViewScreen extends Screen
                 'Учет времени' => [
                     Layout::table('timeEntries', [
                         TD::make('work_date', 'Дата')
-                            ->render(fn($entry) => $entry->work_date->format('d.m.Y')),
+                            ->render(fn ($entry) => $entry->work_date->format('d.m.Y')),
                         TD::make('user.name', 'Исполнитель'),
                         TD::make('hours_spent', 'Часы')
                             ->alignRight()
-                            ->render(fn($entry) => number_format($entry->hours_spent, 2)),
+                            ->render(fn ($entry) => number_format($entry->hours_spent, 2)),
                         TD::make('work_description', 'Описание')
-                            ->render(fn($entry) => Str::limit($entry->work_description, 100)),
+                            ->render(fn ($entry) => Str::limit($entry->work_description, 100)),
                     ]),
                 ],
             ]),
 
             Layout::modal('timeTrackingModal', [
-                HoursSpentTask::class
+                HoursSpentTask::class,
             ])
-            ->title('Учет рабочего времени')
-            ->applyButton('Сохранить'),
+                ->title('Учет рабочего времени')
+                ->applyButton('Сохранить'),
 
             Layout::modal('taskEvaluationModal', [
-                TaskEvaluationLayout::class
+                TaskEvaluationLayout::class,
             ])
-            ->title('Оценка задачи')
-            ->applyButton('Отправить'),
+                ->title('Оценка задачи')
+                ->applyButton('Отправить'),
         ];
 
         return $layouts;

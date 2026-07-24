@@ -21,8 +21,16 @@ class TaskSearchFilter extends Filter
 
     public function run(Builder $builder): Builder
     {
-        // Логика поиска уже в query методе, фильтр просто разрешает параметр
-        return $builder;
+        $search = $this->request->get('search');
+
+        if (empty($search)) {
+            return $builder;
+        }
+
+        return $builder->where(function (Builder $q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%");
+        });
     }
 
     public function display(): array

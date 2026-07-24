@@ -24,6 +24,8 @@ class ActListLayout extends Table
                 ->sort(),
 
             TD::make('customer', 'Заказчик'),
+            TD::make('project.name', 'Проект')
+                ->render(fn (Act $act) => $act->project?->name ?? '—'),
             TD::make('executor', 'Исполнитель'),
             TD::make('total_tasks', 'Задач')->alignCenter(),
             TD::make('total_hours', 'Часов')
