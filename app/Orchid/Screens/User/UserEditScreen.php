@@ -7,7 +7,6 @@ namespace App\Orchid\Screens\User;
 use App\Orchid\Layouts\Role\RolePermissionLayout;
 use App\Orchid\Layouts\User\UserEditLayout;
 use App\Orchid\Layouts\User\UserPasswordLayout;
-use App\Orchid\Layouts\User\UserProjectsLayout;
 use App\Orchid\Layouts\User\UserRoleLayout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -120,8 +119,8 @@ class UserEditScreen extends Screen
                 ),
 
             Layout::block(UserRoleLayout::class)
-                ->title('Роли доступа')
-                ->description('Роль = набор прав. Должность (Backend/Frontend) — это не роль.')
+                ->title('Роли и проекты')
+                ->description('Роль = набор прав. Для клиента / заказчика / контакта сразу укажите проекты в этом блоке.')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
@@ -133,17 +132,6 @@ class UserEditScreen extends Screen
             Layout::block(RolePermissionLayout::class)
                 ->title('Доп. права')
                 ->description('Точечные права поверх ролей — только если нужно исключение.')
-                ->commands(
-                    Button::make(__('Save'))
-                        ->type(Color::BASIC)
-                        ->icon('bs.check-circle')
-                        ->canSee($this->user->exists)
-                        ->method('save')
-                ),
-
-            Layout::block(UserProjectsLayout::class)
-                ->title('Проекты клиента')
-                ->description('Для ролей Клиент, Заказчик и Контакт клиента выберите проекты ниже. Сотрудникам проекты назначаются в карточке проекта (команда).')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
