@@ -95,6 +95,68 @@ class ChatService
         return (bool) $user?->hasAccess('platform.systems.chats');
     }
 
+    /**
+     * Задачи, которые пользователь может открыть / прикрепить в чат.
+     *
+     * @return list<array{id: int, label: string, name: string}>
+     */
+    public function attachableTasksFor(User $user, ?string $search = null, int $limit = 40): array
+    {
+        $query = Task::query()->orderByDesc('id');
+
+        if ($user->hasAccess('platform.systems.tasks')) {
+            // полный список
+        } elseif ($user->isClientAccount()) {
+            $projectIds = $user->projects()->pluck('projects.id');
+            $query->whereIn('project_id', $projectIds);
+        } else {
+            $uid = (int) $user->id;
+            $query->where(function ($q) use ($uid) {
+                $q->where('executor_id', $uid)
+                    ->orWhere('creator_id', $uid)
+                    ->orWhereRaw('JSON_CONTAINS(COALESCE(observers_ids, "[]"), ?)', [json_encode($uid)]);
+            });
+        }
+
+        $search = trim((string) $search);
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                if (ctype_digit($search)) {
+                    $q->where('id', (int) $search)
+                        ->orWhere('name', 'like', '%' . $search . '%');
+                } else {
+                    $digits = preg_replace('/\D+/', '', $search);
+                    if ($digits !== '') {
+                        $q->where('id', (int) $digits)
+                            ->orWhere('name', 'like', '%' . $search . '%');
+                    } else {
+                        $q->where('name', 'like', '%' . $search . '%');
+                    }
+                }
+            });
+        }
+
+        return $query
+            ->limit($limit)
+            ->get(['id', 'name'])
+            ->map(fn (Task $t) => [
+                'id' => (int) $t->id,
+                'name' => (string) $t->name,
+                'label' => '#' . $t->id . ' · ' . $t->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function canAttachTask(User $user, Task $task): bool
+    {
+        if ($user->hasAccess('platform.systems.tasks')) {
+            return true;
+        }
+
+        return $task->canDiscuss($user->id);
+    }
+
     public function isClientSideUser(User $user): bool
     {
         return $user->isClientAccount();
@@ -346,10 +408,19 @@ class ChatService
         $task = null;
         if ($taskId) {
             $task = Task::query()->find($taskId);
+            if ($task && !$this->canAttachTask($actor, $task)) {
+                abort(403, 'Нельзя прикрепить эту задачу');
+            }
+            if (!$task) {
+                abort(422, 'Задача не найдена');
+            }
         }
 
         if (!$task && preg_match('/(?:tasks\/|my-tasks\/)(\d+)/', $plain, $m)) {
-            $task = Task::query()->find((int) $m[1]);
+            $candidate = Task::query()->find((int) $m[1]);
+            if ($candidate && $this->canAttachTask($actor, $candidate)) {
+                $task = $candidate;
+            }
         }
 
         $attachmentIds = collect($request->input('message.attachments', []))->filter();

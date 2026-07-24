@@ -279,6 +279,14 @@ Route::get('chats-poll', function (\Illuminate\Http\Request $request, \App\Servi
     );
 })->name('platform.systems.chats.poll');
 
+Route::get('chats-tasks', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    return response()->json([
+        'tasks' => $chats->attachableTasksFor($request->user(), $request->string('q')->toString(), 30),
+    ]);
+})->name('platform.systems.chats.tasks');
+
 Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
     ->name('platform.systems.chats.view')
     ->breadcrumbs(function (Trail $trail, $chat) {

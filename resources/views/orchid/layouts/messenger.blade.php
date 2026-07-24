@@ -154,15 +154,12 @@
                 </div>
 
                 <div class="bx-composer__box">
-                    <div class="bx-composer__input-wrap">
-                        <div class="bx-composer__highlight" id="bx-composer-highlight" aria-hidden="true"></div>
-                        <textarea name="message[text]"
-                                  id="bx-composer-input"
-                                  class="bx-composer__input"
-                                  form="post-form"
-                                  rows="1"
-                                  placeholder="Написать сообщение… @имя — упомянуть, Enter — отправить"></textarea>
-                    </div>
+                    <textarea name="message[text]"
+                              id="bx-composer-input"
+                              class="bx-composer__input"
+                              form="post-form"
+                              rows="1"
+                              placeholder="Написать сообщение… @имя — упомянуть, Enter — отправить"></textarea>
 
                     <div id="bx-mention-menu" class="bx-mention-menu d-none" role="listbox"></div>
 
@@ -187,19 +184,25 @@
                                 <button type="button" class="bx-composer__tool" data-bx-drop="task" title="Задача">
                                     <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
                                 </button>
-                                <div class="bx-composer__menu" data-bx-menu="task">
+                                <div class="bx-composer__menu bx-composer__menu--task" data-bx-menu="task">
                                     <div class="bx-composer__menu-title">Прикрепить задачу</div>
-                                    <select name="message[task_id]" class="bx-composer__select" form="post-form">
-                                        <option value="">Без задачи</option>
-                                        @foreach($taskOptions as $id => $label)
-                                            <option value="{{ $id }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
+                                    <input type="search"
+                                           id="bx-task-search"
+                                           class="bx-composer__select"
+                                           placeholder="Поиск: номер или название…"
+                                           autocomplete="off">
+                                    <input type="hidden" name="message[task_id]" id="bx-task-id" form="post-form" value="">
+                                    <div id="bx-task-picked" class="bx-task-picked d-none"></div>
+                                    <div id="bx-task-results" class="bx-task-results"
+                                         data-search-url="{{ $composer_tasks_search_url ?? route('platform.systems.chats.tasks') }}"
+                                         data-tasks='@json($taskOptions)'></div>
                                 </div>
                             </div>
 
                             <button type="button" class="bx-composer__tool" id="bx-tool-mention" title="Упомянуть (@)">
-                                <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 8a6 6 0 11-4.5 10.1"/><circle cx="12" cy="12" r="10"/><path d="M16 12a4 4 0 10-4 4"/></svg>
+                                <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zm0 0c0 1.657 1.007 3 2.25 3S21 13.657 21 12a9 9 0 10-2.636 6.364M16.5 12V8.25"/>
+                                </svg>
                             </button>
                         </div>
 
@@ -244,7 +247,6 @@
 
     const root = document.querySelector('.bx-messenger');
     const input = document.getElementById('bx-composer-input');
-    const highlight = document.getElementById('bx-composer-highlight');
     const parentInput = document.getElementById('chat-message-parent-id');
     const replyBanner = document.getElementById('bx-reply-banner');
     const replyAuthor = document.getElementById('bx-reply-author');
@@ -252,11 +254,20 @@
     const filesLabel = document.getElementById('bx-files-label');
     const mentionMenu = document.getElementById('bx-mention-menu');
     const composer = document.getElementById('bx-composer');
+    const taskSearch = document.getElementById('bx-task-search');
+    const taskIdInput = document.getElementById('bx-task-id');
+    const taskResults = document.getElementById('bx-task-results');
+    const taskPicked = document.getElementById('bx-task-picked');
 
     let mentionUsers = [];
     try {
         mentionUsers = JSON.parse(composer?.getAttribute('data-mentions') || '[]');
     } catch (e) { mentionUsers = []; }
+
+    let initialTasks = [];
+    try {
+        initialTasks = JSON.parse(taskResults?.getAttribute('data-tasks') || '[]');
+    } catch (e) { initialTasks = []; }
 
     const escapeHtml = (s) => String(s)
         .replace(/&/g, '&amp;')
@@ -264,35 +275,14 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 
-    const mentionNames = mentionUsers
-        .flatMap((u) => (u.aliases || [u.name]).map((a) => String(a)))
-        .filter(Boolean)
-        .sort((a, b) => b.length - a.length);
-
-    const renderHighlight = () => {
-        if (!input || !highlight) return;
-        let text = input.value || '';
-        let html = escapeHtml(text);
-        mentionNames.forEach((name) => {
-            const re = new RegExp('(^|[^\\w])(@' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')(?![\\w])', 'gu');
-            html = html.replace(re, '$1<span class="bx-mention">$2</span>');
-        });
-        highlight.innerHTML = html.replace(/\n$/g, '\n\n').replace(/\n/g, '<br>');
-    };
-
     const autosize = () => {
         if (!input) return;
         input.style.height = 'auto';
         input.style.height = Math.min(input.scrollHeight, 160) + 'px';
-        if (highlight) highlight.style.height = input.style.height;
-        renderHighlight();
     };
     input?.addEventListener('input', () => {
         autosize();
         updateMentionMenu();
-    });
-    input?.addEventListener('scroll', () => {
-        if (highlight) highlight.scrollTop = input.scrollTop;
     });
     input?.addEventListener('keydown', (e) => {
         if (mentionMenu && !mentionMenu.classList.contains('d-none')) {
@@ -301,15 +291,15 @@
             let idx = items.indexOf(active);
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
+                items.forEach((el) => el.classList.remove('is-active'));
                 items[(idx + 1) % items.length]?.classList.add('is-active');
-                active?.classList.remove('is-active');
                 if (idx < 0) items[0]?.classList.add('is-active');
                 return;
             }
             if (e.key === 'ArrowUp') {
                 e.preventDefault();
+                items.forEach((el) => el.classList.remove('is-active'));
                 items[(idx - 1 + items.length) % items.length]?.classList.add('is-active');
-                active?.classList.remove('is-active');
                 return;
             }
             if (e.key === 'Enter' || e.key === 'Tab') {
@@ -382,23 +372,25 @@
         const after = input.value.slice(pos);
         input.value = before + '@' + name + ' ' + after;
         const caret = before.length + name.length + 2;
+        input.focus();
         input.setSelectionRange(caret, caret);
         hideMentionMenu();
         autosize();
-        input.focus();
     };
 
-    mentionMenu?.addEventListener('click', (e) => {
+    mentionMenu?.addEventListener('mousedown', (e) => {
         const btn = e.target.closest?.('[data-mention-name]');
-        if (btn) insertMention(btn.getAttribute('data-mention-name'));
+        if (!btn) return;
+        e.preventDefault();
+        insertMention(btn.getAttribute('data-mention-name'));
     });
 
     document.getElementById('bx-tool-mention')?.addEventListener('click', () => {
         if (!input) return;
         const pos = input.selectionStart ?? input.value.length;
         input.value = input.value.slice(0, pos) + '@' + input.value.slice(pos);
-        input.setSelectionRange(pos + 1, pos + 1);
         input.focus();
+        input.setSelectionRange(pos + 1, pos + 1);
         autosize();
         updateMentionMenu();
     });
@@ -425,13 +417,97 @@
         }
     });
 
+    /* Task attach: search by id / name */
+    const renderTaskResults = (tasks) => {
+        if (!taskResults) return;
+        if (!tasks.length) {
+            taskResults.innerHTML = '<div class="bx-task-results__empty">Ничего не найдено</div>';
+            return;
+        }
+        taskResults.innerHTML = tasks.map((t) =>
+            `<button type="button" class="bx-task-result" data-task-id="${t.id}" data-task-label="${escapeHtml(t.label)}">
+                <strong>#${t.id}</strong>
+                <span>${escapeHtml(t.name)}</span>
+            </button>`
+        ).join('');
+    };
+
+    const pickTask = (id, label) => {
+        if (taskIdInput) taskIdInput.value = id || '';
+        if (!taskPicked) return;
+        if (!id) {
+            taskPicked.classList.add('d-none');
+            taskPicked.innerHTML = '';
+            return;
+        }
+        taskPicked.classList.remove('d-none');
+        taskPicked.innerHTML = `<span>${escapeHtml(label)}</span>
+            <button type="button" class="bx-composer__icon-btn" id="bx-task-clear" title="Убрать">×</button>`;
+    };
+
+    let taskSearchTimer = null;
+    const runTaskSearch = async (q) => {
+        const query = (q || '').trim();
+        if (!query) {
+            renderTaskResults(initialTasks.slice(0, 12));
+            return;
+        }
+
+        const local = initialTasks.filter((t) => {
+            const hay = (`${t.id} ${t.name} ${t.label}`).toLowerCase();
+            return hay.includes(query.toLowerCase()) || String(t.id) === query.replace(/^#/, '');
+        }).slice(0, 12);
+        renderTaskResults(local);
+
+        const url = taskResults?.getAttribute('data-search-url');
+        if (!url) return;
+        try {
+            const res = await fetch(url + '?q=' + encodeURIComponent(query), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (Array.isArray(data.tasks)) renderTaskResults(data.tasks);
+        } catch (e) {}
+    };
+
+    taskSearch?.addEventListener('input', () => {
+        clearTimeout(taskSearchTimer);
+        taskSearchTimer = setTimeout(() => runTaskSearch(taskSearch.value), 220);
+    });
+    taskSearch?.addEventListener('keydown', (e) => e.stopPropagation());
+    taskSearch?.addEventListener('click', (e) => e.stopPropagation());
+
+    taskResults?.addEventListener('mousedown', (e) => {
+        const btn = e.target.closest?.('.bx-task-result');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        pickTask(btn.getAttribute('data-task-id'), btn.getAttribute('data-task-label'));
+        if (taskSearch) taskSearch.value = '';
+        renderTaskResults([]);
+    });
+
+    taskPicked?.addEventListener('click', (e) => {
+        if (e.target.closest?.('#bx-task-clear')) {
+            pickTask('', '');
+            runTaskSearch('');
+        }
+    });
+
     document.querySelectorAll('[data-bx-drop]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const key = btn.getAttribute('data-bx-drop');
             document.querySelectorAll('[data-bx-menu]').forEach((menu) => {
                 if (menu.getAttribute('data-bx-menu') === key) {
+                    const opening = !menu.classList.contains('is-open');
                     menu.classList.toggle('is-open');
+                    if (opening && key === 'task') {
+                        runTaskSearch(taskSearch?.value || '');
+                        setTimeout(() => taskSearch?.focus(), 30);
+                    }
                 } else {
                     menu.classList.remove('is-open');
                 }

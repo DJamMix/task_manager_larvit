@@ -3,7 +3,6 @@
 namespace App\Orchid\Screens\Chat;
 
 use App\Models\Chat;
-use App\Models\Task;
 use App\Orchid\Layouts\Chat\ChatCreateLayout;
 use App\Orchid\Layouts\Chat\ChatMembersLayout;
 use App\Services\ChatService;
@@ -77,12 +76,7 @@ class MessengerScreen extends Screen
             ->values()
             ->all() ?? [];
 
-        $composerTasks = Task::query()
-            ->orderByDesc('id')
-            ->limit(80)
-            ->get()
-            ->mapWithKeys(fn (Task $t) => [$t->id => "#{$t->id} · {$t->name}"])
-            ->all();
+        $composerTasks = $chats->attachableTasksFor($user, null, 60);
 
         $isMuted = false;
         $canWrite = true;
@@ -112,6 +106,7 @@ class MessengerScreen extends Screen
             'active_chat_id' => $resolved?->id,
             'mention_users' => $mentionUsers,
             'composer_tasks' => $composerTasks,
+            'composer_tasks_search_url' => route('platform.systems.chats.tasks'),
             'chat_is_muted' => $isMuted,
             'chats_poll_url' => route('platform.systems.chats.poll'),
         ];
