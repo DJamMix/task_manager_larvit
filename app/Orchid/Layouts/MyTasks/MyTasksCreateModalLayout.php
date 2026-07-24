@@ -85,7 +85,8 @@ class MyTasksCreateModalLayout extends Rows
             ->title('Дедлайн')
             ->enableTime()
             ->allowInput()
-            ->class('tc-field-chip');
+            ->placeholder('Не выбран')
+            ->class('tc-field-chip form-control');
 
         $fields[] = Group::make($meta)->fullWidth()->alignEnd();
 

@@ -582,6 +582,55 @@
     transition: border-color .15s ease, box-shadow .15s ease;
 }
 
+/* Дедлайн (DateTimer / input-group) — как соседние селекты */
+.tc-modal .row .input-group {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    min-height: 34px;
+    border: 1px solid #dbe3ec;
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.tc-modal .row .input-group:focus-within {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tc-modal .row .input-group > .form-control,
+.tc-modal .row .input-group > input[data-datetime-target],
+.tc-modal .row .input-group .flatpickr-input {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-height: 32px !important;
+    background: transparent !important;
+    font-size: 0.84rem !important;
+    padding: 0.25rem 0.55rem !important;
+}
+
+.tc-modal .row .input-group > .form-control:focus,
+.tc-modal .row .input-group > input[data-datetime-target]:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.tc-modal .row .input-group-append,
+.tc-modal .row .input-group-text {
+    background: transparent !important;
+    border: 0 !important;
+    color: #94a3b8 !important;
+    padding: 0 0.45rem !important;
+}
+
+.tc-modal .row .input-group .btn,
+.tc-modal .row .input-group label.btn {
+    display: none !important;
+}
+
 .tc-modal .row p,
 .tc-modal .row .form-control-plaintext,
 .tc-modal .row .text-muted {
