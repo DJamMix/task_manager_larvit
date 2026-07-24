@@ -4,20 +4,16 @@ namespace App\Services;
 
 use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskStatusEnum;
-use App\CoreLayer\Integrations\Ebot\EBot;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Orchid\Support\Color;
 
 class TaskLogger
 {
-    protected EBot $ebot;
-
-    public function __construct(EBot $ebot)
-    {
-        $this->ebot = $ebot;
-    }
+    public function __construct(
+        private readonly DashboardNotifier $notifier,
+    ) {}
 
     public function logStatusChange(
         Task $task,
@@ -37,10 +33,14 @@ class TaskLogger
             $plainText .= "\n📝 Примечание: " . $additionalMessage;
         }
 
-        $quillContent = $this->formatForQuill($plainText);
-        $telegramMessage = $this->formatForTelegram($plainText, $task);
-
-        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Статус задачи изменён',
+            "{$user->displayName()} → {$toStatusLabel} · «{$task->name}»",
+            Color::INFO
+        );
     }
 
     public function logTaskCreation(Task $task, User $user): void
@@ -51,10 +51,14 @@ class TaskLogger
             $task->name
         );
 
-        $quillContent = $this->formatForQuill($plainText);
-        $telegramMessage = $this->formatForTelegram($plainText, $task);
-
-        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Новая задача',
+            "{$user->displayName()} создал(а) «{$task->name}»",
+            Color::SUCCESS
+        );
     }
 
     public function logTaskCancellation(
@@ -72,10 +76,14 @@ class TaskLogger
             $plainText .= "\n📌 Причина: " . $reason;
         }
 
-        $quillContent = $this->formatForQuill($plainText);
-        $telegramMessage = $this->formatForTelegram($plainText, $task);
-
-        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Задача отменена',
+            "{$user->displayName()} отменил(а) «{$task->name}»",
+            Color::DANGER
+        );
     }
 
     public function logTaskReturnEstimation(
@@ -93,10 +101,14 @@ class TaskLogger
             $plainText .= "\n📌 Причина: " . $reason;
         }
 
-        $quillContent = $this->formatForQuill($plainText);
-        $telegramMessage = $this->formatForTelegram($plainText, $task);
-
-        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Оценка отклонена',
+            "{$user->displayName()} вернул(а) «{$task->name}» на оценку",
+            Color::WARNING
+        );
     }
 
     public function logTaskReturnDemoEstimation(
@@ -114,10 +126,14 @@ class TaskLogger
             $plainText .= "\n📌 Причина: " . $reason;
         }
 
-        $quillContent = $this->formatForQuill($plainText);
-        $telegramMessage = $this->formatForTelegram($plainText, $task);
-
-        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Демо отклонено',
+            "{$user->displayName()} вернул(а) «{$task->name}» в работу",
+            Color::WARNING
+        );
     }
 
     public function logCustomAction(
@@ -136,29 +152,61 @@ class TaskLogger
             $plainText .= "\n🔍 Детали: " . $details;
         }
 
-        $quillContent = $this->formatForQuill($plainText);
-        $telegramMessage = $this->formatForTelegram($plainText, $task);
-
-        $this->createComment($task, $user, $quillContent, $plainText, $telegramMessage);
+        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Действие по задаче',
+            "{$user->displayName()}: {$action} · «{$task->name}»",
+            Color::INFO
+        );
     }
 
     protected function createComment(
         Task $task,
         User $user,
         array $quillContent,
-        string $plainText,
-        string $telegramMessage
+        string $plainText
     ): void {
-
         $task->comments()->create([
             'user_id' => $user->id,
             'text' => $quillContent,
             'plain_text' => $plainText,
             'is_system' => true,
         ]);
+    }
 
-        // Отправляем уведомление в Telegram
-        $this->sendTelegramNotification($task, $user, $telegramMessage);
+    protected function notifyParticipants(
+        Task $task,
+        User $actor,
+        string $title,
+        string $message,
+        Color $color
+    ): void {
+        $ids = collect([
+            $task->executor_id,
+            $task->creator_id,
+            ...$task->observerIds(),
+        ]);
+
+        foreach ($task->project?->clients ?? [] as $client) {
+            $ids->push($client->id);
+        }
+
+        $users = User::query()
+            ->whereIn('id', $ids->filter()->unique()->all())
+            ->get()
+            ->reject(fn (User $u) => (int) $u->id === (int) $actor->id);
+
+        foreach ($users as $user) {
+            $this->notifier->send(
+                $user,
+                $title,
+                $message,
+                $this->notifier->taskUrlFor($user, $task),
+                $color
+            );
+        }
     }
 
     protected function formatForQuill(string $text): array
@@ -168,18 +216,16 @@ class TaskLogger
 
         foreach ($lines as $line) {
             if (!empty($delta)) {
-                // Добавляем перенос строки между параграфами
                 $delta[] = ['insert' => "\n"];
             }
 
-            // Определяем стиль для строки
             $attributes = $this->determineQuillAttributes($line);
             $delta[] = ['insert' => trim($line), 'attributes' => $attributes];
         }
 
         return [
             'ops' => $delta,
-            'html' => $this->convertToHtml($delta)
+            'html' => $this->convertToHtml($delta),
         ];
     }
 
@@ -187,16 +233,15 @@ class TaskLogger
     {
         $attributes = [];
 
-        // Эмодзи в начале строки определяют стиль
         if (Str::startsWith($line, '🔄')) {
             $attributes['bold'] = true;
-            $attributes['color'] = '#2b6cb0'; // синий
+            $attributes['color'] = '#2b6cb0';
         } elseif (Str::startsWith($line, '❌')) {
             $attributes['bold'] = true;
-            $attributes['color'] = '#e53e3e'; // красный
+            $attributes['color'] = '#e53e3e';
         } elseif (Str::startsWith($line, '🆕')) {
             $attributes['bold'] = true;
-            $attributes['color'] = '#38a169'; // зеленый
+            $attributes['color'] = '#38a169';
         } elseif (Str::startsWith($line, '📌') || Str::startsWith($line, '📝')) {
             $attributes['italic'] = true;
         }
@@ -209,7 +254,7 @@ class TaskLogger
         $html = '';
         foreach ($delta as $op) {
             if ($op['insert'] === "\n") {
-                $html .= "<br>";
+                $html .= '<br>';
                 continue;
             }
 
@@ -218,9 +263,15 @@ class TaskLogger
 
             if (!empty($attrs)) {
                 $style = '';
-                if (isset($attrs['bold'])) $style .= 'font-weight:bold;';
-                if (isset($attrs['italic'])) $style .= 'font-style:italic;';
-                if (isset($attrs['color'])) $style .= 'color:' . $attrs['color'] . ';';
+                if (isset($attrs['bold'])) {
+                    $style .= 'font-weight:bold;';
+                }
+                if (isset($attrs['italic'])) {
+                    $style .= 'font-style:italic;';
+                }
+                if (isset($attrs['color'])) {
+                    $style .= 'color:' . $attrs['color'] . ';';
+                }
 
                 $html .= sprintf('<span style="%s">%s</span>', $style, $text);
             } else {
@@ -231,131 +282,29 @@ class TaskLogger
         return $html;
     }
 
-    protected function formatForTelegram(string $text, Task $task): string
+    public function createTaskPushNotifPM(Task $task): void
     {
-        // Базовое сообщение без специфичной ссылки
-        return sprintf(
-            "%s\n\n🏷️ ID: #T%d\n📂 Проект: %s",
-            $text,
-            $task->id,
-            $task->project->name
-        );
-    }
-
-    protected function sendTelegramNotification(Task $task, User $actor, string $baseMessage): void
-    {
-        // Отправка исполнителю
-        if ($task->executor && $task->executor->id !== $actor->id && $task->executor->telegram_id) {
-            $executorUrl = URL::route('platform.systems.my_tasks.view', $task->id);
-            $executorMessage = $baseMessage . "\n\n🔗 [Перейти к задаче](" . $executorUrl . ")" .
-                             "\nℹ️ Вы исполнитель этой задачи";
-            
-            $this->ebot->sendMessage(
-                $task->executor->telegram_id,
-                $executorMessage,
-                null,
-                'Markdown'
-            );
-        }
-
-        // Отправка создателю
-        if ($task->creator && $task->creator->id !== $actor->id && 
-            (!$task->executor || $task->creator->id !== $task->executor->id) &&
-            $task->creator->telegram_id) {
-            $creatorUrl = URL::route('platform.systems.client.project.tasks.view', [
-                'project' => $task->project,
-                'task' => $task
-            ]);
-            $creatorMessage = $baseMessage . "\n\n🔗 [Перейти к задаче](" . $creatorUrl . ")" .
-                            "\nℹ️ Это ваша задача";
-            
-            $this->ebot->sendMessage(
-                $task->creator->telegram_id,
-                $creatorMessage,
-                null,
-                'Markdown'
-            );
-        }
-
-        // Отправка клиентам проекта
-        foreach ($task->project->clients as $client) {
-            if ($client->id !== $actor->id &&
-                $client->telegram_id) {
-                $clientUrl = URL::route('platform.systems.client.project.tasks.view', [
-                    'project' => $task->project,
-                    'task' => $task
-                ]);
-                $clientMessage = $baseMessage . "\n\n🔗 [Перейти к задаче](" . $clientUrl . ")" .
-                                "\nℹ️ Это задача вашего проекта";
-                
-                $this->ebot->sendMessage(
-                    $client->telegram_id,
-                    $clientMessage,
-                    null,
-                'Markdown'
-                );
-            }
-        }
-    }
-
-    protected function getExecutorSpecificText(string $text): string
-    {
-        return $text . "\n\nℹ️ Вы исполнитель этой задачи";
-    }
-
-    protected function getClientSpecificText(string $text): string
-    {
-        return $text . "\n\nℹ️ Это задача вашего проекта";
-    }
-
-    public function createTaskPushNotifPM(Task $task)
-    {
-        $pmTelegramId = 965982077; //Пока хардкод
-
         $priority = TaskPriorityEnum::from($task->priority);
+        $title = 'Новая задача — назначьте исполнителя';
+        $message = "{$priority->label()} · «{$task->name}» · {$task->creator?->displayName()}";
 
-        $taskUrl = route('platform.systems.tasks.edit', $task);
+        $managers = User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', ['admin', 'pm', 'manager']))
+            ->get()
+            ->filter(fn (User $u) => $u->hasAccess('platform.systems.tasks'));
 
-        $message = $this->getPriorityHeader($priority) . "\n\n";
-        $message .= "📌 *{$task->name}*\n\n";
-        $message .= "👤 *Создатель задачи:* {$task->creator->name}\n";
-        $message .= "📅 *Создана:* {$task->created_at->format('d.m.Y в H:i')}\n";
-        $message .= $this->getPriorityLine($priority) . "\n";
+        foreach ($managers as $manager) {
+            if ((int) $manager->id === (int) $task->creator_id) {
+                continue;
+            }
 
-        $message .= "\n🔗 [🚀 Перейти к задаче]({$taskUrl})";
-        $message .= "\n_Требуется назначить исполнителя_ 👤";
-
-        $this->ebot->sendMessage(
-            $pmTelegramId,
-            $message,
-            null,
-            'Markdown'
-        );
-    }
-
-    private function getPriorityHeader(TaskPriorityEnum $priority): string
-    {
-        return match($priority) {
-            TaskPriorityEnum::EMERGENCY => "🔥 *🚨 АВАРИЙНАЯ ЗАДАЧА! 🚨*",
-            TaskPriorityEnum::BLOCKER => "⛔ *🚧 БЛОКИРУЮЩАЯ ЗАДАЧА*",
-            TaskPriorityEnum::HIGH => "⚠️ *📈 ВЫСОКИЙ ПРИОРИТЕТ*",
-            TaskPriorityEnum::MEDIUM => "🔵 *📊 НОВАЯ ЗАДАЧА*",
-            TaskPriorityEnum::LOW => "🔹 *📉 ЗАДАЧА НИЗКОГО ПРИОРИТЕТА*",
-            TaskPriorityEnum::TRIVIAL => "⚪ *📋 НЕСРОЧНАЯ ЗАДАЧА*",
-        };
-    }
-
-    private function getPriorityLine(TaskPriorityEnum $priority): string
-    {
-        $emoji = match($priority) {
-            TaskPriorityEnum::EMERGENCY => '🔥',
-            TaskPriorityEnum::BLOCKER => '⛔',
-            TaskPriorityEnum::HIGH => '⚠️',
-            TaskPriorityEnum::MEDIUM => '🔵',
-            TaskPriorityEnum::LOW => '🔹',
-            TaskPriorityEnum::TRIVIAL => '⚪',
-        };
-        
-        return "🎯 *Уровень важности:* {$emoji} {$priority->label()}";
+            $this->notifier->send(
+                $manager,
+                $title,
+                $message,
+                $this->notifier->taskUrlFor($manager, $task),
+                Color::WARNING
+            );
+        }
     }
 }

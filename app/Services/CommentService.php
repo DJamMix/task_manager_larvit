@@ -7,14 +7,12 @@ namespace App\Services;
 use App\Models\Comment;
 use App\Models\Task;
 use App\Models\User;
-use App\CoreLayer\Integrations\Ebot\EBot;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\URL;
 
 class CommentService
 {
     public function __construct(
-        private readonly EBot $ebot,
+        private readonly DashboardNotifier $notifier,
     ) {}
 
     public function addFromRequest(Task $task, User $actor, Request $request): Comment
@@ -74,22 +72,23 @@ class CommentService
         ?Comment $parent,
         array $mentionIds
     ): void {
-        $preview = \Illuminate\Support\Str::limit($comment->plain_text, 180);
-        $base = "💬 {$actor->displayName()} написал(а) в задаче «{$task->name}»:\n{$preview}";
+        $preview = \Illuminate\Support\Str::limit($comment->plain_text, 160);
 
-        if ($parent) {
-            $parentAuthor = $parent->user?->displayName() ?? 'участник';
-            $base = "↩️ {$actor->displayName()} ответил(а) {$parentAuthor} в задаче «{$task->name}»:\n{$preview}";
+        $title = $parent ? 'Ответ в задаче' : 'Новое сообщение в задаче';
+        if ($parent && in_array((int) ($parent->user_id), $mentionIds, true)) {
+            $title = 'Вам ответили в задаче';
+        } elseif ($mentionIds !== []) {
+            $title = 'Вас упомянули в задаче';
         }
+
+        $message = "{$actor->displayName()} · «{$task->name}»: {$preview}";
 
         $recipients = collect();
 
-        // Явные упоминания / ответ
         foreach ($mentionIds as $userId) {
             $recipients->push((int) $userId);
         }
 
-        // Если никого не указали явно — уведомляем ключевых участников
         if ($recipients->isEmpty()) {
             if ($task->executor_id) {
                 $recipients->push((int) $task->executor_id);
@@ -105,70 +104,19 @@ class CommentService
             }
         }
 
-        $recipients = $recipients
-            ->unique()
-            ->reject(fn ($id) => $id === (int) $actor->id)
-            ->values();
+        $users = User::query()
+            ->whereIn('id', $recipients->unique()->reject(fn ($id) => $id === (int) $actor->id)->all())
+            ->get();
 
-        $users = User::query()->whereIn('id', $recipients)->get()->keyBy('id');
-
-        foreach ($recipients as $userId) {
-            $user = $users->get($userId);
-            if (!$user?->telegram_id) {
-                continue;
-            }
-
-            $url = $this->taskUrlFor($user, $task);
-            $roleNote = $this->roleNoteFor($user, $task, $mentionIds, $parent);
-            $message = $base . "\n\n🔗 [Открыть задачу]({$url})" . ($roleNote ? "\n{$roleNote}" : '');
-
-            try {
-                $this->ebot->sendMessage($user->telegram_id, $message, null, 'Markdown');
-            } catch (\Throwable) {
-                // Не ломаем отправку комментария из‑за Telegram
-            }
+        foreach ($users as $user) {
+            $this->notifier->send(
+                $user,
+                $title,
+                $message,
+                $this->notifier->taskUrlFor($user, $task),
+                $parent ? \Orchid\Support\Color::SUCCESS : \Orchid\Support\Color::INFO
+            );
         }
-    }
-
-    private function taskUrlFor(User $user, Task $task): string
-    {
-        if ($user->hasAccess('platform.systems.my_tasks')) {
-            return URL::route('platform.systems.my_tasks.view', $task->id);
-        }
-
-        if ($user->hasAccess('platform.systems.client.project.tasks.view') && $task->project_id) {
-            return URL::route('platform.systems.client.project.tasks.view', [
-                'project' => $task->project_id,
-                'task' => $task->id,
-            ]);
-        }
-
-        if ($user->hasAccess('platform.systems.tasks')) {
-            return URL::route('platform.systems.tasks.edit', $task->id);
-        }
-
-        return URL::route('platform.welcome');
-    }
-
-    private function roleNoteFor(User $user, Task $task, array $mentionIds, ?Comment $parent): string
-    {
-        if (in_array((int) $user->id, $mentionIds, true)) {
-            if ($parent && (int) $parent->user_id === (int) $user->id) {
-                return 'ℹ️ Вам ответили в обсуждении';
-            }
-
-            return 'ℹ️ Вас упомянули в обсуждении';
-        }
-
-        if ((int) $task->executor_id === (int) $user->id) {
-            return 'ℹ️ Вы исполнитель задачи';
-        }
-
-        if ($task->isObserver((int) $user->id)) {
-            return 'ℹ️ Вы наблюдатель задачи';
-        }
-
-        return 'ℹ️ Вы участник задачи';
     }
 
     public function normalizeQuill(mixed $quillData): array
