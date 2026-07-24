@@ -19,11 +19,18 @@
 
         <div class="bx-messenger__list">
             @forelse($chatList as $item)
+                @php
+                    $listAvatarUser = $item->type === 'direct' ? $item->otherMember() : null;
+                @endphp
                 <a href="{{ route('platform.systems.chats.view', $item) }}"
                    class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }}">
-                    <div class="bx-chat-item__avatar">
-                        {{ mb_strtoupper(mb_substr($item->displayTitle(), 0, 1)) }}
-                    </div>
+                    @if($listAvatarUser)
+                        @include('orchid.layouts.partials.bx-avatar', ['user' => $listAvatarUser, 'size' => 'md'])
+                    @else
+                        <div class="bx-chat-item__avatar">
+                            {{ mb_strtoupper(mb_substr($item->displayTitle(), 0, 1)) }}
+                        </div>
+                    @endif
                     <div class="bx-chat-item__body">
                         <div class="bx-chat-item__top">
                             <strong>
@@ -50,15 +57,27 @@
     <section class="bx-messenger__main">
         @if($active)
             <div class="bx-messenger__header">
-                <div>
-                    <h2 class="h5 mb-0">{{ $active->displayTitle() }}</h2>
-                    <div class="small text-muted">
-                        {{ $active->type === 'direct' ? 'Личный чат' : 'Группа' }}
-                        ·
-                        {{ $active->members->count() }} уч.
-                        ·
-                        {{ $active->members->take(4)->map->displayName()->implode(', ') }}
-                        @if($active->members->count() > 4)…@endif
+                <div class="bx-messenger__header-main">
+                    @php
+                        $headerAvatar = $active->type === 'direct' ? $active->otherMember() : null;
+                    @endphp
+                    @if($headerAvatar)
+                        @include('orchid.layouts.partials.bx-avatar', ['user' => $headerAvatar, 'size' => 'lg'])
+                    @else
+                        <div class="bx-chat-item__avatar bx-chat-item__avatar--lg">
+                            {{ mb_strtoupper(mb_substr($active->displayTitle(), 0, 1)) }}
+                        </div>
+                    @endif
+                    <div>
+                        <h2 class="h5 mb-0">{{ $active->displayTitle() }}</h2>
+                        <div class="small text-muted">
+                            {{ $active->type === 'direct' ? 'Личный чат' : 'Группа' }}
+                            ·
+                            {{ $active->members->count() }} уч.
+                            ·
+                            {{ $active->members->take(4)->map->displayName()->implode(', ') }}
+                            @if($active->members->count() > 4)…@endif
+                        </div>
                     </div>
                 </div>
                 <button type="submit"
@@ -80,59 +99,120 @@
                 @forelse($feed as $message)
                     @php
                         $mine = (int)$message->user_id === (int)auth()->id();
+                        $readers = [];
+                        $readStatus = null;
+                        if (!$message->is_system && $mine) {
+                            $readers = $active->readersForMessage($message);
+                            $othersCount = $active->members
+                                ->reject(fn ($u) => (int) $u->id === (int) $message->user_id)
+                                ->count();
+                            if ($othersCount === 0 || count($readers) === 0) {
+                                $readStatus = 'sent';
+                            } elseif (count($readers) >= $othersCount) {
+                                $readStatus = 'read';
+                            } else {
+                                $readStatus = 'partial';
+                            }
+                        }
                     @endphp
                     <article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }}"
                              id="chat-msg-{{ $message->id }}">
-                        @if($message->parent)
-                            <div class="bx-msg__reply">
-                                Ответ на {{ $message->parent->user?->displayName() }}:
-                                {{ \Illuminate\Support\Str::limit(strip_tags($message->parent->plain_text ?? ''), 70) }}
-                            </div>
-                        @endif
-
                         @unless($message->is_system)
-                            <div class="bx-msg__meta">
-                                <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
-                                <span>{{ $message->created_at?->format('d.m H:i') }}</span>
+                            <div class="bx-msg__avatar">
+                                @include('orchid.layouts.partials.bx-avatar', ['user' => $message->user, 'size' => 'sm'])
                             </div>
                         @endunless
 
-                        <div class="bx-msg__body tw-msg__body">
-                            {!! $message->formatted_text !!}
+                        <div class="bx-msg__bubble">
+                            @if($message->parent)
+                                <div class="bx-msg__reply">
+                                    Ответ на {{ $message->parent->user?->displayName() }}:
+                                    {{ \Illuminate\Support\Str::limit(strip_tags($message->parent->plain_text ?? ''), 70) }}
+                                </div>
+                            @endif
+
+                            @unless($message->is_system)
+                                <div class="bx-msg__meta">
+                                    <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
+                                    <span>{{ $message->created_at?->format('d.m H:i') }}</span>
+                                </div>
+                            @endunless
+
+                            <div class="bx-msg__body tw-msg__body">
+                                {!! $message->formatted_text !!}
+                            </div>
+
+                            @if($message->task)
+                                @php
+                                    $taskHref = auth()->user()->hasAccess('platform.systems.tasks')
+                                        ? route('platform.systems.tasks.edit', $message->task)
+                                        : (auth()->user()->hasAccess('platform.systems.my_tasks')
+                                            ? route('platform.systems.my_tasks.view', $message->task)
+                                            : '#');
+                                @endphp
+                                <a class="bx-task-card" href="{{ $taskHref }}">
+                                    <span class="bx-task-card__id">#{{ $message->task->id }}</span>
+                                    <span class="bx-task-card__name">{{ $message->task->name }}</span>
+                                </a>
+                            @endif
+
+                            @if($message->attachment->isNotEmpty())
+                                <div class="bx-msg__files">
+                                    @foreach($message->attachment as $file)
+                                        <a href="{{ route('platform.task.attachment.download', $file) }}" class="badge text-bg-light border text-decoration-none">
+                                            {{ $file->original_name }}
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            <div class="bx-msg__footer">
+                                @unless($message->is_system)
+                                    <button type="button"
+                                            class="bx-msg__reply-btn"
+                                            data-parent-id="{{ $message->id }}"
+                                            data-author="{{ $message->user?->displayName() ?? 'участник' }}">
+                                        Ответить
+                                    </button>
+                                @endunless
+
+                                @if($mine && $readStatus)
+                                    <div class="bx-msg__receipt bx-msg__receipt--{{ $readStatus }}" tabindex="0">
+                                        <span class="bx-msg__checks" aria-hidden="true">
+                                            @if($readStatus === 'sent')
+                                                <svg viewBox="0 0 16 12" width="16" height="12"><path fill="currentColor" d="M5.5 9.5L1.8 5.8l1-1L5.5 7.4 12.2.7l1 1z"/></svg>
+                                            @else
+                                                <svg viewBox="0 0 22 12" width="20" height="12"><path fill="currentColor" d="M15.2 1.2l1 1-7.7 7.7L5 6.4l1-1 2.5 2.5 6.7-6.7zm-5 0l1 1-7.7 7.7L.1 6.4l1-1 2.5 2.5L10.2 1.2z"/></svg>
+                                            @endif
+                                        </span>
+                                        @if(count($readers))
+                                            <div class="bx-msg__receipt-tip" role="tooltip">
+                                                <div class="bx-msg__receipt-tip-title">
+                                                    {{ $readStatus === 'read' ? 'Прочитано всеми' : 'Прочитали' }}
+                                                    · {{ count($readers) }}
+                                                </div>
+                                                <ul class="bx-msg__receipt-list">
+                                                    @foreach($readers as $reader)
+                                                        <li>
+                                                            <span class="bx-avatar bx-avatar--xs" style="--bx-avatar-bg: {{ $reader['color'] }}">
+                                                                <span class="bx-avatar__initials">{{ $reader['initials'] }}</span>
+                                                            </span>
+                                                            <span class="bx-msg__receipt-name">{{ $reader['name'] }}</span>
+                                                            <span class="bx-msg__receipt-time">{{ $reader['read_at'] }}</span>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @else
+                                            <div class="bx-msg__receipt-tip" role="tooltip">
+                                                <div class="bx-msg__receipt-tip-title">Отправлено</div>
+                                                <div class="bx-msg__receipt-empty">Ещё никто не просмотрел</div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+                            </div>
                         </div>
-
-                        @if($message->task)
-                            @php
-                                $taskHref = auth()->user()->hasAccess('platform.systems.tasks')
-                                    ? route('platform.systems.tasks.edit', $message->task)
-                                    : (auth()->user()->hasAccess('platform.systems.my_tasks')
-                                        ? route('platform.systems.my_tasks.view', $message->task)
-                                        : '#');
-                            @endphp
-                            <a class="bx-task-card" href="{{ $taskHref }}">
-                                <span class="bx-task-card__id">#{{ $message->task->id }}</span>
-                                <span class="bx-task-card__name">{{ $message->task->name }}</span>
-                            </a>
-                        @endif
-
-                        @if($message->attachment->isNotEmpty())
-                            <div class="bx-msg__files">
-                                @foreach($message->attachment as $file)
-                                    <a href="{{ route('platform.task.attachment.download', $file) }}" class="badge text-bg-light border text-decoration-none">
-                                        {{ $file->original_name }}
-                                    </a>
-                                @endforeach
-                            </div>
-                        @endif
-
-                        @unless($message->is_system)
-                            <button type="button"
-                                    class="bx-msg__reply-btn"
-                                    data-parent-id="{{ $message->id }}"
-                                    data-author="{{ $message->user?->displayName() ?? 'участник' }}">
-                                Ответить
-                            </button>
-                        @endunless
                     </article>
                 @empty
                     <div class="text-muted text-center py-5">Начните переписку</div>
@@ -585,7 +665,12 @@
     const poll = async () => {
         if (!pollUrl) return;
         try {
-            const url = pollUrl + (since ? ('?since=' + since) : '');
+            const activeChat = root?.getAttribute('data-active-chat') || '';
+            const params = new URLSearchParams();
+            if (since) params.set('since', String(since));
+            if (activeChat) params.set('chat', activeChat);
+            const qs = params.toString();
+            const url = pollUrl + (qs ? ('?' + qs) : '');
             const res = await fetch(url, {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
@@ -597,8 +682,6 @@
                 since = data.max_id;
                 localStorage.setItem(storageKey, String(since));
             }
-            const badge = document.querySelector('[href*="chats"] .badge, .menu .badge');
-            // leave Orchid menu badge to page reload; update sidebar badges if present
             (data.chats || []).forEach((c) => {
                 const link = document.querySelector('.bx-chat-item[href*="/chats/' + c.id + '"]');
                 if (!link) return;
@@ -613,6 +696,34 @@
                 } else if (b) {
                     b.remove();
                 }
+            });
+
+            (data.receipts || []).forEach((r) => {
+                const article = document.getElementById('chat-msg-' + r.id);
+                const receipt = article?.querySelector('.bx-msg__receipt');
+                if (!receipt) return;
+                receipt.classList.remove('bx-msg__receipt--sent', 'bx-msg__receipt--partial', 'bx-msg__receipt--read');
+                receipt.classList.add('bx-msg__receipt--' + r.status);
+                const checks = receipt.querySelector('.bx-msg__checks');
+                if (checks) {
+                    checks.innerHTML = r.status === 'sent'
+                        ? '<svg viewBox="0 0 16 12" width="16" height="12"><path fill="currentColor" d="M5.5 9.5L1.8 5.8l1-1L5.5 7.4 12.2.7l1 1z"/></svg>'
+                        : '<svg viewBox="0 0 22 12" width="20" height="12"><path fill="currentColor" d="M15.2 1.2l1 1-7.7 7.7L5 6.4l1-1 2.5 2.5 6.7-6.7zm-5 0l1 1-7.7 7.7L.1 6.4l1-1 2.5 2.5L10.2 1.2z"/></svg>';
+                }
+                const tip = receipt.querySelector('.bx-msg__receipt-tip');
+                if (!tip) return;
+                const readers = r.readers || [];
+                if (!readers.length) {
+                    tip.innerHTML = '<div class="bx-msg__receipt-tip-title">Отправлено</div><div class="bx-msg__receipt-empty">Ещё никто не просмотрел</div>';
+                    return;
+                }
+                const title = r.status === 'read' ? 'Прочитано всеми' : 'Прочитали';
+                tip.innerHTML = '<div class="bx-msg__receipt-tip-title">' + title + ' · ' + readers.length + '</div><ul class="bx-msg__receipt-list">' +
+                    readers.map((u) =>
+                        '<li><span class="bx-avatar bx-avatar--xs" style="--bx-avatar-bg:' + u.color + '"><span class="bx-avatar__initials">' +
+                        escapeHtml(u.initials) + '</span></span><span class="bx-msg__receipt-name">' + escapeHtml(u.name) +
+                        '</span><span class="bx-msg__receipt-time">' + escapeHtml(u.read_at || '') + '</span></li>'
+                    ).join('') + '</ul>';
             });
         } catch (e) {}
     };

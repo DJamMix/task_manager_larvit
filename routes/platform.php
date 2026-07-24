@@ -275,7 +275,11 @@ Route::get('chats-poll', function (\Illuminate\Http\Request $request, \App\Servi
     abort_unless($chats->canAccessMessenger($request->user()), 403);
 
     return response()->json(
-        $chats->pollState($request->user(), $request->integer('since') ?: null)
+        $chats->pollState(
+            $request->user(),
+            $request->integer('since') ?: null,
+            $request->integer('chat') ?: null
+        )
     );
 })->name('platform.systems.chats.poll');
 

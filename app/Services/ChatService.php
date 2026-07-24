@@ -238,8 +238,15 @@ class ChatService
             });
     }
 
-    public function pollState(User $user, ?int $sinceMessageId = null): array
+    public function pollState(User $user, ?int $sinceMessageId = null, ?int $activeChatId = null): array
     {
+        if ($activeChatId) {
+            $active = Chat::query()->find($activeChatId);
+            if ($active && $active->isMember($user->id)) {
+                $this->markRead($active, $user);
+            }
+        }
+
         $chats = $this->chatsFor($user);
         $chatIds = $chats->pluck('id')->filter()->values();
         $mutedIds = $chats->where('is_muted', true)->pluck('id')->all();
@@ -268,7 +275,48 @@ class ChatService
                 'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
                 'muted' => (bool) $chat->is_muted,
             ])->values()->all(),
+            'receipts' => $this->receiptsPayload($user, $activeChatId),
         ];
+    }
+
+    /**
+     * @return list<array{id: int, status: string, readers: list<array{id: int, name: string, initials: string, color: string, read_at: string|null}>}>
+     */
+    private function receiptsPayload(User $user, ?int $activeChatId): array
+    {
+        if (!$activeChatId) {
+            return [];
+        }
+
+        $chat = Chat::query()->with('members')->find($activeChatId);
+        if (!$chat || !$chat->isMember($user->id)) {
+            return [];
+        }
+
+        $ownMessages = $chat->messages()
+            ->where('user_id', $user->id)
+            ->where('is_system', false)
+            ->orderByDesc('id')
+            ->limit(40)
+            ->get();
+
+        $othersCount = $chat->members
+            ->reject(fn (User $u) => (int) $u->id === (int) $user->id)
+            ->count();
+
+        return $ownMessages->map(function (ChatMessage $message) use ($chat, $othersCount) {
+            $readers = $chat->readersForMessage($message);
+            $status = 'sent';
+            if ($othersCount > 0 && count($readers) > 0) {
+                $status = count($readers) >= $othersCount ? 'read' : 'partial';
+            }
+
+            return [
+                'id' => (int) $message->id,
+                'status' => $status,
+                'readers' => $readers,
+            ];
+        })->values()->all();
     }
 
     public function toggleMute(Chat $chat, User $user): bool

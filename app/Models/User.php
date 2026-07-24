@@ -99,6 +99,45 @@ class User extends Authenticatable
         return (string) $this->name;
     }
 
+    public function avatarInitials(): string
+    {
+        $name = trim((string) $this->name);
+        if ($name === '') {
+            return '?';
+        }
+
+        $parts = preg_split('/\s+/u', $name) ?: [];
+        if (count($parts) >= 2) {
+            return mb_strtoupper(mb_substr($parts[0], 0, 1) . mb_substr($parts[1], 0, 1));
+        }
+
+        return mb_strtoupper(mb_substr($name, 0, 2));
+    }
+
+    /** Стабильный цвет аватарки (как в Bitrix / мессенджерах) */
+    public function avatarColor(): string
+    {
+        $palette = [
+            '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7',
+            '#ec4899', '#f43f5e', '#ef4444', '#f97316',
+            '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+        ];
+
+        return $palette[(int) $this->id % count($palette)];
+    }
+
+    public function avatarUrl(): string
+    {
+        $email = strtolower(trim((string) $this->email));
+        if ($email === '') {
+            return '';
+        }
+
+        $hash = md5($email);
+
+        return "https://www.gravatar.com/avatar/{$hash}?s=80&d=404";
+    }
+
     public function roleLabels(): string
     {
         return $this->roles->pluck('name')->filter()->implode(' / ');

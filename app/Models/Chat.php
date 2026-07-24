@@ -71,6 +71,75 @@ class Chat extends Model
         return $this->title ?: 'Групповой чат';
     }
 
+    public function otherMember(?int $viewerId = null): ?User
+    {
+        if ($this->type !== 'direct') {
+            return null;
+        }
+
+        $viewerId = $viewerId ?? auth()->id();
+
+        return $this->members->first(fn (User $u) => (int) $u->id !== (int) $viewerId);
+    }
+
+    /**
+     * Кто уже видел сообщение (по last_read_at участников).
+     *
+     * @return list<array{id: int, name: string, initials: string, color: string, read_at: string|null}>
+     */
+    public function readersForMessage(ChatMessage $message): array
+    {
+        $this->loadMissing('members');
+
+        return $this->members
+            ->reject(fn (User $u) => (int) $u->id === (int) $message->user_id)
+            ->filter(function (User $u) use ($message) {
+                $readAt = $u->pivot?->last_read_at;
+                if (!$readAt) {
+                    return false;
+                }
+                $readAt = \Illuminate\Support\Carbon::parse($readAt);
+
+                return $readAt->greaterThanOrEqualTo($message->created_at);
+            })
+            ->map(fn (User $u) => [
+                'id' => (int) $u->id,
+                'name' => $u->displayName(),
+                'initials' => $u->avatarInitials(),
+                'color' => $u->avatarColor(),
+                'read_at' => $u->pivot?->last_read_at
+                    ? \Illuminate\Support\Carbon::parse($u->pivot->last_read_at)->format('d.m H:i')
+                    : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** sent | partial | read */
+    public function readStatusForMessage(ChatMessage $message): string
+    {
+        $this->loadMissing('members');
+        $othersCount = $this->members
+            ->reject(fn (User $u) => (int) $u->id === (int) $message->user_id)
+            ->count();
+
+        if ($othersCount === 0) {
+            return 'sent';
+        }
+
+        $readCount = count($this->readersForMessage($message));
+
+        if ($readCount === 0) {
+            return 'sent';
+        }
+
+        if ($readCount >= $othersCount) {
+            return 'read';
+        }
+
+        return 'partial';
+    }
+
     public function unreadCountFor(int $userId): int
     {
         $pivot = $this->members()->where('users.id', $userId)->first()?->pivot;
