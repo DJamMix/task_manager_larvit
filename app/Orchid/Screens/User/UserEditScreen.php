@@ -141,19 +141,18 @@ class UserEditScreen extends Screen
                         ->method('save')
                 ),
 
-        ];
-
-        if ($this->user->exists) {
-            $layouts[] = Layout::block(UserProjectsLayout::class)
-                ->title('Проекты клиента / заказчика')
-                ->description('Нужны только для ролей Клиент и Заказчик. Для сотрудников проекты назначаются в карточке проекта (команда).')
+            Layout::block(UserProjectsLayout::class)
+                ->title('Проекты клиента')
+                ->description('Для ролей Клиент, Заказчик и Контакт клиента выберите проекты ниже. Сотрудникам проекты назначаются в карточке проекта (команда).')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
                         ->icon('bs.check-circle')
+                        ->canSee($this->user->exists)
                         ->method('save')
-                );
-        }
+                ),
+
+        ];
 
         return $layouts;
     }
@@ -179,8 +178,8 @@ class UserEditScreen extends Screen
             $request->validate([
                 'user.projects' => 'required|array|min:1',
             ], [
-                'user.projects.required' => 'Для клиента / заказчика выберите хотя бы один проект',
-                'user.projects.min' => 'Для клиента / заказчика выберите хотя бы один проект',
+                'user.projects.required' => 'Для клиента / заказчика / контакта выберите хотя бы один проект',
+                'user.projects.min' => 'Для клиента / заказчика / контакта выберите хотя бы один проект',
             ]);
         }
 
