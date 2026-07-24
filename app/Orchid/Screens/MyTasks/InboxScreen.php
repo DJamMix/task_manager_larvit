@@ -5,6 +5,7 @@ namespace App\Orchid\Screens\MyTasks;
 use App\Models\Comment;
 use App\Models\Task;
 use App\Services\ProjectContext;
+use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
@@ -25,12 +26,15 @@ class InboxScreen extends Screen
         $context->applyToTaskQuery($taskIdsQuery);
         $taskIds = $taskIdsQuery->pluck('id');
 
-        $comments = Comment::with(['user', 'task.project'])
-            ->whereIn('task_id', $taskIds)
-            ->where('user_id', '!=', $userId)
-            ->latest()
-            ->limit(50)
-            ->get();
+        $comments = collect();
+        if ($taskIds->isNotEmpty()) {
+            $comments = Comment::with(['user', 'task.project'])
+                ->whereIn('task_id', $taskIds)
+                ->where('user_id', '!=', $userId)
+                ->latest()
+                ->limit(50)
+                ->get();
+        }
 
         $awaitingEstimation = Task::query()
             ->where('executor_id', $userId)
@@ -44,8 +48,8 @@ class InboxScreen extends Screen
 
         return [
             'comments' => $comments,
-            'awaiting_estimation' => $awaitingEstimation->orderByDesc('updated_at')->limit(10)->get(),
-            'new_tasks' => $newTasks->orderByDesc('updated_at')->limit(10)->get(),
+            'awaiting_estimation' => $awaitingEstimation->with('project')->orderByDesc('updated_at')->limit(10)->get(),
+            'new_tasks' => $newTasks->with('project')->orderByDesc('updated_at')->limit(10)->get(),
         ];
     }
 
@@ -74,13 +78,20 @@ class InboxScreen extends Screen
                 'Требуют внимания' => Layout::view('orchid.layouts.inbox-attention'),
                 'Комментарии' => Layout::table('comments', [
                     TD::make('created_at', 'Когда')
-                        ->render(fn (Comment $c) => $c->created_at->format('d.m.Y H:i')),
-                    TD::make('user.name', 'Автор'),
-                    TD::make('task.name', 'Задача')
-                        ->render(fn (Comment $c) => Link::make($c->task?->name ?? '—')
-                            ->route('platform.systems.my_tasks.view', $c->task_id)),
-                    TD::make('plain_text', 'Текст')
-                        ->render(fn (Comment $c) => \Illuminate\Support\Str::limit($c->plain_text, 100)),
+                        ->render(fn (Comment $c) => $c->created_at?->format('d.m.Y H:i') ?? '—'),
+                    TD::make('author', 'Автор')
+                        ->render(fn (Comment $c) => $c->user?->name ?? '—'),
+                    TD::make('task', 'Задача')
+                        ->render(function (Comment $c) {
+                            if (!$c->task_id || !$c->task) {
+                                return '—';
+                            }
+
+                            return Link::make($c->task->name)
+                                ->route('platform.systems.my_tasks.view', $c->task_id);
+                        }),
+                    TD::make('text', 'Текст')
+                        ->render(fn (Comment $c) => e(Str::limit((string) $c->plain_text, 100))),
                 ]),
             ]),
         ];

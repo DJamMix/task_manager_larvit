@@ -65,16 +65,20 @@ class MyTasksCreateModalLayout extends Rows
             ->value(TaskTypeEnum::DEFAULT->value);
 
         $fields[] = Label::make('priority_help')
-            ->title('Описание приоритетов:')
+            ->title('Приоритет — что брать первым')
             ->help(collect(TaskPriorityEnum::orderedCases())
-                ->map(fn ($p) => "<b>{$p->label()}:</b> {$p->description()}")
+                ->map(fn ($p) => "<b>{$p->code()} {$p->label()}:</b> {$p->description()}")
                 ->join('<br>'));
 
         $fields[] = Select::make('task.priority')
-            ->options(TaskPriorityEnum::options())
+            ->options(
+                collect(TaskPriorityEnum::orderedCases())
+                    ->mapWithKeys(fn ($p) => [$p->value => "{$p->code()} · {$p->label()}"])
+                    ->all()
+            )
             ->title('Приоритет задачи')
             ->required()
-            ->help('Выберите приоритет выполнения задачи')
+            ->help('P0 — чинить сейчас, P3 — обычная очередь')
             ->value(TaskPriorityEnum::MEDIUM->value);
 
         $fields[] = DateTimer::make('task.end_datetime')

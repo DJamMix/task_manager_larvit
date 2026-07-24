@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
+use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\Orchid\Filters\TaskCategoryFilter;
 use App\Orchid\Filters\TaskCreatedAtFilter;
 use App\Orchid\Filters\TaskExecutorFilter;
@@ -199,10 +200,13 @@ class Task extends Model
             return false;
         }
 
-        return !in_array($this->status, [
-            TaskStatusEnum::DRAFT->value,
-            TaskStatusEnum::CANCELED->value,
-        ], true);
+        // Трекинг с любого статуса, кроме отменённой. Оценка живёт отдельно.
+        return $this->status !== TaskStatusEnum::CANCELED->value;
+    }
+
+    public function priorityRowClass(): string
+    {
+        return TaskPriorityEnum::tryFrom((string) $this->priority)?->rowClass() ?? '';
     }
 
     public function isOverdue(): bool

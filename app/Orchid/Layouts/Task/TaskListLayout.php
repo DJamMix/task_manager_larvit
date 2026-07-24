@@ -13,21 +13,10 @@ use Orchid\Screen\TD;
 
 class TaskListLayout extends Table
 {
-    /**
-     * Data source.
-     *
-     * The name of the key to fetch it from the query.
-     * The results of which will be elements of the table.
-     *
-     * @var string
-     */
     protected $target = 'tasks';
 
-    /**
-     * Get the table cells to be displayed.
-     *
-     * @return TD[]
-     */
+    protected $template = 'orchid.layouts.tasks-priority-table';
+
     protected function columns(): iterable
     {
         return [
@@ -74,6 +63,14 @@ class TaskListLayout extends Table
             TD::make('status', __('task.status.label'))
                 ->width('100px')
                 ->render(fn (Task $task) => view('components.task.status', ['status' => $task->status])),
+
+            TD::make('priority', 'Приоритет')
+                ->width('160px')
+                ->render(function (Task $task) {
+                    $priority = \App\CoreLayer\Enums\TaskPriorityEnum::tryFrom($task->priority);
+
+                    return $priority ? $priority->badgeHtml() : '—';
+                }),
 
             TD::make('project_id', __('task.project_id'))
                 ->render(fn (Task $task) => $task->project->name),

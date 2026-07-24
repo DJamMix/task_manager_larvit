@@ -43,12 +43,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.inbox')
                 ->route('platform.systems.inbox')
                 ->permission('platform.systems.my_tasks')
-                ->badge(fn () => $this->inboxBadgeCount()),
-
-            Menu::make('Моё время')
-                ->icon('bs.clock-history')
-                ->route('platform.systems.my_time')
-                ->permission('platform.systems.my_tasks')
+                ->badge(fn () => $this->inboxBadgeCount())
                 ->divider(),
 
             Menu::make('Мои проекты')

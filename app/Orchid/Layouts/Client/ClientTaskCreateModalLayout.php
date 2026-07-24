@@ -51,16 +51,20 @@ class ClientTaskCreateModalLayout extends Rows
                 ->value(TaskTypeEnum::DEFAULT->value),
 
             Label::make('priority_help')
-                ->title('Описание приоритетов:')
+                ->title('Приоритет — что брать первым')
                 ->help(collect(TaskPriorityEnum::orderedCases())
-                    ->map(fn($p) => "<b>{$p->label()}:</b> {$p->description()}")
+                    ->map(fn ($p) => "<b>{$p->code()} {$p->label()}:</b> {$p->description()}")
                     ->join('<br>')),
 
             Select::make('task.priority')
-                ->options(TaskPriorityEnum::options())
+                ->options(
+                    collect(TaskPriorityEnum::orderedCases())
+                        ->mapWithKeys(fn ($p) => [$p->value => "{$p->code()} · {$p->label()}"])
+                        ->all()
+                )
                 ->title('Приоритет задачи')
                 ->required()
-                ->help('Выберите приоритет выполнения задачи')
+                ->help('P0 — критично, P3 — обычная очередь')
                 ->value(TaskPriorityEnum::MEDIUM->value),
 
             Quill::make('task.description')->toolbar(["text", "color", "header", "list", "format"])

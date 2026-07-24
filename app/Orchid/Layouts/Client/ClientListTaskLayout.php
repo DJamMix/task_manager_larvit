@@ -13,21 +13,10 @@ use Orchid\Screen\TD;
 
 class ClientListTaskLayout extends Table
 {
-    /**
-     * Data source.
-     *
-     * The name of the key to fetch it from the query.
-     * The results of which will be elements of the table.
-     *
-     * @var string
-     */
     protected $target = 'tasks';
 
-    /**
-     * Get the table cells to be displayed.
-     *
-     * @return TD[]
-     */
+    protected $template = 'orchid.layouts.tasks-priority-table';
+
     protected function columns(): iterable
     {
         return [
@@ -47,17 +36,17 @@ class ClientListTaskLayout extends Table
                     if (!$type) {
                         return 'N/A';
                     }
-                    
-                    $icon = match($type) {
+
+                    $icon = match ($type) {
                         TaskTypeEnum::DEFAULT => '📝',
                         TaskTypeEnum::BUG => '🐛',
                     };
-                    
-                    $badgeClass = match($type) {
+
+                    $badgeClass = match ($type) {
                         TaskTypeEnum::DEFAULT => 'bg-primary',
                         TaskTypeEnum::BUG => 'bg-danger',
                     };
-                    
+
                     return sprintf(
                         '<span class="badge %s">%s %s</span>',
                         $badgeClass,
@@ -68,25 +57,19 @@ class ClientListTaskLayout extends Table
                 ->align(TD::ALIGN_CENTER)
                 ->width('140px'),
 
+            TD::make('priority', 'Приоритет')
+                ->width('160px')
+                ->render(function (Task $task) {
+                    $priority = TaskPriorityEnum::tryFrom($task->priority);
+
+                    return $priority ? $priority->badgeHtml() : '—';
+                }),
+
             TD::make('status', __('task.status.label'))
                 ->render(fn (Task $task) => view('components.task.status', ['status' => $task->status])),
 
             TD::make('task_category_id', __('task.task_category_id'))
-                ->render(fn (Task $task) => $task->category->name),
-
-            TD::make('priority', __('Приоритет'))
-                ->render(function (Task $task) {
-                    $priority = TaskPriorityEnum::tryFrom($task->priority);
-                    if (!$priority) {
-                        return 'N/A';
-                    }
-                    
-                    return sprintf(
-                        '<span class="me-2">%s</span> %s',
-                        $priority->icon(),
-                        $priority->label()
-                    );
-                }),
+                ->render(fn (Task $task) => $task->category->name ?? '—'),
 
             TD::make('actions', 'Действия')
                 ->align(TD::ALIGN_CENTER)

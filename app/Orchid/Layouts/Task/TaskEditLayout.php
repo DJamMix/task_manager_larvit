@@ -96,10 +96,14 @@ class TaskEditLayout extends Rows
 
             Group::make([
                 Select::make('task.priority')
-                    ->options(TaskPriorityEnum::options())
+                    ->options(
+                        collect(TaskPriorityEnum::orderedCases())
+                            ->mapWithKeys(fn ($p) => [$p->value => "{$p->code()} · {$p->label()}"])
+                            ->all()
+                    )
                     ->title('Приоритет задачи')
                     ->required()
-                    ->help('Выберите приоритет выполнения задачи')
+                    ->help('P0 — критично, P3 — обычная очередь')
                     ->value(TaskPriorityEnum::MEDIUM->value)
                     ->width('50%'),
 

@@ -65,6 +65,7 @@ class MyTasksListScreen extends Screen
 
         $tasks = $query->filters()
             ->with(['project', 'category'])
+            ->orderByRaw("FIELD(priority, 'emergency', 'blocker', 'high', 'medium', 'low', 'trivial')")
             ->orderByRaw('CASE WHEN end_datetime IS NOT NULL AND end_datetime < NOW() THEN 0 ELSE 1 END')
             ->orderBy('created_at', 'desc')
             ->paginate(15);

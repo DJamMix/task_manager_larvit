@@ -13,50 +13,100 @@ enum TaskPriorityEnum: string
 
     public function label(): string
     {
-        return match($this) {
-            self::EMERGENCY => 'Авария',
-            self::BLOCKER => 'Блокер',
+        return match ($this) {
+            self::EMERGENCY => 'Критический',
+            self::BLOCKER => 'Блокирующий',
             self::HIGH => 'Высокий',
-            self::MEDIUM => 'Средний',
+            self::MEDIUM => 'Обычный',
             self::LOW => 'Низкий',
-            self::TRIVIAL => 'Не важная',
+            self::TRIVIAL => 'Минимальный',
+        };
+    }
+
+    /**
+     * Короткий код для быстрого сканирования списка (P0…P5).
+     */
+    public function code(): string
+    {
+        return match ($this) {
+            self::EMERGENCY => 'P0',
+            self::BLOCKER => 'P1',
+            self::HIGH => 'P2',
+            self::MEDIUM => 'P3',
+            self::LOW => 'P4',
+            self::TRIVIAL => 'P5',
         };
     }
 
     public function description(): string
     {
-        return match($this) {
-            self::EMERGENCY => 'Самая важная задача. Требуется немедленное решение (hotfix), так как система работает в корне неверно, что приводит к потерям прибыли',
-            self::BLOCKER => 'Функционал работает неверно, много жалоб. Все задачи блокируются, на решение обычно до 3 дней',
-            self::HIGH => 'Задача берётся в первую очередь при отсутствии блокеров и аварий',
-            self::MEDIUM => 'Берётся при отсутствии задач с более высоким приоритетом',
-            self::LOW => 'Берётся когда нет задач с более высоким приоритетом',
-            self::TRIVIAL => 'Задача без срочности, можно откладывать пока есть более важные задачи',
+        return match ($this) {
+            self::EMERGENCY => 'Чинить сейчас: прод лежит или теряем деньги',
+            self::BLOCKER => 'Блокирует работу команды / клиента, срок до ~3 дней',
+            self::HIGH => 'Важная задача — брать сразу после P0/P1',
+            self::MEDIUM => 'Обычный приоритет, в порядке очереди',
+            self::LOW => 'Можно отложить, если есть более важные',
+            self::TRIVIAL => 'Когда освободится время',
         };
     }
 
     public function colorClass(): string
     {
-        return match($this) {
-            self::EMERGENCY => 'bg-danger text-white',    // Красный
-            self::BLOCKER => 'bg-danger-light text-dark', // Светло-красный
-            self::HIGH => 'bg-warning text-white',        // Оранжевый
-            self::MEDIUM => 'bg-info text-white',         // Синий
-            self::LOW => 'bg-primary-light text-dark',    // Светло-синий
-            self::TRIVIAL => 'bg-light text-dark',        // Светлый
+        return match ($this) {
+            self::EMERGENCY => 'priority-badge priority-badge--p0',
+            self::BLOCKER => 'priority-badge priority-badge--p1',
+            self::HIGH => 'priority-badge priority-badge--p2',
+            self::MEDIUM => 'priority-badge priority-badge--p3',
+            self::LOW => 'priority-badge priority-badge--p4',
+            self::TRIVIAL => 'priority-badge priority-badge--p5',
+        };
+    }
+
+    public function rowClass(): string
+    {
+        return match ($this) {
+            self::EMERGENCY => 'task-row--p0',
+            self::BLOCKER => 'task-row--p1',
+            self::HIGH => 'task-row--p2',
+            self::MEDIUM => 'task-row--p3',
+            self::LOW => 'task-row--p4',
+            self::TRIVIAL => 'task-row--p5',
+        };
+    }
+
+    public function sortWeight(): int
+    {
+        return match ($this) {
+            self::EMERGENCY => 0,
+            self::BLOCKER => 1,
+            self::HIGH => 2,
+            self::MEDIUM => 3,
+            self::LOW => 4,
+            self::TRIVIAL => 5,
         };
     }
 
     public function icon(): string
     {
-        return match($this) {
-            self::EMERGENCY => '🔥', // Огонь
-            self::BLOCKER => '⛔',   // Стоп
-            self::HIGH => '⚠️',      // Внимание
-            self::MEDIUM => '🔵',    // Синий круг
-            self::LOW => '🔹',       // Маленький синий ромб
-            self::TRIVIAL => '⚪',   // Белый круг
+        return match ($this) {
+            self::EMERGENCY => '🔥',
+            self::BLOCKER => '⛔',
+            self::HIGH => '▲',
+            self::MEDIUM => '●',
+            self::LOW => '▼',
+            self::TRIVIAL => '·',
         };
+    }
+
+    public function badgeHtml(): string
+    {
+        return sprintf(
+            '<span class="%s" title="%s"><span class="priority-badge__code">%s</span> %s</span>',
+            e($this->colorClass()),
+            e($this->description()),
+            e($this->code()),
+            e($this->label())
+        );
     }
 
     public static function orderedCases(): array
@@ -75,8 +125,8 @@ enum TaskPriorityEnum: string
     {
         return array_reduce(
             self::orderedCases(),
-            fn(array $options, self $priority) => $options + [
-                $priority->value => $priority->label()
+            fn (array $options, self $priority) => $options + [
+                $priority->value => sprintf('%s · %s — %s', $priority->code(), $priority->label(), $priority->description()),
             ],
             []
         );
