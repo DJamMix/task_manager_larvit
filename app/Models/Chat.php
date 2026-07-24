@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Orchid\Screen\AsSource;
 
 class Chat extends Model
@@ -36,9 +37,9 @@ class Chat extends Model
         return $this->hasMany(ChatMessage::class);
     }
 
-    public function latestMessage(): HasMany
+    public function latestMessage(): HasOne
     {
-        return $this->hasMany(ChatMessage::class)->latestOfMany();
+        return $this->hasOne(ChatMessage::class)->latestOfMany();
     }
 
     public function isMember(?int $userId = null): bool

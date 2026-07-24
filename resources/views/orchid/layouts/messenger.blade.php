@@ -118,7 +118,7 @@
         @else
             <div class="bx-messenger__empty">
                 <h2 class="h4">Корпоративные чаты</h2>
-                <p class="text-muted mb-0">Создайте групповой чат или напишите коллеге лично — как в Битрикс24.</p>
+                <p class="text-muted mb-0">Создайте групповой чат или напишите коллеге лично.</p>
             </div>
         @endif
     </section>
