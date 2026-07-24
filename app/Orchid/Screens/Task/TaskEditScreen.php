@@ -2,14 +2,17 @@
 
 namespace App\Orchid\Screens\Task;
 
+use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
 use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
-use App\Orchid\Layouts\Comment\CommentListLayout;
-use App\Orchid\Layouts\Comment\CommentSendLayout;
+use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Orchid\Layouts\Task\TaskEditLayout;
+use App\Orchid\Layouts\Task\TaskObserversLayout;
+use App\Services\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
 use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
@@ -22,11 +25,6 @@ class TaskEditScreen extends Screen
      */
     public $task;
 
-    /**
-     * Fetch data to be displayed on the screen.
-     *
-     * @return array
-     */
     public function query(Task $task): iterable
     {
         if (!$task->exists) {
@@ -36,39 +34,45 @@ class TaskEditScreen extends Screen
             }
         }
 
+        if ($task->exists) {
+            $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+        }
+
+        $user = auth()->user();
+
         return [
             'task' => $task,
-            'comments' => $task->exists
+            'task_status_label' => $task->exists
+                ? TaskStatusEnum::tryFrom($task->status)?->label()
+                : null,
+            'discussion_comments' => $task->exists
                 ? $task->comments()
-                    ->with('user')
-                    ->latest()
+                    ->with(['user', 'parent.user', 'attachment'])
+                    ->orderBy('created_at')
                     ->get()
-                    ->map(fn ($comment) => $this->transformComment($comment))
                 : collect(),
+            'notify_options' => $task->exists ? $task->participantsForNotify() : [],
+            'can_discuss' => $task->exists && $task->canDiscuss((int) $user->id),
+            'is_observer_only' => false,
+            'viewer_role' => 'admin',
+            'show_time_link' => false,
+            'time_route' => null,
             'timeEntries' => $task->exists
                 ? $task->timeEntries()->with('user')->latest()->get()
                 : collect(),
         ];
     }
 
-    protected function transformComment($comment): array
-    {
-        return [
-            'id' => $comment->id,
-            'user' => ['name' => $comment->user?->displayName() ?? 'Неизвестно'],
-            'created_at' => $comment->created_at->format('d.m.Y H:i'),
-            'text' => $comment->plain_text
-        ];
-    }
-
-    /**
-     * The name of the screen displayed in the header.
-     *
-     * @return string|null
-     */
     public function name(): ?string
     {
-        return $this->task->exists ? 'Редактировать' : 'Создать';
+        return $this->task->exists ? ($this->task->name ?? 'Редактировать') : 'Создать задачу';
+    }
+
+    public function description(): ?string
+    {
+        return $this->task->exists
+            ? 'Карточка задачи, обсуждение и наблюдатели'
+            : 'Создание новой задачи';
     }
 
     public function permission(): ?iterable
@@ -78,71 +82,91 @@ class TaskEditScreen extends Screen
         ];
     }
 
-    /**
-     * The screen's action buttons.
-     *
-     * @return \Orchid\Screen\Action[]
-     */
     public function commandBar(): iterable
     {
-        return [
-            Button::make(__('project.remove.title'))
-                ->icon('bs.trash3')
-                ->confirm(__('project.remove.warning'))
-                ->method('remove')
-                ->canSee($this->task->exists),
+        $buttons = [];
 
-            Button::make(__('project.save'))
-                ->icon('bs.check-circle')
-                ->method('save'),
-        ];
+        if ($this->task->exists) {
+            $buttons[] = Link::make('К списку')
+                ->icon('bs.arrow-left')
+                ->route('platform.systems.tasks');
+        }
+
+        $buttons[] = Button::make(__('project.remove.title'))
+            ->icon('bs.trash3')
+            ->confirm(__('project.remove.warning'))
+            ->method('remove')
+            ->canSee($this->task->exists);
+
+        $buttons[] = Button::make(__('project.save'))
+            ->icon('bs.check-circle')
+            ->method('save');
+
+        return $buttons;
     }
 
-    /**
-     * The screen's layout elements.
-     *
-     * @return \Orchid\Screen\Layout[]|string[]
-     */
     public function layout(): iterable
     {
+        if (!$this->task->exists) {
+            return [
+                TaskEditLayout::class,
+                TaskObserversLayout::class,
+                ClientTaskFilesLayout::class,
+            ];
+        }
+
         return [
             Layout::tabs([
-                'Редактирование информации' => [
+                'Задача и обсуждение' => [
+                    Layout::view('orchid.layouts.task-workspace'),
+                    Layout::view('orchid.layouts.composer-anchor'),
+                    DiscussionComposerLayout::class,
+                ],
+                'Редактирование' => [
                     TaskEditLayout::class,
+                    TaskObserversLayout::class,
                     ClientTaskFilesLayout::class,
                 ],
-                'Комментарии' => [
-                    CommentSendLayout::class,
-                    CommentListLayout::class,
-                ],
-                'Учет времени' => [
+                'Учёт времени' => [
                     Layout::table('timeEntries', [
                         TD::make('work_date', 'Дата')
-                            ->render(fn($entry) => $entry->work_date->format('d.m.Y')),
-                        TD::make('user.name', 'Исполнитель'),
+                            ->render(fn ($entry) => $entry->work_date->format('d.m.Y')),
+                        TD::make('user.name', 'Исполнитель')
+                            ->render(fn ($entry) => $entry->user?->displayName() ?? '—'),
                         TD::make('hours_spent', 'Часы')
                             ->alignRight()
-                            ->render(fn($entry) => number_format($entry->hours_spent, 2)),
+                            ->render(fn ($entry) => number_format($entry->hours_spent, 2)),
                         TD::make('work_description', 'Описание')
-                            ->render(fn($entry) => Str::limit($entry->work_description, 100)),
+                            ->render(fn ($entry) => Str::limit($entry->work_description, 100)),
                     ]),
                 ],
             ]),
         ];
     }
 
-    /**
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function save(Request $request, Task $task)
     {
         $data = $request->get('task');
+
+        if (!is_array($data) || $data === []) {
+            Toast::warning('Откройте вкладку «Редактирование», чтобы сохранить карточку задачи');
+            return back();
+        }
 
         if (!$task->exists && empty($data['project_id'])) {
             $contextId = app(\App\Services\ProjectContext::class)->id();
             if ($contextId) {
                 $data['project_id'] = $contextId;
             }
+        }
+
+        if (array_key_exists('observers_ids', $data)) {
+            $data['observers_ids'] = collect($data['observers_ids'] ?? [])
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
         }
 
         $task->fill($data);
@@ -154,14 +178,9 @@ class TaskEditScreen extends Screen
 
         Toast::info(__('task.save'));
 
-        return redirect()->route('platform.systems.tasks');
+        return redirect()->route('platform.systems.tasks.edit', $task);
     }
 
-    /**
-     * @throws \Exception
-     *
-     * @return \Illuminate\Http\RedirectResponse
-     */
     public function remove(Task $task)
     {
         $task->delete();
@@ -171,45 +190,16 @@ class TaskEditScreen extends Screen
         return redirect()->route('platform.systems.tasks');
     }
 
-    public function addComment(Request $request, Task $task)
+    public function addComment(Request $request, Task $task, CommentService $comments)
     {
-        // Получаем данные из Quill редактора
-        $quillData = $request->input('comment.text');
-        
-        // Если данные пришли как массив (обычный случай для Quill)
-        if (is_array($quillData)) {
-            $quillContent = $quillData;
-        } 
-        // Если данные пришли как JSON строка (на всякий случай)
-        elseif (json_validate($quillData)) {
-            $quillContent = json_decode($quillData, true);
-        } 
-        // Если данные в непонятном формате
-        else {
-            $quillContent = [
-                'ops' => [
-                    ['insert' => $quillData]
-                ]
-            ];
+        if (!$task->canDiscuss()) {
+            Toast::error('Нельзя писать в этой задаче');
+            return back();
         }
 
-        // Извлекаем plain text из Quill delta
-        $plainText = '';
-        foreach ($quillContent['ops'] ?? [] as $op) {
-            if (is_string($op['insert'] ?? null)) {
-                $plainText .= $op['insert'];
-            }
-        }
+        $comments->addFromRequest($task, $request->user(), $request);
+        Toast::success('Сообщение отправлено');
 
-        // Удаляем лишние переносы строк
-        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
-
-        $task->comments()->create([
-            'user_id' => auth()->id(),
-            'text' => $quillContent,
-            'plain_text' => $plainText
-        ]);
-
-        Toast::success('Комментарий добавлен');
+        return redirect()->route('platform.systems.tasks.edit', $task);
     }
 }

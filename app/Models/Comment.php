@@ -5,23 +5,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Orchid\Attachment\Attachable;
 use Orchid\Screen\AsSource;
 
 class Comment extends Model
 {
-    use HasFactory, AsSource;
+    use HasFactory, AsSource, Attachable;
 
     protected $fillable = [
         'user_id',
         'task_id',
+        'parent_id',
         'text',
-        'plain_text'
+        'plain_text',
+        'is_system',
+        'mentioned_user_ids',
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'text' => 'array',
+        'is_system' => 'boolean',
+        'mentioned_user_ids' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -34,65 +41,55 @@ class Comment extends Model
         return $this->belongsTo(Task::class);
     }
 
-    public function getFormattedTextAttribute()
+    public function parent(): BelongsTo
     {
-        if (empty($this->text)) {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function replies(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function getFormattedTextAttribute(): string
+    {
+        if (empty($this->text) || empty($this->text['ops'] ?? null)) {
             return nl2br(e($this->plain_text ?? ''));
         }
 
-        $html = '';
-        foreach ($this->text['ops'] ?? [] as $op) {
-            if ($op['insert'] === "\n") {
-                $html .= "<br>";
-                continue;
-            }
-
-            if (is_string($op['insert'] ?? null)) {
-                $text = htmlspecialchars($op['insert']);
-                $attrs = $op['attributes'] ?? [];
-
-                $style = '';
-                if (!empty($attrs)) {
-                    if ($attrs['bold'] ?? false) $style .= 'font-weight:bold;';
-                    if ($attrs['italic'] ?? false) $style .= 'font-style:italic;';
-                    if (isset($attrs['color'])) $style .= 'color:' . $attrs['color'] . ';';
-                }
-
-                $html .= $style ? "<span style=\"$style\">$text</span>" : $text;
-            }
+        // Если TaskLogger положил готовый html
+        if (!empty($this->text['html'])) {
+            return $this->text['html'];
         }
 
-        return $html;
-    }
-
-    protected function convertDeltaToHtml(array $ops): string
-    {
         $html = '';
-        foreach ($ops as $op) {
-            if ($op['insert'] === "\n") {
-                $html .= "<br>";
+        foreach ($this->text['ops'] as $op) {
+            if (($op['insert'] ?? null) === "\n") {
+                $html .= '<br>';
                 continue;
             }
 
-            $text = htmlspecialchars($op['insert']);
+            if (!is_string($op['insert'] ?? null)) {
+                continue;
+            }
+
+            $text = e($op['insert']);
             $attrs = $op['attributes'] ?? [];
+            $style = '';
 
-            if (!empty($attrs)) {
-                $styles = [];
-                if (isset($attrs['bold'])) $styles[] = 'font-weight:bold';
-                if (isset($attrs['italic'])) $styles[] = 'font-style:italic';
-                if (isset($attrs['color'])) $styles[] = 'color:' . $attrs['color'];
-                
-                $html .= sprintf(
-                    '<span style="%s">%s</span>', 
-                    implode(';', $styles), 
-                    $text
-                );
-            } else {
-                $html .= $text;
+            if ($attrs['bold'] ?? false) {
+                $style .= 'font-weight:600;';
             }
+            if ($attrs['italic'] ?? false) {
+                $style .= 'font-style:italic;';
+            }
+            if (isset($attrs['color'])) {
+                $style .= 'color:' . e($attrs['color']) . ';';
+            }
+
+            $html .= $style !== '' ? '<span style="' . $style . '">' . $text . '</span>' : $text;
         }
-        
-        return $html;
+
+        return $html !== '' ? $html : nl2br(e($this->plain_text ?? ''));
     }
 }

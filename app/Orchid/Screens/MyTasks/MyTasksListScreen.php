@@ -31,7 +31,11 @@ class MyTasksListScreen extends Screen
     {
         $userId = auth()->id();
 
-        $query = Task::where('executor_id', $userId)
+        $query = Task::query()
+            ->where(function ($q) use ($userId) {
+                $q->where('executor_id', $userId)
+                    ->orWhereRaw('JSON_CONTAINS(COALESCE(observers_ids, "[]"), ?)', [json_encode((int) $userId)]);
+            })
             ->whereNotIn('status', [
                 TaskStatusEnum::COMPLETED->value,
                 TaskStatusEnum::CANCELED->value,
@@ -70,7 +74,11 @@ class MyTasksListScreen extends Screen
             ->orderBy('created_at', 'desc')
             ->paginate(15);
 
-        $allTasks = Task::where('executor_id', $userId)
+        $allTasks = Task::query()
+            ->where(function ($q) use ($userId) {
+                $q->where('executor_id', $userId)
+                    ->orWhereRaw('JSON_CONTAINS(COALESCE(observers_ids, "[]"), ?)', [json_encode((int) $userId)]);
+            })
             ->whereNotIn('status', [
                 TaskStatusEnum::COMPLETED->value,
                 TaskStatusEnum::CANCELED->value,

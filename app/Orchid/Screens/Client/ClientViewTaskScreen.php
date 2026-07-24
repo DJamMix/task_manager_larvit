@@ -6,10 +6,9 @@ use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
 use App\Orchid\Layouts\Client\ClientTaskCreateModalLayout;
-use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
-use App\Orchid\Layouts\Client\ClientTaskViewLayout;
-use App\Orchid\Layouts\Comment\CommentListLayout;
-use App\Orchid\Layouts\Comment\CommentSendLayout;
+use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
+use App\Services\CommentService;
+use App\Services\TaskLogger;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\Link;
@@ -17,7 +16,6 @@ use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
-use App\Services\TaskLogger;
 
 class ClientViewTaskScreen extends Screen
 {
@@ -33,26 +31,32 @@ class ClientViewTaskScreen extends Screen
      */
     public function query(Project $project, Task $task): iterable
     {
+        $user = auth()->user();
+
+        if (
+            !$user->hasAccess('platform.systems.tasks')
+            && !$user->projects()->where('projects.id', $project->id)->exists()
+        ) {
+            abort(403);
+        }
+
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+
         return [
-            'user' => auth()->user(),
+            'user' => $user,
             'project' => $project,
             'task' => $task,
-            'task_status_label' => TaskStatusEnum::from($task->status)?->label(),
-            'comments' => $task->comments()
-                ->with('user')
-                ->latest()
-                ->get()
-                ->map(fn($comment) => $this->transformComment($comment)),
-        ];
-    }
-
-    protected function transformComment($comment): array
-    {
-        return [
-            'id' => $comment->id,
-            'user' => ['name' => $comment->user?->displayName() ?? 'Неизвестно'],
-            'created_at' => $comment->created_at->format('d.m.Y H:i'),
-            'text' => $comment->plain_text
+            'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
+            'discussion_comments' => $task->comments()
+                ->with(['user', 'parent.user', 'attachment'])
+                ->orderBy('created_at')
+                ->get(),
+            'notify_options' => $task->participantsForNotify(),
+            'can_discuss' => true,
+            'is_observer_only' => false,
+            'viewer_role' => 'client',
+            'show_time_link' => false,
+            'time_route' => null,
         ];
     }
 
@@ -63,7 +67,12 @@ class ClientViewTaskScreen extends Screen
      */
     public function name(): ?string
     {
-        return 'Просмотр задачи';
+        return $this->task->name ?? 'Просмотр задачи';
+    }
+
+    public function description(): ?string
+    {
+        return 'Описание задачи и обсуждение с исполнителем';
     }
 
     /**
@@ -77,7 +86,7 @@ class ClientViewTaskScreen extends Screen
 
         $buttons = [];
 
-        if($task['status'] === TaskStatusEnum::DRAFT->value) {
+        if ($task->status === TaskStatusEnum::DRAFT->value) {
             $buttons[] = Button::make('Согласовано')
                 ->method('approveTask')
                 ->icon('check')
@@ -91,7 +100,7 @@ class ClientViewTaskScreen extends Screen
                 ->class('btn btn-primary');
         }
 
-        if($task['status'] === TaskStatusEnum::ESTIMATION_REVIEW->value) {
+        if ($task->status === TaskStatusEnum::ESTIMATION_REVIEW->value) {
             $buttons[] = Button::make('Принять')
                 ->method('applyTask')
                 ->icon('check')
@@ -113,7 +122,7 @@ class ClientViewTaskScreen extends Screen
                 ->confirm('При нажатии задача будет переведена в статус "Не оплачена" в связи с тем, что исполнитель затратил время на оценивание реализации.');
         }
 
-        if($task['status'] === TaskStatusEnum::DEMO->value) {
+        if ($task->status === TaskStatusEnum::DEMO->value) {
             $buttons[] = Button::make('Принять демо')
                 ->method('applyDemoTask')
                 ->icon('check')
@@ -126,6 +135,10 @@ class ClientViewTaskScreen extends Screen
                 ->class('btn btn-warning')
                 ->confirm('При нажатии вы не принимаете задачу, задача возвращается на доработку!');
         }
+
+        $buttons[] = Link::make('К проекту')
+            ->icon('bs.arrow-left')
+            ->route('platform.systems.client.project.tasks', $task->project_id);
 
         return $buttons;
     }
@@ -275,19 +288,12 @@ class ClientViewTaskScreen extends Screen
     public function layout(): iterable
     {
         return [
-            Layout::tabs([
-                'Основная информация' => [
-                    ClientTaskViewLayout::class,
-                    ClientTaskFilesLayout::class,
-                ],
-                'Обсуждение' => [
-                    CommentSendLayout::class,
-                    CommentListLayout::class,
-                ],
-            ]),
+            Layout::view('orchid.layouts.task-workspace'),
+            Layout::view('orchid.layouts.composer-anchor'),
+            DiscussionComposerLayout::class,
 
             Layout::modal('editTaskModal', [
-                ClientTaskCreateModalLayout::class
+                ClientTaskCreateModalLayout::class,
             ])
                 ->title('Редактирование задачи')
                 ->applyButton('Сохранить')
@@ -298,8 +304,8 @@ class ClientViewTaskScreen extends Screen
                     \Orchid\Screen\Fields\TextArea::make('cancel_reason')
                         ->title('Причина отмены')
                         ->required()
-                        ->help('Пожалуйста, укажите подробную причину отмены задачи')
-                ])
+                        ->help('Пожалуйста, укажите подробную причину отмены задачи'),
+                ]),
             ])
                 ->title('Отмена задачи')
                 ->applyButton('Подтвердить отмену')
@@ -310,8 +316,8 @@ class ClientViewTaskScreen extends Screen
                     \Orchid\Screen\Fields\TextArea::make('return_reason')
                         ->title('Причина возврата на оценку?')
                         ->required()
-                        ->help('Пожалуйста, укажите подробную причину возврата на оценку задачи')
-                ])
+                        ->help('Пожалуйста, укажите подробную причину возврата на оценку задачи'),
+                ]),
             ])
                 ->title('Отклонение оценки')
                 ->applyButton('Подтвердить отклонение оценки')
@@ -319,45 +325,11 @@ class ClientViewTaskScreen extends Screen
         ];
     }
 
-    public function addComment(Request $request, Task $task)
+    public function addComment(Request $request, Task $task, CommentService $comments)
     {
-        // Получаем данные из Quill редактора
-        $quillData = $request->input('comment.text');
-        
-        // Если данные пришли как массив (обычный случай для Quill)
-        if (is_array($quillData)) {
-            $quillContent = $quillData;
-        } 
-        // Если данные пришли как JSON строка (на всякий случай)
-        elseif (json_validate($quillData)) {
-            $quillContent = json_decode($quillData, true);
-        } 
-        // Если данные в непонятном формате
-        else {
-            $quillContent = [
-                'ops' => [
-                    ['insert' => $quillData]
-                ]
-            ];
-        }
+        $comments->addFromRequest($task, $request->user(), $request);
+        Toast::success('Сообщение отправлено. Участники получат уведомление.');
 
-        // Извлекаем plain text из Quill delta
-        $plainText = '';
-        foreach ($quillContent['ops'] ?? [] as $op) {
-            if (is_string($op['insert'] ?? null)) {
-                $plainText .= $op['insert'];
-            }
-        }
-
-        // Удаляем лишние переносы строк
-        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
-
-        $task->comments()->create([
-            'user_id' => auth()->id(),
-            'text' => $quillContent,
-            'plain_text' => $plainText
-        ]);
-
-        Toast::success('Комментарий добавлен');
+        return back();
     }
 }

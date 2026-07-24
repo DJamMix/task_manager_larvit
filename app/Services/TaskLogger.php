@@ -152,8 +152,9 @@ class TaskLogger
 
         $task->comments()->create([
             'user_id' => $user->id,
-            'text' => json_encode($quillContent),
-            'plain_text' => $plainText
+            'text' => $quillContent,
+            'plain_text' => $plainText,
+            'is_system' => true,
         ]);
 
         // Отправляем уведомление в Telegram

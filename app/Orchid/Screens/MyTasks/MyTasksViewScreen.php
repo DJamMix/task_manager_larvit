@@ -5,131 +5,81 @@ namespace App\Orchid\Screens\MyTasks;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
 use App\Models\TrackingTime;
-use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
-use App\Orchid\Layouts\Comment\CommentListLayout;
-use App\Orchid\Layouts\Comment\CommentSendLayout;
+use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Orchid\Layouts\MyTasks\HoursSpentTask;
-use App\Orchid\Layouts\MyTasks\MyTasksViewLayout;
 use App\Orchid\Layouts\MyTasks\StatusSwitcherLayout;
 use App\Orchid\Layouts\MyTasks\TaskEvaluationLayout;
-use Carbon\Carbon;
+use App\Orchid\Layouts\Task\TaskObserversLayout;
+use App\Services\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
+use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Screen;
-use Orchid\Screen\TD;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
 
 class MyTasksViewScreen extends Screen
 {
-    /**
-     * @var Task
-     */
     public $task;
 
-    /**
-     * Fetch data to be displayed on the screen.
-     *
-     * @return array
-     */
     public function query(Task $task, Request $request): iterable
     {
-        $status = strtolower($task->status);
-        $statusLabel = TaskStatusEnum::from($task->status)?->label();
+        $this->authorizeAccess($task);
+
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+
+        $comments = $task->comments()
+            ->with(['user', 'parent.user', 'attachment'])
+            ->orderBy('created_at')
+            ->get();
+
+        $user = $request->user();
+        $isObserverOnly = $task->isObserver((int) $user->id)
+            && (int) $task->executor_id !== (int) $user->id
+            && !$user->hasAccess('platform.systems.tasks');
 
         return [
             'task' => $task,
-            'task_status_label' => $statusLabel,
-            'comments' => $task->comments()
-                ->with('user')
-                ->latest()
-                ->get()
-                ->map(fn($comment) => $this->transformComment($comment)),
-            'timeEntries' => $task->timeEntries()
-                ->with('user')
-                ->latest()
-                ->get(),
-            'user' => $request->user(),
+            'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
+            'discussion_comments' => $comments,
+            'notify_options' => $task->participantsForNotify(),
+            'can_discuss' => $task->canDiscuss((int) $user->id),
+            'is_observer_only' => $isObserverOnly,
+            'viewer_role' => 'employee',
+            'show_time_link' => !$isObserverOnly && $task->canTrackTime((int) $user->id),
+            'time_route' => (!$isObserverOnly && $task->canTrackTime((int) $user->id))
+                ? route('platform.systems.my_tasks.time', $task)
+                : null,
+            'user' => $user,
         ];
     }
 
-    protected function transformTask(Task $task): array
-    {
-        // Преобразуем строки дат в объекты Carbon при необходимости
-        $startDatetime = is_string($task->start_datetime) 
-            ? Carbon::parse($task->start_datetime) 
-            : $task->start_datetime;
-        
-        $endDatetime = is_string($task->end_datetime) 
-            ? Carbon::parse($task->end_datetime) 
-            : $task->end_datetime;
-
-        return [
-            'id' => $task->id,
-            'name' => $task->name,
-            'creator' => ['name' => $task->creator->name ?? 'Не указан'],
-            'executor' => [
-                'name' => $task->executor->name ?? 'Не указан',
-                'id' => $task->executor->id ?? null,
-            ],
-            'project' => ['name' => $task->project->name ?? null],
-            'task_category' => ['name' => $task->category->name ?? null],
-            'status' => $task->status,
-            'status_html' => view('components.task-status', [
-                'status' => strtolower($task->status),
-                'label' => TaskStatusEnum::tryFrom($task->status)?->label()
-            ])->render(),
-            'pay_status' => $task->pay_status,
-            'start_datetime' => $startDatetime?->format('d.m.Y H:i') ?? 'Не указано',
-            'end_datetime' => $endDatetime?->format('d.m.Y H:i') ?? 'Не указано',
-            'hours_spent' => number_format($task->hours_spent, 2),
-            'estimation_hours' => number_format($task->estimation_hours, 2),
-            'description' => $task->description
-        ];
-    }
-
-    protected function transformComment($comment): array
-    {
-        return [
-            'id' => $comment->id,
-            'user' => ['name' => $comment->user?->displayName() ?? 'Неизвестно'],
-            'created_at' => $comment->created_at->format('d.m.Y H:i'),
-            'text' => $comment->plain_text
-        ];
-    }
-
-    /**
-     * The name of the screen displayed in the header.
-     *
-     * @return string|null
-     */
     public function name(): ?string
     {
-        return __('adminpanel.MyTasksView');
+        return $this->task->name ?? 'Задача';
+    }
+
+    public function description(): ?string
+    {
+        return 'Описание и обсуждение на одной странице';
     }
 
     public function permission(): ?iterable
     {
-        return [
-            'platform.systems.my_tasks',
-        ];
+        return ['platform.systems.my_tasks'];
     }
 
-    /**
-     * The screen's action buttons.
-     *
-     * @return \Orchid\Screen\Action[]
-     */
     public function commandBar(): iterable
     {
-        $task = $this->task;
+        $task = $this->task instanceof Task
+            ? $this->task
+            : Task::find(data_get($this->task, 'id'));
 
         $buttons = [];
 
-        // Добавляем кнопку "Оценить задачу" если статус "estimation"
-        if (auth()->id() == $task['executor']['id'] && $task['status'] === TaskStatusEnum::ESTIMATION->value) {
+        if ($task && auth()->id() == $task->executor_id && $task->status === TaskStatusEnum::ESTIMATION->value) {
             $buttons[] = ModalToggle::make('Оценить задачу')
                 ->modalTitle('Оценка задачи')
                 ->icon('exclamation-triangle')
@@ -138,49 +88,124 @@ class MyTasksViewScreen extends Screen
                 ->class('btn btn-warning');
         }
 
-        // Трекинг доступен сразу после назначения, независимо от статуса/оценки
-        $taskModel = $this->task instanceof Task
-            ? $this->task
-            : Task::find(data_get($this->task, 'id'));
-
-        if ($taskModel && $taskModel->canTrackTime()) {
+        if ($task && $task->canTrackTime()) {
             $buttons[] = ModalToggle::make('Добавить время')
                 ->modalTitle('Учет рабочего времени')
                 ->modal('timeTrackingModal')
                 ->method('saveTimeEntry')
                 ->icon('clock');
+
+            $buttons[] = Link::make('Журнал времени')
+                ->icon('bs.journal-text')
+                ->route('platform.systems.my_tasks.time', $task);
         }
 
-        if (
-            auth()->id() == $task['executor']['id'] &&
-            $task['status'] === TaskStatusEnum::NEW->value
-        ) {
+        if ($task && auth()->id() == $task->executor_id && $task->status === TaskStatusEnum::NEW->value) {
             $buttons[] = Button::make('Взять в работу')
                 ->method('takeWork')
                 ->icon('check')
                 ->class('btn btn-primary')
-                ->confirm('При нажатии задача перейдет в статус "В работе"');
+                ->confirm('Задача перейдёт в статус «В работе»');
         }
 
-        $buttons[] = Button::make('Назад')
-            ->icon('arrow-left')
-            ->method('back');
+        if ($task && $task->canManageTask()) {
+            $buttons[] = ModalToggle::make('Наблюдатели')
+                ->modal('observersModal')
+                ->method('saveObservers')
+                ->icon('bs.eye');
+        }
+
+        $buttons[] = Link::make('К списку')
+            ->icon('bs.arrow-left')
+            ->route('platform.systems.my_tasks');
 
         return $buttons;
     }
 
+    public function layout(): iterable
+    {
+        $layouts = [
+            Layout::view('orchid.layouts.task-workspace'),
+            StatusSwitcherLayout::class,
+            Layout::view('orchid.layouts.composer-anchor'),
+        ];
+
+        if ($this->task && $this->task->canDiscuss()) {
+            $layouts[] = DiscussionComposerLayout::class;
+        }
+
+        $layouts[] = Layout::modal('timeTrackingModal', [HoursSpentTask::class])
+            ->title('Учет рабочего времени')
+            ->applyButton('Сохранить');
+
+        $layouts[] = Layout::modal('taskEvaluationModal', [TaskEvaluationLayout::class])
+            ->title('Оценка задачи')
+            ->applyButton('Отправить');
+
+        $layouts[] = Layout::modal('observersModal', [TaskObserversLayout::class])
+            ->title('Наблюдатели задачи')
+            ->applyButton('Сохранить');
+
+        return $layouts;
+    }
+
+    public function addComment(Request $request, Task $task, CommentService $comments)
+    {
+        $this->authorizeAccess($task);
+
+        if (!$task->canDiscuss()) {
+            Toast::error('Нельзя писать в этой задаче');
+            return back();
+        }
+
+        $comments->addFromRequest($task, $request->user(), $request);
+        Toast::success('Сообщение отправлено');
+
+        return redirect()->route('platform.systems.my_tasks.view', $task);
+    }
+
+    public function saveObservers(Request $request, Task $task)
+    {
+        if (!$task->canManageTask()) {
+            abort(403);
+        }
+
+        $ids = collect($request->input('task.observers_ids', []))
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $task->observers_ids = $ids;
+        $task->save();
+
+        Toast::success('Наблюдатели обновлены');
+
+        return back();
+    }
+
     public function takeWork(Task $task)
     {
+        $this->authorizeAccess($task);
+
+        if (!$task->canChangeWorkflow() || (int) $task->executor_id !== (int) auth()->id()) {
+            Toast::error('Недостаточно прав');
+            return back();
+        }
+
         $task->status = TaskStatusEnum::IN_PROGRESS->value;
         $task->save();
 
-        Toast::success('Задача успешно перешла в статус "В работе"');
+        Toast::success('Задача в работе');
 
-        return redirect()->back();
+        return back();
     }
 
     public function saveTimeEntry(Task $task, Request $request)
     {
+        $this->authorizeAccess($task);
+
         if (!$task->canTrackTime()) {
             Toast::error('Нельзя учитывать время по этой задаче');
             return back();
@@ -201,14 +226,15 @@ class MyTasksViewScreen extends Screen
         $tracking->user_id = auth()->id();
         $tracking->save();
 
-        // Факт времени не трогает estimation_hours — только hours_spent
         $task->increment('hours_spent', $request->input('tracking.hours_spent'));
 
-        Toast::success('Время учтено. Оценка задачи не изменилась.');
+        Toast::success('Время учтено. Оценка не изменилась.');
     }
 
     public function saveEstimation(Task $task, Request $request)
     {
+        $this->authorizeAccess($task);
+
         $request->validate([
             'task.estimation_hours' => 'required|numeric|max:1000|min:0',
         ]);
@@ -217,33 +243,18 @@ class MyTasksViewScreen extends Screen
         $task->status = TaskStatusEnum::ESTIMATION_REVIEW->value;
         $task->save();
 
-        Toast::success('Оценка отправлена на согласование. Учтённое время не изменилось.');
-    }
-
-    public function saveHoursSpent(Task $task, Request $request)
-    {
-        $request->validate([
-            'task.hours_spent' => 'required|numeric|max:1000|min:0',
-            'tracking.work_description' => 'required|string|max:2000',
-            'tracking.work_date' => 'required|date',
-        ]);
-
-        $tracking = new \App\Models\TrackingTime();
-        $tracking->id = \Illuminate\Support\Str::ulid();
-        $tracking->task_id = $task->id;
-        $tracking->hours_spent = $request->input('tracking.hours_spent');
-        $tracking->work_description = $request->input('tracking.work_description');
-        $tracking->work_date = $request->input('tracking.work_date');
-        $tracking->user_id = auth()->id();
-        $tracking->save();
-
-        $task->increment('hours_spent', $request->input('tracking.hours_spent'));
-
-        Toast::info('Затраченные часы успешно сохранены!');
+        Toast::success('Оценка отправлена на согласование');
     }
 
     public function changeStatus(Task $task, Request $request)
     {
+        $this->authorizeAccess($task);
+
+        if (!$task->canChangeWorkflow()) {
+            Toast::error('Наблюдатель не может менять статус');
+            return back();
+        }
+
         $validStatuses = [
             TaskStatusEnum::IN_PROGRESS->value,
             TaskStatusEnum::TESTING_STAGE->value,
@@ -254,129 +265,32 @@ class MyTasksViewScreen extends Screen
 
         $newStatus = $request->get('status');
 
-        if (!in_array($newStatus, $validStatuses)) {
+        if (!in_array($newStatus, $validStatuses, true)) {
             Toast::error('Недопустимый статус');
             return back();
         }
 
-        if($newStatus === TaskStatusEnum::UNPAID->value && $task->type_task == 'bug') {
+        if ($newStatus === TaskStatusEnum::UNPAID->value && $task->type_task == 'bug') {
             $newStatus = TaskStatusEnum::COMPLETED->value;
         }
 
         $task->status = $newStatus;
         $task->save();
 
-        Toast::success('Статус задачи обновлен');
+        Toast::success('Статус обновлён');
+
         return back();
     }
 
-    /**
-     * The screen's layout elements.
-     *
-     * @return \Orchid\Screen\Layout[]|string[]
-     */
-    public function layout(): iterable
+    private function authorizeAccess(Task $task): void
     {
-        $layouts = [];
+        $user = auth()->user();
+        $ok = (int) $task->executor_id === (int) $user->id
+            || $task->isObserver((int) $user->id)
+            || $user->hasAccess('platform.systems.tasks');
 
-        $layouts[] = [
-            Layout::view('orchid.layouts.estimate-vs-spent'),
-
-            Layout::tabs([
-                'Основная информация' => [
-                    StatusSwitcherLayout::class,
-                    MyTasksViewLayout::class,
-                    ClientTaskFilesLayout::class,
-                ],
-                'Комментарии' => [
-                    CommentSendLayout::class,
-                    CommentListLayout::class,
-                ],
-                'Учет времени' => [
-                    Layout::table('timeEntries', [
-                        TD::make('work_date', 'Дата')
-                            ->render(fn ($entry) => $entry->work_date->format('d.m.Y')),
-                        TD::make('user.name', 'Исполнитель'),
-                        TD::make('hours_spent', 'Часы')
-                            ->alignRight()
-                            ->render(fn ($entry) => number_format($entry->hours_spent, 2)),
-                        TD::make('work_description', 'Описание')
-                            ->render(fn ($entry) => Str::limit($entry->work_description, 100)),
-                    ]),
-                ],
-            ]),
-
-            Layout::modal('timeTrackingModal', [
-                HoursSpentTask::class,
-            ])
-                ->title('Учет рабочего времени')
-                ->applyButton('Сохранить'),
-
-            Layout::modal('taskEvaluationModal', [
-                TaskEvaluationLayout::class,
-            ])
-                ->title('Оценка задачи')
-                ->applyButton('Отправить'),
-        ];
-
-        return $layouts;
-    }
-
-    public function asyncGetTimeEntryData(Task $task): array
-    {
-        return [
-            'tracking' => [  // Изменил с 'time' на 'tracking'
-                'work_date' => now()->format('Y-m-d'),
-                'hours_spent' => null,
-                'work_description' => null,
-            ]
-        ];
-    }
-
-    public function back()
-    {
-        return redirect()->route('platform.systems.my_tasks');
-    }
-
-    public function addComment(Request $request, Task $task)
-    {
-        // Получаем данные из Quill редактора
-        $quillData = $request->input('comment.text');
-        
-        // Если данные пришли как массив (обычный случай для Quill)
-        if (is_array($quillData)) {
-            $quillContent = $quillData;
-        } 
-        // Если данные пришли как JSON строка (на всякий случай)
-        elseif (json_validate($quillData)) {
-            $quillContent = json_decode($quillData, true);
-        } 
-        // Если данные в непонятном формате
-        else {
-            $quillContent = [
-                'ops' => [
-                    ['insert' => $quillData]
-                ]
-            ];
+        if (!$ok) {
+            abort(403, 'Нет доступа к этой задаче');
         }
-
-        // Извлекаем plain text из Quill delta
-        $plainText = '';
-        foreach ($quillContent['ops'] ?? [] as $op) {
-            if (is_string($op['insert'] ?? null)) {
-                $plainText .= $op['insert'];
-            }
-        }
-
-        // Удаляем лишние переносы строк
-        $plainText = trim(preg_replace('/\s+/', ' ', $plainText));
-
-        $task->comments()->create([
-            'user_id' => auth()->id(),
-            'text' => $quillContent,
-            'plain_text' => $plainText
-        ]);
-
-        Toast::success('Комментарий добавлен');
     }
 }

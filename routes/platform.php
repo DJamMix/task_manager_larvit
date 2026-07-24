@@ -21,6 +21,7 @@ use App\Orchid\Screens\Examples\ExampleScreen;
 use App\Orchid\Screens\Examples\ExampleTextEditorsScreen;
 use App\Orchid\Screens\MyTasks\MyTasksListScreen;
 use App\Orchid\Screens\MyTasks\MyTasksViewScreen;
+use App\Orchid\Screens\MyTasks\MyTaskTimeScreen;
 use App\Orchid\Screens\MyTasks\InboxScreen;
 use App\Orchid\Screens\PlatformScreen;
 use App\Orchid\Screens\Project\ProjectEditScreen;
@@ -251,6 +252,12 @@ Route::screen('my_tasks/{task}/view', MyTasksViewScreen::class)
     ->breadcrumbs(fn (Trail $trail, $task) => $trail
         ->parent('platform.systems.my_tasks')
         ->push($task->name, route('platform.systems.my_tasks.view', $task)));
+
+Route::screen('my_tasks/{task}/time', MyTaskTimeScreen::class)
+    ->name('platform.systems.my_tasks.time')
+    ->breadcrumbs(fn (Trail $trail, $task) => $trail
+        ->parent('platform.systems.my_tasks.view', $task)
+        ->push('Учёт времени', route('platform.systems.my_tasks.time', $task)));
 
 Route::screen('inbox', InboxScreen::class)
     ->name('platform.systems.inbox')

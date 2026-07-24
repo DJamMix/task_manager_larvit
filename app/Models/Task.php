@@ -245,4 +245,96 @@ class Task extends Model
 
         return (float) $this->hours_spent / $estimate;
     }
+
+    /**
+     * @return list<int>
+     */
+    public function observerIds(): array
+    {
+        return collect($this->observers_ids ?? [])
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function isObserver(?int $userId = null): bool
+    {
+        $userId = $userId ?? auth()->id();
+
+        return $userId && in_array((int) $userId, $this->observerIds(), true);
+    }
+
+    public function canDiscuss(?int $userId = null): bool
+    {
+        $userId = $userId ?? auth()->id();
+        if (!$userId) {
+            return false;
+        }
+
+        if ((int) $this->executor_id === (int) $userId || (int) $this->creator_id === (int) $userId) {
+            return true;
+        }
+
+        if ($this->isObserver($userId)) {
+            return true;
+        }
+
+        $user = User::find($userId);
+        if ($user?->hasAccess('platform.systems.tasks')) {
+            return true;
+        }
+
+        // Клиент проекта
+        return $user?->projects()->where('projects.id', $this->project_id)->exists() ?? false;
+    }
+
+    public function canManageTask(?int $userId = null): bool
+    {
+        $userId = $userId ?? auth()->id();
+        $user = $userId ? User::find($userId) : null;
+
+        return (bool) ($user?->hasAccess('platform.systems.tasks') || $user?->hasAccess('platform.systems.projects'));
+    }
+
+    public function canChangeWorkflow(?int $userId = null): bool
+    {
+        $userId = $userId ?? auth()->id();
+
+        // Наблюдатель только пишет в обсуждении
+        if ($this->isObserver($userId) && (int) $this->executor_id !== (int) $userId) {
+            return false;
+        }
+
+        return (int) $this->executor_id === (int) $userId
+            || $this->canManageTask($userId);
+    }
+
+    public function participantsForNotify(): array
+    {
+        $ids = collect([
+            $this->executor_id,
+            $this->creator_id,
+            ...$this->observerIds(),
+        ])->filter()->map(fn ($id) => (int) $id);
+
+        foreach ($this->project?->clients ?? [] as $client) {
+            $ids->push((int) $client->id);
+        }
+
+        $ids = $ids->unique()->values();
+
+        return User::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (User $u) => [$u->id => $u->displayName()])
+            ->all();
+    }
+
+    public function observers()
+    {
+        return User::query()->whereIn('id', $this->observerIds())->orderBy('name')->get();
+    }
 }
