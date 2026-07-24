@@ -118,7 +118,12 @@ class PlatformProvider extends OrchidServiceProvider
 
             return \App\Models\ChatMessage::query()
                 ->whereIn('chat_id', function ($q) use ($userId) {
-                    $q->select('chat_id')->from('chat_user')->where('user_id', $userId);
+                    $q->select('chat_id')
+                        ->from('chat_user')
+                        ->where('user_id', $userId)
+                        ->where(function ($qq) {
+                            $qq->whereNull('is_muted')->orWhere('is_muted', false);
+                        });
                 })
                 ->where('user_id', '!=', $userId)
                 ->whereRaw('created_at > COALESCE(

@@ -3,7 +3,6 @@
 namespace App\Orchid\Layouts\Chat;
 
 use App\Services\ChatService;
-use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Layouts\Rows;
 
@@ -13,7 +12,7 @@ class ChatMembersLayout extends Rows
 
     protected function fields(): iterable
     {
-        $options = app(ChatService::class)->staffUserOptions();
+        $options = app(ChatService::class)->chatMemberOptions();
         $chat = $this->query->get('chat');
         $current = $chat?->members?->pluck('id')->all() ?? [];
 
@@ -23,7 +22,7 @@ class ChatMembersLayout extends Rows
                 ->multiple()
                 ->title('Участники чата')
                 ->value($current)
-                ->help('Владелец остаётся в чате'),
+                ->help('Сотрудники и контакты клиентов. Владелец остаётся в чате.'),
         ];
     }
 }

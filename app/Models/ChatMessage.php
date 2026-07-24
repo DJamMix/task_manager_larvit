@@ -59,6 +59,17 @@ class ChatMessage extends Model
 
     public function getFormattedTextAttribute(): string
     {
-        return app(MessageHtmlRenderer::class)->render($this->text, $this->plain_text);
+        $labels = [];
+        if (!empty($this->mentioned_user_ids)) {
+            $labels = User::query()
+                ->whereIn('id', $this->mentioned_user_ids)
+                ->get()
+                ->flatMap(fn (User $u) => array_filter([$u->displayName(), $u->name]))
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return app(MessageHtmlRenderer::class)->render($this->text, $this->plain_text, $labels);
     }
 }

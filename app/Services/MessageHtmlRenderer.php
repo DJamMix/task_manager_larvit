@@ -10,36 +10,29 @@ namespace App\Services;
  */
 final class MessageHtmlRenderer
 {
-    public function render(mixed $payload, ?string $plainText = null): string
+    public function render(mixed $payload, ?string $plainText = null, array $mentionLabels = []): string
     {
         // Markdown fence из textarea чата
         if (is_string($plainText) && str_contains($plainText, '```')) {
-            return $this->enhance($this->plainToHtml($plainText));
-        }
-
-        if (is_string($payload) && $payload !== '') {
+            $html = $this->enhance($this->plainToHtml($plainText));
+        } elseif (is_string($payload) && $payload !== '') {
             if ($this->looksLikeHtml($payload)) {
-                return $this->enhance($this->sanitizeHtml($payload));
+                $html = $this->enhance($this->sanitizeHtml($payload));
+            } else {
+                $html = $this->enhance($this->plainToHtml($payload));
             }
-
-            return $this->enhance($this->plainToHtml($payload));
+        } elseif (!is_array($payload) || $payload === []) {
+            $html = $this->enhance($this->plainToHtml((string) ($plainText ?? '')));
+        } elseif (!empty($payload['html']) && is_string($payload['html'])) {
+            $html = $this->enhance($this->sanitizeHtml($payload['html']));
+        } elseif (!empty($payload['ops']) && is_array($payload['ops'])) {
+            $built = $this->deltaToHtml($payload['ops']);
+            $html = $this->enhance($built !== '' ? $built : $this->plainToHtml((string) ($plainText ?? '')));
+        } else {
+            $html = $this->enhance($this->plainToHtml((string) ($plainText ?? '')));
         }
 
-        if (!is_array($payload) || $payload === []) {
-            return $this->enhance($this->plainToHtml((string) ($plainText ?? '')));
-        }
-
-        if (!empty($payload['html']) && is_string($payload['html'])) {
-            return $this->enhance($this->sanitizeHtml($payload['html']));
-        }
-
-        if (!empty($payload['ops']) && is_array($payload['ops'])) {
-            $html = $this->deltaToHtml($payload['ops']);
-
-            return $this->enhance($html !== '' ? $html : $this->plainToHtml((string) ($plainText ?? '')));
-        }
-
-        return $this->enhance($this->plainToHtml((string) ($plainText ?? '')));
+        return $this->highlightMentions($html, $mentionLabels);
     }
 
     /**
@@ -191,24 +184,28 @@ final class MessageHtmlRenderer
 
     private function enhance(string $html): string
     {
-        $html = preg_replace_callback(
-            '/<pre[^>]*>([\s\S]*?)<\/pre>/i',
-            function (array $m) {
-                if (str_contains($m[0], 'tw-codeblock')) {
-                    return $m[0];
-                }
-                $inner = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                $lang = '';
-                if (preg_match('/class=["\'][^"\']*language-([a-zA-Z0-9_-]+)/', $m[0], $lm)) {
-                    $lang = $lm[1];
-                }
+        // Уже собранные fence-блоки не трогаем (иначе бар CODE дублируется)
+        if (!str_contains($html, 'tw-codeblock')) {
+            $html = preg_replace_callback(
+                '/<pre[^>]*>([\s\S]*?)<\/pre>/i',
+                function (array $m) {
+                    $fullPre = $m[0];
+                    if (str_contains($fullPre, 'hljs')) {
+                        return $fullPre;
+                    }
 
-                return $this->renderCodeBlock($inner, $lang);
-            },
-            $html
-        ) ?? $html;
+                    $inner = html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $lang = '';
+                    if (preg_match('/class=["\'][^"\']*language-([a-zA-Z0-9_-]+)/', $fullPre, $lm)) {
+                        $lang = $lm[1];
+                    }
 
-        // Автоссылки на задачи /admin/.../tasks/...
+                    return $this->renderCodeBlock($inner, $lang);
+                },
+                $html
+            ) ?? $html;
+        }
+
         $html = preg_replace_callback(
             '/(?<!["\'>])(https?:\/\/[^\s<]+|(?:\/admin\/)?(?:tasks\/\d+(?:\/edit)?|my-tasks\/\d+|client\/projects\/\d+\/tasks\/\d+))/i',
             function (array $m) {
@@ -223,6 +220,29 @@ final class MessageHtmlRenderer
             },
             $html
         ) ?? $html;
+
+        return $html;
+    }
+
+    /**
+     * @param  list<string>  $mentionLabels
+     */
+    public function highlightMentions(string $html, array $mentionLabels): string
+    {
+        $labels = collect($mentionLabels)
+            ->filter()
+            ->unique()
+            ->sortByDesc(fn ($l) => mb_strlen($l))
+            ->values();
+
+        foreach ($labels as $label) {
+            $quoted = preg_quote($label, '/');
+            $html = preg_replace(
+                '/(^|[^\\w])@(' . $quoted . ')(?![\\w])/u',
+                '$1<span class="bx-mention">@$2</span>',
+                $html
+            ) ?? $html;
+        }
 
         return $html;
     }

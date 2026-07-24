@@ -20,7 +20,7 @@ class MessengerScreen extends Screen
 
     public $can_create = false;
 
-    public $staff_options = [];
+    public $member_options = [];
 
     public function query(ChatService $chats, Request $request): iterable
     {
@@ -57,9 +57,18 @@ class MessengerScreen extends Screen
                 ->get()
             : collect();
 
-        $composerMembers = $resolved?->members
+        $mentionUsers = $resolved?->members
             ?->reject(fn ($u) => (int) $u->id === (int) $user->id)
-            ->mapWithKeys(fn ($u) => [$u->id => $u->displayName()])
+            ->map(fn ($u) => [
+                'id' => (int) $u->id,
+                'name' => $u->name,
+                'aliases' => array_values(array_unique(array_filter([
+                    $u->name,
+                    $u->displayName(),
+                    $u->email ? strtok($u->email, '@') : null,
+                ]))),
+            ])
+            ->values()
             ->all() ?? [];
 
         $composerTasks = Task::query()
@@ -69,15 +78,26 @@ class MessengerScreen extends Screen
             ->mapWithKeys(fn (Task $t) => [$t->id => "#{$t->id} · {$t->name}"])
             ->all();
 
+        $isMuted = false;
+        if ($resolved) {
+            $isMuted = (bool) $resolved->members
+                ->firstWhere('id', $user->id)
+                ?->pivot
+                ?->is_muted;
+        }
+
         return [
             'chats' => $list,
             'chat' => $resolved,
             'messages' => $messages,
             'can_create' => $chats->canCreate($user),
-            'staff_options' => $chats->staffUserOptions($user->id),
+            'member_options' => $chats->chatMemberOptions($user->id),
+            'staff_options' => $chats->chatMemberOptions($user->id),
             'active_chat_id' => $resolved?->id,
-            'composer_members' => $composerMembers,
+            'mention_users' => $mentionUsers,
             'composer_tasks' => $composerTasks,
+            'chat_is_muted' => $isMuted,
+            'chats_poll_url' => route('platform.systems.chats.poll'),
         ];
     }
 
@@ -100,17 +120,19 @@ class MessengerScreen extends Screen
     {
         $buttons = [];
 
+        // Личные чаты — всем с доступом к мессенджеру
+        $buttons[] = ModalToggle::make('Личный')
+            ->modal('createDirectModal')
+            ->method('createDirect')
+            ->icon('bs.person');
+
+        // Группы — только с правом создания
         if ($this->can_create) {
             $buttons[] = ModalToggle::make('Групповой чат')
                 ->modal('createChatModal')
                 ->method('createGroup')
                 ->icon('bs.plus-lg')
                 ->class('btn btn-primary');
-
-            $buttons[] = ModalToggle::make('Личный')
-                ->modal('createDirectModal')
-                ->method('createDirect')
-                ->icon('bs.person');
         }
 
         if ($this->chat?->exists && $this->chat->type !== 'direct'
@@ -126,6 +148,9 @@ class MessengerScreen extends Screen
 
     public function layout(): iterable
     {
+        $memberOptions = $this->member_options
+            ?: app(ChatService::class)->chatMemberOptions(auth()->id());
+
         return [
             Layout::view('orchid.layouts.messenger'),
 
@@ -137,8 +162,9 @@ class MessengerScreen extends Screen
             Layout::modal('createDirectModal', [
                 Layout::rows([
                     \Orchid\Screen\Fields\Select::make('direct.user_id')
-                        ->options($this->staff_options ?: app(ChatService::class)->staffUserOptions(auth()->id()))
-                        ->title('Сотрудник')
+                        ->options($memberOptions)
+                        ->title('Собеседник')
+                        ->help('Сотрудник или контакт клиента')
                         ->required()
                         ->empty('Выберите'),
                 ]),
@@ -179,7 +205,7 @@ class MessengerScreen extends Screen
 
     public function createDirect(Request $request, ChatService $chats)
     {
-        if (!$chats->canCreate()) {
+        if (!$chats->canAccessMessenger($request->user())) {
             abort(403);
         }
 
@@ -209,6 +235,14 @@ class MessengerScreen extends Screen
     {
         $chats->addMessage($chat, $request->user(), $request);
         Toast::success('Отправлено');
+
+        return redirect()->route('platform.systems.chats.view', $chat);
+    }
+
+    public function toggleMute(Request $request, Chat $chat, ChatService $chats)
+    {
+        $muted = $chats->toggleMute($chat, $request->user());
+        Toast::info($muted ? 'Чат без звука' : 'Уведомления включены');
 
         return redirect()->route('platform.systems.chats.view', $chat);
     }

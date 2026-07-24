@@ -10,9 +10,12 @@ namespace App\Support;
  */
 final class RoleCatalog
 {
-    public const CLIENT_SLUGS = ['client', 'client_employer'];
+    public const CLIENT_SLUGS = ['client', 'client_employer', 'client_contact'];
 
     public const STAFF_SLUGS = ['admin', 'pm', 'manager', 'employee'];
+
+    /** Кто может быть в чатах (сотрудники + клиентские контакты) */
+    public const CHAT_MEMBER_SLUGS = ['admin', 'pm', 'manager', 'employee', 'client', 'client_employer', 'client_contact'];
 
     /**
      * @return array<string, array{name: string, description: string, permissions: list<string>}>
@@ -55,9 +58,15 @@ final class RoleCatalog
 
         $client = [
             'platform.systems.attachment',
+            'platform.systems.chats',
             'platform.systems.client.projects',
             'platform.systems.client.project.tasks',
             'platform.systems.client.project.tasks.view',
+        ];
+
+        $clientContact = [
+            'platform.systems.attachment',
+            'platform.systems.chats',
         ];
 
         return [
@@ -78,18 +87,23 @@ final class RoleCatalog
             ],
             'employee' => [
                 'name' => 'Сотрудник',
-                'description' => 'Свои задачи, входящие, учёт времени, комментарии',
+                'description' => 'Свои задачи, входящие, учёт времени, комментарии, чаты',
                 'permissions' => $employee,
             ],
             'client' => [
                 'name' => 'Клиент',
-                'description' => 'Просмотр своих проектов, создание и согласование задач',
+                'description' => 'Проекты, задачи и чаты с командой',
                 'permissions' => $client,
             ],
             'client_employer' => [
                 'name' => 'Заказчик',
                 'description' => 'Клиентский доступ для представителя компании-заказчика',
                 'permissions' => $client,
+            ],
+            'client_contact' => [
+                'name' => 'Контакт клиента',
+                'description' => 'Только чаты с командой — без доступа к задачам и проектам',
+                'permissions' => $clientContact,
             ],
         ];
     }

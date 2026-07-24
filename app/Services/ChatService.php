@@ -21,15 +21,22 @@ class ChatService
         private readonly DashboardNotifier $notifier,
     ) {}
 
-    public function staffUserOptions(?int $exceptId = null): array
+    /** Участники чатов: сотрудники + клиентские контакты */
+    public function chatMemberOptions(?int $exceptId = null): array
     {
         return User::query()
-            ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::STAFF_SLUGS))
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::CHAT_MEMBER_SLUGS))
             ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
             ->orderBy('name')
             ->get()
             ->mapWithKeys(fn (User $u) => [$u->id => $u->displayName()])
             ->all();
+    }
+
+    /** @deprecated use chatMemberOptions */
+    public function staffUserOptions(?int $exceptId = null): array
+    {
+        return $this->chatMemberOptions($exceptId);
     }
 
     public function canCreate(?User $user = null): bool
@@ -68,7 +75,57 @@ class ChatService
                     ->limit(1)
             )
             ->orderByDesc('chats.updated_at')
-            ->get();
+            ->get()
+            ->each(function (Chat $chat) use ($user) {
+                $pivot = $chat->members->firstWhere('id', $user->id)?->pivot;
+                $chat->setAttribute('is_muted', (bool) ($pivot?->is_muted ?? false));
+            });
+    }
+
+    public function pollState(User $user, ?int $sinceMessageId = null): array
+    {
+        $chats = $this->chatsFor($user);
+        $chatIds = $chats->pluck('id')->filter()->values();
+        $mutedIds = $chats->where('is_muted', true)->pluck('id')->all();
+
+        $maxId = (int) (ChatMessage::query()
+            ->whereIn('chat_id', $chatIds)
+            ->max('id') ?? 0);
+
+        $sound = false;
+        if ($sinceMessageId && $sinceMessageId > 0) {
+            $sound = ChatMessage::query()
+                ->where('user_id', '!=', $user->id)
+                ->where('id', '>', $sinceMessageId)
+                ->whereIn('chat_id', $chatIds)
+                ->when($mutedIds !== [], fn ($q) => $q->whereNotIn('chat_id', $mutedIds))
+                ->exists();
+        }
+
+        return [
+            'unread_total' => (int) $chats->sum('unread_count'),
+            'sound' => $sound,
+            'max_id' => $maxId,
+            'chats' => $chats->map(fn (Chat $chat) => [
+                'id' => (int) $chat->id,
+                'unread' => (int) ($chat->unread_count ?? 0),
+                'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
+                'muted' => (bool) $chat->is_muted,
+            ])->values()->all(),
+        ];
+    }
+
+    public function toggleMute(Chat $chat, User $user): bool
+    {
+        if (!$chat->isMember($user->id)) {
+            abort(403);
+        }
+
+        $current = (bool) $chat->members()->where('users.id', $user->id)->first()?->pivot?->is_muted;
+        $next = !$current;
+        $chat->members()->updateExistingPivot($user->id, ['is_muted' => $next]);
+
+        return $next;
     }
 
     /**
@@ -88,7 +145,7 @@ class ChatService
                 ->map(fn ($id) => (int) $id)
                 ->push($actor->id)
                 ->unique()
-                ->filter(fn ($id) => $this->isStaffUserId($id))
+                ->filter(fn ($id) => $this->isChatMemberUserId($id))
                 ->values();
 
             $sync = [];
@@ -96,6 +153,7 @@ class ChatService
                 $sync[$id] = [
                     'role' => (int) $id === (int) $actor->id ? 'owner' : 'member',
                     'last_read_at' => now(),
+                    'is_muted' => false,
                 ];
             }
             $chat->members()->sync($sync);
@@ -108,7 +166,7 @@ class ChatService
 
     public function findOrCreateDirect(User $actor, int $otherUserId): Chat
     {
-        if (!$this->isStaffUserId($otherUserId) || (int) $otherUserId === (int) $actor->id) {
+        if (!$this->isChatMemberUserId($otherUserId) || (int) $otherUserId === (int) $actor->id) {
             abort(422, 'Нельзя создать личный чат с этим пользователем');
         }
 
@@ -133,8 +191,8 @@ class ChatService
             ]);
 
             $chat->members()->sync([
-                $actor->id => ['role' => 'owner', 'last_read_at' => now()],
-                $other->id => ['role' => 'member', 'last_read_at' => now()],
+                $actor->id => ['role' => 'owner', 'last_read_at' => now(), 'is_muted' => false],
+                $other->id => ['role' => 'member', 'last_read_at' => now(), 'is_muted' => false],
             ]);
 
             $this->postSystem($chat, $actor, 'Личный чат создан');
@@ -160,15 +218,17 @@ class ChatService
             ->map(fn ($id) => (int) $id)
             ->push($actor->id)
             ->unique()
-            ->filter(fn ($id) => $this->isStaffUserId($id))
+            ->filter(fn ($id) => $this->isChatMemberUserId($id))
             ->values();
 
         $sync = [];
         foreach ($ids as $id) {
-            $existingRole = $chat->members()->where('users.id', $id)->first()?->pivot?->role;
+            $member = $chat->members()->where('users.id', $id)->first();
+            $existingRole = $member?->pivot?->role;
             $sync[$id] = [
                 'role' => $existingRole === 'owner' || (int) $id === (int) $chat->created_by ? 'owner' : 'member',
-                'last_read_at' => $chat->members()->where('users.id', $id)->first()?->pivot?->last_read_at ?? now(),
+                'last_read_at' => $member?->pivot?->last_read_at ?? now(),
+                'is_muted' => (bool) ($member?->pivot?->is_muted ?? false),
             ];
         }
 
@@ -224,21 +284,25 @@ class ChatService
                 ->first();
         }
 
-        $mentions = collect($request->input('message.notify_user_ids', []))
-            ->map(fn ($id) => (int) $id)
-            ->filter();
+        $chat->loadMissing('members');
+        $mentions = $this->parseMentionsFromText($plain, $chat->members)
+            ->merge(collect($request->input('message.notify_user_ids', []))->map(fn ($id) => (int) $id));
 
         if ($parent?->user_id && (int) $parent->user_id !== (int) $actor->id) {
             $mentions->push((int) $parent->user_id);
         }
 
-        $mentions = $mentions->unique()->reject(fn ($id) => $id === (int) $actor->id)->values();
+        $mentions = $mentions
+            ->filter()
+            ->unique()
+            ->reject(fn ($id) => $id === (int) $actor->id)
+            ->values();
 
         $message = $chat->messages()->create([
             'user_id' => $actor->id,
             'parent_id' => $parent?->id,
             'text' => $quill,
-            'plain_text' => $plain !== '' ? $plain : ($task ? 'Задача #' . $task->id : '📎 Вложение'),
+            'plain_text' => $plain !== '' ? $plain : ($task ? 'Задача #' . $task->id : 'Вложение'),
             'mentioned_user_ids' => $mentions->all(),
             'task_id' => $task?->id,
             'is_system' => false,
@@ -253,6 +317,37 @@ class ChatService
         $this->notifyMembers($chat, $actor, $message, $mentions->all());
 
         return $message;
+    }
+
+    /**
+     * @param  Collection<int, User>  $members
+     * @return Collection<int, int>
+     */
+    public function parseMentionsFromText(string $plain, Collection $members): Collection
+    {
+        $ids = collect();
+
+        foreach ($members as $member) {
+            $labels = array_filter([
+                $member->displayName(),
+                $member->name,
+                $member->email ? strtok($member->email, '@') : null,
+            ]);
+
+            foreach ($labels as $label) {
+                $label = trim((string) $label);
+                if ($label === '') {
+                    continue;
+                }
+                $quoted = preg_quote($label, '/');
+                if (preg_match('/(^|[\s([{])@' . $quoted . '(?=$|[\s,.:;!?)\]}])/u', $plain)) {
+                    $ids->push((int) $member->id);
+                    break;
+                }
+            }
+        }
+
+        return $ids->unique()->values();
     }
 
     public function markRead(Chat $chat, User $user): void
@@ -280,10 +375,26 @@ class ChatService
         $url = route('platform.systems.chats.view', $chat);
 
         $recipients = $chat->members
-            ->reject(fn (User $u) => (int) $u->id === (int) $actor->id);
+            ->reject(fn (User $u) => (int) $u->id === (int) $actor->id)
+            ->reject(fn (User $u) => (bool) ($u->pivot?->is_muted ?? false));
 
+        // Упоминания — всегда (даже если чат замьючен), как в Telegram/Bitrix
         if ($mentionIds !== []) {
-            $recipients = $recipients->filter(fn (User $u) => in_array((int) $u->id, $mentionIds, true));
+            $mentioned = $chat->members
+                ->reject(fn (User $u) => (int) $u->id === (int) $actor->id)
+                ->filter(fn (User $u) => in_array((int) $u->id, $mentionIds, true));
+
+            foreach ($mentioned as $user) {
+                $this->notifier->send($user, 'Вас упомянули в чате', $body, $url, Color::INFO);
+            }
+
+            // Остальным незамьюченным — обычное «новое сообщение»
+            $mentionedIds = $mentioned->pluck('id')->all();
+            foreach ($recipients->reject(fn (User $u) => in_array((int) $u->id, $mentionedIds, true)) as $user) {
+                $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO);
+            }
+
+            return;
         }
 
         foreach ($recipients as $user) {
@@ -291,11 +402,11 @@ class ChatService
         }
     }
 
-    private function isStaffUserId(int $userId): bool
+    private function isChatMemberUserId(int $userId): bool
     {
         return User::query()
             ->whereKey($userId)
-            ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::STAFF_SLUGS))
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::CHAT_MEMBER_SLUGS))
             ->exists();
     }
 }

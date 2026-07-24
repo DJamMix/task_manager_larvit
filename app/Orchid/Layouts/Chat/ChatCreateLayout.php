@@ -3,7 +3,6 @@
 namespace App\Orchid\Layouts\Chat;
 
 use App\Services\ChatService;
-use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Input;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\TextArea;
@@ -15,7 +14,7 @@ class ChatCreateLayout extends Rows
 
     protected function fields(): iterable
     {
-        $options = app(ChatService::class)->staffUserOptions(auth()->id());
+        $options = app(ChatService::class)->chatMemberOptions(auth()->id());
 
         return [
             Input::make('chat.title')
@@ -33,7 +32,7 @@ class ChatCreateLayout extends Rows
                 ->options($options)
                 ->multiple()
                 ->title('Участники')
-                ->help('Можно добавить сотрудников, PM и админов. Клиентов добавить нельзя.')
+                ->help('Сотрудники и контакты клиентов. Групповой чат могут создавать только пользователи с правом «Чаты (создание)».')
                 ->required(),
         ];
     }
