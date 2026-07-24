@@ -139,6 +139,7 @@
                 @endforelse
             </div>
 
+            @if($can_write ?? true)
             <div class="bx-composer" id="bx-composer"
                  data-mentions='@json($mentionUsers)'>
                 <input type="hidden" name="message[parent_id]" id="chat-message-parent-id" form="post-form" value="">
@@ -214,6 +215,11 @@
                     </div>
                 </div>
             </div>
+            @else
+                <div class="alert alert-warning mb-0 m-3">
+                    Нет права писать клиентам в личных чатах. Обратитесь к проектному менеджеру — нужно право «Чаты с клиентами».
+                </div>
+            @endif
         @else
             <div class="bx-messenger__empty">
                 <h2 class="h4">Корпоративные чаты</h2>

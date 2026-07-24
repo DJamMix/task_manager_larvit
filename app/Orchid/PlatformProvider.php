@@ -158,7 +158,8 @@ class PlatformProvider extends OrchidServiceProvider
             ItemPermission::group('Сотрудник')
                 ->addPermission('platform.systems.my_tasks', 'Мои задачи / входящие / время')
                 ->addPermission('platform.systems.chats', 'Чаты (участие)')
-                ->addPermission('platform.systems.chats.create', 'Чаты (создание)'),
+                ->addPermission('platform.systems.chats.create', 'Чаты (создание групп)')
+                ->addPermission('platform.systems.chats.clients', 'Чаты с клиентами (личные)'),
 
             ItemPermission::group('Клиент / Заказчик')
                 ->addPermission('platform.systems.client.projects', 'Мои проекты')

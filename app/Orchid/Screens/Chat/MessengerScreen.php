@@ -20,7 +20,13 @@ class MessengerScreen extends Screen
 
     public $can_create = false;
 
+    public $can_chat_clients = false;
+
+    public $can_write = true;
+
     public $member_options = [];
+
+    public $direct_options = [];
 
     public function query(ChatService $chats, Request $request): iterable
     {
@@ -79,11 +85,18 @@ class MessengerScreen extends Screen
             ->all();
 
         $isMuted = false;
+        $canWrite = true;
         if ($resolved) {
             $isMuted = (bool) $resolved->members
                 ->firstWhere('id', $user->id)
                 ?->pivot
                 ?->is_muted;
+
+            try {
+                $chats->assertCanWriteInChat($resolved, $user);
+            } catch (\Throwable) {
+                $canWrite = false;
+            }
         }
 
         return [
@@ -91,8 +104,11 @@ class MessengerScreen extends Screen
             'chat' => $resolved,
             'messages' => $messages,
             'can_create' => $chats->canCreate($user),
+            'can_chat_clients' => $chats->canChatWithClients($user),
+            'can_write' => $canWrite,
             'member_options' => $chats->chatMemberOptions($user->id),
-            'staff_options' => $chats->chatMemberOptions($user->id),
+            'direct_options' => $chats->directInterlocutorOptions($user),
+            'staff_options' => $chats->directInterlocutorOptions($user),
             'active_chat_id' => $resolved?->id,
             'mention_users' => $mentionUsers,
             'composer_tasks' => $composerTasks,
@@ -148,8 +164,8 @@ class MessengerScreen extends Screen
 
     public function layout(): iterable
     {
-        $memberOptions = $this->member_options
-            ?: app(ChatService::class)->chatMemberOptions(auth()->id());
+        $directOptions = $this->direct_options
+            ?: app(ChatService::class)->directInterlocutorOptions(auth()->user());
 
         return [
             Layout::view('orchid.layouts.messenger'),
@@ -162,9 +178,11 @@ class MessengerScreen extends Screen
             Layout::modal('createDirectModal', [
                 Layout::rows([
                     \Orchid\Screen\Fields\Select::make('direct.user_id')
-                        ->options($memberOptions)
+                        ->options($directOptions)
                         ->title('Собеседник')
-                        ->help('Сотрудник или контакт клиента')
+                        ->help($this->can_chat_clients
+                            ? 'Коллега или клиент / контакт клиента'
+                            : 'Только сотрудники. Для личных чатов с клиентами нужно право «Чаты с клиентами»')
                         ->required()
                         ->empty('Выберите'),
                 ]),

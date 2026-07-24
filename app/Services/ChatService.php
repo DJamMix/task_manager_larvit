@@ -33,6 +33,41 @@ class ChatService
             ->all();
     }
 
+    /**
+     * Кого можно выбрать для личного чата.
+     * Сотрудник без права chats.clients — только коллеги (staff).
+     * С правом — staff + клиенты/контакты.
+     * Клиент — только сотрудники с правом chats.clients (PM и т.п.).
+     */
+    public function directInterlocutorOptions(User $actor): array
+    {
+        $exceptId = (int) $actor->id;
+
+        if ($actor->isClientAccount()) {
+            return User::query()
+                ->whereKeyNot($exceptId)
+                ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::STAFF_SLUGS))
+                ->get()
+                ->filter(fn (User $u) => $u->hasAccess('platform.systems.chats.clients'))
+                ->sortBy('name')
+                ->mapWithKeys(fn (User $u) => [$u->id => $u->displayName()])
+                ->all();
+        }
+
+        if ($this->canChatWithClients($actor)) {
+            return $this->chatMemberOptions($exceptId);
+        }
+
+        // Обычный сотрудник — только коллеги
+        return User::query()
+            ->whereKeyNot($exceptId)
+            ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::STAFF_SLUGS))
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (User $u) => [$u->id => $u->displayName()])
+            ->all();
+    }
+
     /** @deprecated use chatMemberOptions */
     public function staffUserOptions(?int $exceptId = null): array
     {
@@ -46,11 +81,70 @@ class ChatService
         return (bool) $user?->hasAccess('platform.systems.chats.create');
     }
 
+    public function canChatWithClients(?User $user = null): bool
+    {
+        $user = $user ?? auth()->user();
+
+        return (bool) $user?->hasAccess('platform.systems.chats.clients');
+    }
+
     public function canAccessMessenger(?User $user = null): bool
     {
         $user = $user ?? auth()->user();
 
         return (bool) $user?->hasAccess('platform.systems.chats');
+    }
+
+    public function isClientSideUser(User $user): bool
+    {
+        return $user->isClientAccount();
+    }
+
+    public function assertCanDirectWith(User $actor, int $otherUserId): void
+    {
+        if ((int) $otherUserId === (int) $actor->id || !$this->isChatMemberUserId($otherUserId)) {
+            abort(422, 'Нельзя создать личный чат с этим пользователем');
+        }
+
+        $other = User::query()->with('roles')->findOrFail($otherUserId);
+        $otherIsClient = $this->isClientSideUser($other);
+        $actorIsClient = $this->isClientSideUser($actor);
+
+        if ($actorIsClient) {
+            if ($otherIsClient || !$other->hasAccess('platform.systems.chats.clients')) {
+                abort(403, 'Личный чат с этим пользователем недоступен');
+            }
+
+            return;
+        }
+
+        // Сотрудник → клиент только с правом
+        if ($otherIsClient && !$this->canChatWithClients($actor)) {
+            abort(403, 'Нет права писать клиентам в личных чатах');
+        }
+    }
+
+    /** Личный чат с клиентом — писать может только staff с chats.clients (и сам клиент). */
+    public function assertCanWriteInChat(Chat $chat, User $actor): void
+    {
+        if ($chat->type !== 'direct') {
+            return;
+        }
+
+        $chat->loadMissing('members.roles');
+
+        $hasClient = $chat->members->contains(fn (User $u) => $this->isClientSideUser($u));
+        if (!$hasClient) {
+            return;
+        }
+
+        if ($this->isClientSideUser($actor)) {
+            return;
+        }
+
+        if (!$this->canChatWithClients($actor)) {
+            abort(403, 'Нет права писать клиентам в личных чатах');
+        }
     }
 
     /**
@@ -166,9 +260,7 @@ class ChatService
 
     public function findOrCreateDirect(User $actor, int $otherUserId): Chat
     {
-        if (!$this->isChatMemberUserId($otherUserId) || (int) $otherUserId === (int) $actor->id) {
-            abort(422, 'Нельзя создать личный чат с этим пользователем');
-        }
+        $this->assertCanDirectWith($actor, $otherUserId);
 
         $existing = Chat::query()
             ->where('type', 'direct')
@@ -241,6 +333,8 @@ class ChatService
         if (!$chat->isMember($actor->id)) {
             abort(403);
         }
+
+        $this->assertCanWriteInChat($chat, $actor);
 
         $rawText = $request->input('message.text');
         $quill = $this->comments->normalizeQuill($rawText);
