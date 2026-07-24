@@ -149,11 +149,13 @@ class ClientListTaskScreen extends Screen
             ClientListTaskLayout::class,
 
             Layout::modal('createTaskModal', [
-                ClientTaskCreateModalLayout::class,
+                Layout::wrapper('orchid.layouts.task-create-shell', [
+                    'fields' => ClientTaskCreateModalLayout::class,
+                ]),
             ])
-                ->title('Создание задачи')
+                ->title('Новая задача')
                 ->size(Modal::SIZE_XL)
-                ->applyButton('Создать задачу')
+                ->applyButton('Создать')
                 ->closeButton('Отмена'),
         ];
     }

@@ -301,9 +301,11 @@ class ClientViewTaskScreen extends Screen
             ]),
 
             Layout::modal('editTaskModal', [
-                ClientTaskCreateModalLayout::class,
+                Layout::wrapper('orchid.layouts.task-create-shell', [
+                    'fields' => ClientTaskCreateModalLayout::class,
+                ]),
             ])
-                ->title('Редактирование задачи')
+                ->title('Редактирование')
                 ->size(Modal::SIZE_XL)
                 ->applyButton('Сохранить')
                 ->closeButton('Отмена'),

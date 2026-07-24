@@ -396,44 +396,245 @@
     }
 }
 
-/* Create / edit task modal */
+/* Create / edit task modal — modern dense form */
 #screen-modal-createTaskModal .modal-dialog,
 #screen-modal-editTaskModal .modal-dialog {
-    max-width: min(1080px, 96vw);
-    margin: 1.25rem auto;
+    max-width: min(820px, 94vw);
+    margin: 1.5rem auto;
+}
+
+#screen-modal-createTaskModal .modal-content,
+#screen-modal-editTaskModal .modal-content {
+    border: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.18);
+}
+
+#screen-modal-createTaskModal .modal-header,
+#screen-modal-editTaskModal .modal-header {
+    padding: 0.9rem 1.15rem 0.55rem;
+    border-bottom: 0;
+}
+
+#screen-modal-createTaskModal .modal-title,
+#screen-modal-editTaskModal .modal-title {
+    font-size: 0.95rem;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em;
+    color: #64748b;
 }
 
 #screen-modal-createTaskModal .modal-body,
 #screen-modal-editTaskModal .modal-body {
-    max-height: min(75vh, 780px);
+    max-height: min(72vh, 700px);
     overflow-y: auto;
-    padding-top: 0.5rem;
+    padding: 0 1.15rem 0.35rem;
 }
 
-#screen-modal-createTaskModal .form-group,
-#screen-modal-editTaskModal .form-group {
-    margin-bottom: 0.85rem !important;
+#screen-modal-createTaskModal .modal-footer,
+#screen-modal-editTaskModal .modal-footer {
+    padding: 0.7rem 1.15rem 0.95rem;
+    border-top: 1px solid #eef2f7;
+    background: #fafbfc;
 }
 
-#screen-modal-createTaskModal .ql-container,
-#screen-modal-editTaskModal .ql-container {
-    min-height: 200px !important;
+#screen-modal-createTaskModal .modal-footer .btn-default,
+#screen-modal-editTaskModal .modal-footer .btn-default {
+    border-radius: 8px;
+    padding: 0.4rem 1rem;
+    font-weight: 600;
 }
 
-#screen-modal-createTaskModal .ql-editor,
-#screen-modal-editTaskModal .ql-editor {
-    min-height: 180px !important;
+#screen-modal-createTaskModal .modal-footer .btn-link,
+#screen-modal-editTaskModal .modal-footer .btn-link {
+    text-decoration: none;
+    color: #64748b;
 }
 
-#screen-modal-createTaskModal .row,
-#screen-modal-editTaskModal .row {
-    --bs-gutter-x: 1rem;
-    align-items: flex-start;
+.tc-modal {
+    --tc-line: #e8edf3;
+    --tc-soft: #f4f6f9;
+    --tc-ink: #0f172a;
+    --tc-muted: #64748b;
 }
 
-#screen-modal-createTaskModal .upload-container,
-#screen-modal-createTaskModal .dropzone,
-#screen-modal-editTaskModal .upload-container,
-#screen-modal-editTaskModal .dropzone {
-    min-height: 72px !important;
+.tc-modal__intro {
+    font-size: 0.78rem;
+    color: var(--tc-muted);
+    margin-bottom: 0.65rem;
+}
+
+.tc-modal .bg-white,
+.tc-modal .wrapper-md,
+.tc-modal .layout > .bg-white {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.tc-modal .form-group {
+    margin-bottom: 0.55rem !important;
+}
+
+.tc-modal .form-group:has(> input[type="hidden"]:only-child) {
+    display: none !important;
+    margin: 0 !important;
+    height: 0 !important;
+    overflow: hidden;
+}
+
+.tc-modal .form-group > label,
+.tc-modal label.form-label {
+    display: block;
+    font-size: 0.68rem !important;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--tc-muted) !important;
+    margin-bottom: 0.2rem !important;
+}
+
+.tc-modal .form-text,
+.tc-modal .help-block,
+.tc-modal small.text-muted {
+    display: none !important;
+}
+
+/* Title like Linear */
+.tc-modal .form-group:has(.tc-field-title) {
+    margin-bottom: 0.75rem !important;
+}
+
+.tc-modal .form-group:has(.tc-field-title) > label {
+    display: none !important;
+}
+
+.tc-modal .tc-field-title,
+.tc-modal input[name="task[name]"] {
+    font-size: 1.35rem !important;
+    font-weight: 650 !important;
+    line-height: 1.3 !important;
+    color: var(--tc-ink) !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid var(--tc-line) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0.15rem 0 0.55rem !important;
+    min-height: auto !important;
+}
+
+.tc-modal .tc-field-title:focus,
+.tc-modal input[name="task[name]"]:focus {
+    border-bottom-color: #2563eb !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Meta chips row */
+.tc-modal .row {
+    --bs-gutter-x: 0.45rem;
+    --bs-gutter-y: 0.45rem;
+    align-items: stretch !important;
+    margin-bottom: 0.35rem;
+    padding: 0.55rem;
+    background: var(--tc-soft);
+    border: 1px solid var(--tc-line);
+    border-radius: 12px;
+}
+
+.tc-modal .row > [class*="col"] {
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+}
+
+.tc-modal .row .form-group {
+    margin-bottom: 0 !important;
+}
+
+.tc-modal .row .form-control,
+.tc-modal .row select,
+.tc-modal .row .ts-control,
+.tc-modal .row .select2-selection,
+.tc-modal .row .flatpickr-input,
+.tc-modal .row input[type="text"] {
+    border-radius: 8px !important;
+    border: 1px solid #dbe3ec !important;
+    background: #fff !important;
+    min-height: 34px !important;
+    font-size: 0.84rem !important;
+    padding: 0.25rem 0.55rem !important;
+    box-shadow: none !important;
+}
+
+.tc-modal .row p,
+.tc-modal .row .form-control-plaintext,
+.tc-modal .row .text-muted {
+    margin: 0;
+    font-size: 0.84rem;
+    color: var(--tc-ink);
+    background: #fff;
+    border: 1px solid #dbe3ec;
+    border-radius: 8px;
+    padding: 0.4rem 0.55rem;
+    min-height: 34px;
+}
+
+/* Description */
+.tc-modal .ql-toolbar {
+    border: 1px solid var(--tc-line) !important;
+    border-bottom: 0 !important;
+    border-radius: 10px 10px 0 0 !important;
+    background: var(--tc-soft) !important;
+    padding: 0.25rem 0.35rem !important;
+}
+
+.tc-modal .ql-container {
+    border: 1px solid var(--tc-line) !important;
+    border-radius: 0 0 10px 10px !important;
+    min-height: 140px !important;
+    max-height: 220px;
+    background: #fff !important;
+}
+
+.tc-modal .ql-editor {
+    min-height: 120px !important;
+    max-height: 200px;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--tc-ink);
+}
+
+.tc-modal .ql-editor.ql-blank::before {
+    color: #94a3b8;
+    font-style: normal;
+}
+
+/* Attachments */
+.tc-modal .upload-container,
+.tc-modal .dropzone {
+    min-height: 52px !important;
+    max-height: 88px;
+    overflow: auto;
+    border-radius: 10px !important;
+    border: 1px dashed #cbd5e1 !important;
+    background: var(--tc-soft) !important;
+    padding: 0.45rem 0.6rem !important;
+}
+
+@media (max-width: 768px) {
+    .tc-modal .row > [class*="col"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+}
+
+@media (max-width: 520px) {
+    .tc-modal .row > [class*="col"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
 }

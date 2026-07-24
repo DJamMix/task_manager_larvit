@@ -11,7 +11,6 @@ use Orchid\Screen\Field;
 use Orchid\Screen\Fields\DateTimer;
 use Orchid\Screen\Fields\Group;
 use Orchid\Screen\Fields\Input;
-use Orchid\Screen\Fields\Label;
 use Orchid\Screen\Fields\Quill;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\Upload;
@@ -26,27 +25,26 @@ class MyTasksCreateModalLayout extends Rows
         $context = app(ProjectContext::class);
         $fields = [];
 
-        $fields[] = Label::make('create_hint')
-            ->value('Заполните суть и параметры. После создания задача уйдёт на согласование.');
-
         $fields[] = Input::make('task.name')
             ->type('text')
             ->max(255)
             ->required()
             ->title('Название')
-            ->placeholder('Кратко: что нужно сделать');
+            ->placeholder('Название задачи')
+            ->class('tc-field-title');
+
+        $meta = [];
 
         if ($context->has()) {
-            $fields[] = Label::make('project_context_info')
-                ->title('Проект')
-                ->value($context->project()->name)
-                ->help('Активный проект из переключателя слева');
-
             $fields[] = Input::make('task.project_id')
                 ->type('hidden')
                 ->value($context->id());
+
+            $meta[] = \Orchid\Screen\Fields\Label::make('project_context_info')
+                ->title('Проект')
+                ->value($context->project()->name);
         } else {
-            $fields[] = Select::make('task.project_id')
+            $meta[] = Select::make('task.project_id')
                 ->fromQuery(
                     Project::query()->whereIn('id', $context->availableProjects()->pluck('id')),
                     'name',
@@ -54,57 +52,56 @@ class MyTasksCreateModalLayout extends Rows
                 )
                 ->title('Проект')
                 ->required()
-                ->empty('Выберите проект')
-                ->help('Или зафиксируйте проект в переключателе слева');
+                ->empty('Проект')
+                ->class('tc-field-chip');
         }
 
-        $fields[] = Group::make([
-            Select::make('task.task_category_id')
-                ->fromModel(TaskCategory::class, 'name', 'id')
-                ->title('Категория')
-                ->required()
-                ->empty('Выберите'),
+        $meta[] = Select::make('task.task_category_id')
+            ->fromModel(TaskCategory::class, 'name', 'id')
+            ->title('Категория')
+            ->required()
+            ->empty('Категория')
+            ->class('tc-field-chip');
 
-            Select::make('task.type_task')
-                ->options(TaskTypeEnum::options())
-                ->title('Тип')
-                ->required()
-                ->value(TaskTypeEnum::DEFAULT->value),
-        ])->fullWidth();
+        $meta[] = Select::make('task.type_task')
+            ->options(TaskTypeEnum::options())
+            ->title('Тип')
+            ->required()
+            ->value(TaskTypeEnum::DEFAULT->value)
+            ->class('tc-field-chip');
 
-        $fields[] = Group::make([
-            Select::make('task.priority')
-                ->options(
-                    collect(TaskPriorityEnum::orderedCases())
-                        ->mapWithKeys(fn ($p) => [$p->value => "{$p->code()} · {$p->label()}"])
-                        ->all()
-                )
-                ->title('Приоритет')
-                ->required()
-                ->value(TaskPriorityEnum::MEDIUM->value)
-                ->help('P0 — сейчас, P3 — обычная очередь'),
+        $meta[] = Select::make('task.priority')
+            ->options(
+                collect(TaskPriorityEnum::orderedCases())
+                    ->mapWithKeys(fn ($p) => [$p->value => "{$p->code()} {$p->label()}"])
+                    ->all()
+            )
+            ->title('Приоритет')
+            ->required()
+            ->value(TaskPriorityEnum::MEDIUM->value)
+            ->class('tc-field-chip');
 
-            DateTimer::make('task.end_datetime')
-                ->title('Дедлайн')
-                ->enableTime()
-                ->allowInput()
-                ->help('Необязательно'),
-        ])->fullWidth();
+        $meta[] = DateTimer::make('task.end_datetime')
+            ->title('Дедлайн')
+            ->enableTime()
+            ->allowInput()
+            ->class('tc-field-chip');
+
+        $fields[] = Group::make($meta)->fullWidth()->alignEnd();
 
         $fields[] = Quill::make('task.description')
-            ->toolbar(['text', 'list', 'quote', 'format'])
-            ->height('220px')
+            ->toolbar(['text', 'list', 'quote'])
+            ->height('160px')
             ->title('Описание')
-            ->placeholder('Контекст, шаги, ожидаемый результат. Код — кнопкой </>')
+            ->placeholder('Описание, шаги, критерии. Код — </>')
             ->required();
 
         $fields[] = Upload::make('task.attachments')
-            ->title('Файлы')
+            ->title('Вложения')
             ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig')
             ->storage('public')
             ->maxFileSize(50)
-            ->maxFiles(10)
-            ->help('Скриншоты, макеты, документы — до 50 МБ');
+            ->maxFiles(8);
 
         return $fields;
     }

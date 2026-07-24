@@ -220,11 +220,13 @@ class MyTasksListScreen extends Screen
             MyTasksListLayout::class,
 
             Layout::modal('createTaskModal', [
-                MyTasksCreateModalLayout::class,
+                Layout::wrapper('orchid.layouts.task-create-shell', [
+                    'fields' => MyTasksCreateModalLayout::class,
+                ]),
             ])
-                ->title('Создание задачи')
+                ->title('Новая задача')
                 ->size(Modal::SIZE_XL)
-                ->applyButton('Создать задачу')
+                ->applyButton('Создать')
                 ->closeButton('Отмена'),
         ];
     }
