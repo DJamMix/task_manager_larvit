@@ -56,7 +56,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.eye')
                 ->route('platform.systems.contact.tasks')
                 ->permission('platform.systems.contact.tasks')
-                ->canSee(fn () => (bool) auth()->user()?->isClientContact())
+                ->canSee((bool) auth()->user()?->isClientContact())
                 ->title('Контакт клиента')
                 ->divider(),
 
