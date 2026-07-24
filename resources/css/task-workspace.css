@@ -6,12 +6,12 @@
     --tw-soft: #f4f6f9;
     --tw-accent: #2563eb;
     --tw-accent-soft: #eff4ff;
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
 }
 
 .task-workspace__grid {
     display: grid;
-    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
     gap: 1rem;
     align-items: start;
 }
@@ -25,18 +25,18 @@
 .tw-card {
     background: var(--tw-surface);
     border: 1px solid var(--tw-line);
-    border-radius: 14px;
-    padding: 1rem 1.1rem;
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
     box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
 .tw-meta__row {
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.5rem 0;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
     border-bottom: 1px solid var(--tw-line);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
 }
 
 .tw-meta__row:last-child {
@@ -47,35 +47,41 @@
     color: var(--tw-muted);
 }
 
-.tw-description {
-    max-height: 280px;
-    overflow: auto;
+.tw-description-card .tw-description {
+    max-height: none;
+    overflow: visible;
     font-size: 0.95rem;
-    line-height: 1.55;
+    line-height: 1.6;
     color: var(--tw-ink);
 }
 
+.tw-description-card .tw-description p {
+    margin-bottom: 0.65rem;
+}
+
+.tw-description-card .tw-description p:last-child {
+    margin-bottom: 0;
+}
+
 .tw-discussion {
-    min-height: 640px;
     display: flex;
     flex-direction: column;
 }
 
 .tw-feed {
-    flex: 1;
-    max-height: min(58vh, 560px);
+    max-height: min(48vh, 480px);
     overflow: auto;
-    padding: 0.25rem 0.35rem 0.75rem 0;
+    padding: 0.15rem 0.25rem 0.5rem 0;
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
+    gap: 0.55rem;
     scroll-behavior: smooth;
 }
 
 .tw-msg {
     border: 1px solid var(--tw-line);
-    border-radius: 12px;
-    padding: 0.7rem 0.85rem;
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
     background: var(--tw-soft);
 }
 
@@ -90,46 +96,130 @@
 }
 
 .tw-msg__reply-to {
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     color: var(--tw-muted);
     border-left: 3px solid #94a3b8;
-    padding-left: 0.55rem;
-    margin-bottom: 0.4rem;
+    padding-left: 0.5rem;
+    margin-bottom: 0.35rem;
 }
 
 .tw-msg__head {
     display: flex;
     justify-content: space-between;
     gap: 0.75rem;
-    margin-bottom: 0.3rem;
-    font-size: 0.84rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.8rem;
 }
 
 .tw-msg__body {
-    font-size: 0.95rem;
-    line-height: 1.5;
+    font-size: 0.92rem;
+    line-height: 1.45;
     word-break: break-word;
     color: var(--tw-ink);
+}
+
+.tw-msg__body p {
+    margin: 0 0 0.4rem;
+}
+
+.tw-msg__body p:last-child {
+    margin-bottom: 0;
 }
 
 .tw-msg__files {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem;
-    margin-top: 0.5rem;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
 }
 
 .tw-msg__actions {
-    margin-top: 0.25rem;
+    margin-top: 0.15rem;
 }
 
 .tw-msg__actions .btn-link {
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.8rem;
 }
 
+/* Status pipeline */
+.tw-pipeline {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+}
+
+.tw-pipeline__step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 3.2rem;
+    flex: 1;
+    opacity: 0.45;
+}
+
+.tw-pipeline__step--done,
+.tw-pipeline__step--current {
+    opacity: 1;
+}
+
+.tw-pipeline__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dot, #94a3b8);
+    box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--tw-line);
+}
+
+.tw-pipeline__step--current .tw-pipeline__dot {
+    box-shadow: 0 0 0 3px #fff, 0 0 0 4px var(--dot, #2563eb);
+    transform: scale(1.15);
+}
+
+.tw-pipeline__label {
+    font-size: 0.68rem;
+    line-height: 1.15;
+    text-align: center;
+    color: var(--tw-muted);
+}
+
+.tw-pipeline__step--current .tw-pipeline__label {
+    color: var(--tw-ink);
+    font-weight: 600;
+}
+
+.tw-pipeline__line {
+    height: 2px;
+    flex: 0 0 8px;
+    align-self: center;
+    margin-top: -0.9rem;
+    background: var(--tw-line);
+}
+
+.tw-pipeline__line.is-done {
+    background: #94a3b8;
+}
+
+.tw-status__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.tw-status__actions .btn,
+.tw-status__btn {
+    border-radius: 999px !important;
+    font-size: 0.8rem !important;
+    padding: 0.25rem 0.7rem !important;
+}
+
+/* Composer compact */
 .tw-composer-wrap {
-    margin-top: 0.75rem;
+    margin-top: 0.5rem;
 }
 
 .tw-reply-banner {
@@ -140,21 +230,68 @@
     background: var(--tw-accent-soft);
     border: 1px solid #bfd0ff;
     border-radius: 10px;
-    padding: 0.55rem 0.8rem;
-    margin-bottom: 0.75rem;
+    padding: 0.45rem 0.7rem;
+    margin-bottom: 0.5rem;
 }
 
-#task-composer-anchor + .bg-white,
-.layout [data-controller="fields--quill"] {
+.tw-composer-shell {
+    border: 1px solid var(--tw-line);
     border-radius: 12px;
+    background: #fff;
+    padding: 0.75rem 0.9rem 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.tw-composer-shell__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.tw-composer-shell .bg-white {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    padding: 0 !important;
+}
+
+.tw-composer-shell .form-group {
+    margin-bottom: 0.55rem !important;
+}
+
+.tw-composer-shell label {
+    font-size: 0.8rem;
+    margin-bottom: 0.2rem;
+}
+
+.tw-composer-shell .ql-toolbar {
+    border-radius: 8px 8px 0 0;
+    padding: 4px !important;
+}
+
+.tw-composer-shell .ql-container {
+    border-radius: 0 0 8px 8px;
+    min-height: 100px !important;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.tw-composer-shell .ql-editor {
+    min-height: 90px !important;
+    max-height: 140px;
+    font-size: 0.92rem;
+}
+
+.tw-composer-shell .upload-container,
+.tw-composer-shell .dropzone {
+    min-height: 56px !important;
+    padding: 0.5rem !important;
 }
 
 @media (max-width: 576px) {
-    .tw-discussion {
-        min-height: 420px;
-    }
-
     .tw-feed {
-        max-height: 420px;
+        max-height: 360px;
     }
 }

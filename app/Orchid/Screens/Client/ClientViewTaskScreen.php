@@ -57,6 +57,11 @@ class ClientViewTaskScreen extends Screen
             'viewer_role' => 'client',
             'show_time_link' => false,
             'time_route' => null,
+            'status_pipeline' => TaskStatusEnum::pipelineWithState((string) $task->status),
+            'status_actions' => [],
+            'status_hint' => $task->status === TaskStatusEnum::DEMO->value
+                ? 'Задача на демо — примите или верните на доработку кнопками сверху.'
+                : null,
         ];
     }
 
@@ -290,7 +295,9 @@ class ClientViewTaskScreen extends Screen
         return [
             Layout::view('orchid.layouts.task-workspace'),
             Layout::view('orchid.layouts.composer-anchor'),
-            DiscussionComposerLayout::class,
+            Layout::wrapper('orchid.layouts.composer-shell', [
+                'composer' => DiscussionComposerLayout::class,
+            ]),
 
             Layout::modal('editTaskModal', [
                 ClientTaskCreateModalLayout::class,

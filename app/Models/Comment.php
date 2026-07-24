@@ -53,27 +53,45 @@ class Comment extends Model
 
     public function getFormattedTextAttribute(): string
     {
-        if (empty($this->text) || empty($this->text['ops'] ?? null)) {
-            return nl2br(e($this->plain_text ?? ''));
+        $payload = $this->text;
+
+        // Quill / legacy: иногда в text лежит HTML-строка
+        if (is_string($payload) && $payload !== '') {
+            return $this->sanitizeHtml($payload);
         }
 
-        // Если TaskLogger положил готовый html
-        if (!empty($this->text['html'])) {
-            return $this->text['html'];
+        if (!is_array($payload) || $payload === []) {
+            return nl2br(e(strip_tags((string) ($this->plain_text ?? ''))));
+        }
+
+        if (!empty($payload['html']) && is_string($payload['html'])) {
+            return $this->sanitizeHtml($payload['html']);
+        }
+
+        if (empty($payload['ops']) || !is_array($payload['ops'])) {
+            return nl2br(e(strip_tags((string) ($this->plain_text ?? ''))));
         }
 
         $html = '';
-        foreach ($this->text['ops'] as $op) {
-            if (($op['insert'] ?? null) === "\n") {
+        foreach ($payload['ops'] as $op) {
+            $insert = $op['insert'] ?? null;
+
+            if ($insert === "\n") {
                 $html .= '<br>';
                 continue;
             }
 
-            if (!is_string($op['insert'] ?? null)) {
+            if (!is_string($insert)) {
                 continue;
             }
 
-            $text = e($op['insert']);
+            // Старые записи: в insert лежит целый <p>...</p>
+            if ($this->looksLikeHtml($insert)) {
+                $html .= $this->sanitizeHtml($insert);
+                continue;
+            }
+
+            $text = e($insert);
             $attrs = $op['attributes'] ?? [];
             $style = '';
 
@@ -83,13 +101,39 @@ class Comment extends Model
             if ($attrs['italic'] ?? false) {
                 $style .= 'font-style:italic;';
             }
+            if ($attrs['underline'] ?? false) {
+                $style .= 'text-decoration:underline;';
+            }
             if (isset($attrs['color'])) {
-                $style .= 'color:' . e($attrs['color']) . ';';
+                $style .= 'color:' . e((string) $attrs['color']) . ';';
             }
 
             $html .= $style !== '' ? '<span style="' . $style . '">' . $text . '</span>' : $text;
         }
 
-        return $html !== '' ? $html : nl2br(e($this->plain_text ?? ''));
+        return $html !== ''
+            ? $html
+            : nl2br(e(strip_tags((string) ($this->plain_text ?? ''))));
+    }
+
+    private function looksLikeHtml(string $value): bool
+    {
+        return (bool) preg_match('/<\/?[a-z][\s\S]*>/i', $value);
+    }
+
+    private function sanitizeHtml(string $html): string
+    {
+        $allowed = '<p><br><br/><b><strong><i><em><u><ul><ol><li><a><span><h1><h2><h3><blockquote><code><pre>';
+        $clean = strip_tags($html, $allowed);
+        $clean = preg_replace('/\son\w+="[^"]*"/i', '', $clean) ?? $clean;
+        $clean = preg_replace("/\son\w+='[^']*'/i", '', $clean) ?? $clean;
+        $clean = preg_replace('/javascript:/i', '', $clean) ?? $clean;
+
+        // Пустые обёртки Quill
+        if (trim(strip_tags($clean)) === '') {
+            return '';
+        }
+
+        return $clean;
     }
 }

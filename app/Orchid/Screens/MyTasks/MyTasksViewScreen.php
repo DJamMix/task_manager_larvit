@@ -7,7 +7,6 @@ use App\Models\Task;
 use App\Models\TrackingTime;
 use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Orchid\Layouts\MyTasks\HoursSpentTask;
-use App\Orchid\Layouts\MyTasks\StatusSwitcherLayout;
 use App\Orchid\Layouts\MyTasks\TaskEvaluationLayout;
 use App\Orchid\Layouts\Task\TaskObserversLayout;
 use App\Services\CommentService;
@@ -40,6 +39,36 @@ class MyTasksViewScreen extends Screen
             && (int) $task->executor_id !== (int) $user->id
             && !$user->hasAccess('platform.systems.tasks');
 
+        $canChangeStatus = (int) $task->executor_id === (int) $user->id
+            && $task->canChangeWorkflow((int) $user->id);
+
+        $statusActions = [];
+        if ($canChangeStatus) {
+            foreach (TaskStatusEnum::executorTransitions((string) $task->status) as $transition) {
+                $btn = Button::make($transition['label'])
+                    ->method('changeStatus')
+                    ->parameters(['status' => $transition['to']])
+                    ->class(
+                        ($transition['tone'] ?? 'next') === 'back'
+                            ? 'btn btn-sm btn-outline-secondary tw-status__btn'
+                            : 'btn btn-sm btn-primary tw-status__btn'
+                    );
+
+                if (!empty($transition['confirm'])) {
+                    $btn = $btn->confirm($transition['confirm']);
+                }
+
+                $statusActions[] = $btn;
+            }
+        }
+
+        $statusHint = null;
+        if ($task->status === TaskStatusEnum::DEMO->value) {
+            $statusHint = 'На демо у заказчика — ждите решение.';
+        } elseif ($task->status === TaskStatusEnum::NEW->value && $canChangeStatus) {
+            $statusHint = 'Нажмите «Взять в работу» сверху, чтобы начать.';
+        }
+
         return [
             'task' => $task,
             'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
@@ -52,6 +81,9 @@ class MyTasksViewScreen extends Screen
             'time_route' => (!$isObserverOnly && $task->canTrackTime((int) $user->id))
                 ? route('platform.systems.my_tasks.time', $task)
                 : null,
+            'status_pipeline' => TaskStatusEnum::pipelineWithState((string) $task->status),
+            'status_actions' => $statusActions,
+            'status_hint' => $statusHint,
             'user' => $user,
         ];
     }
@@ -126,12 +158,13 @@ class MyTasksViewScreen extends Screen
     {
         $layouts = [
             Layout::view('orchid.layouts.task-workspace'),
-            StatusSwitcherLayout::class,
             Layout::view('orchid.layouts.composer-anchor'),
         ];
 
         if ($this->task && $this->task->canDiscuss()) {
-            $layouts[] = DiscussionComposerLayout::class;
+            $layouts[] = Layout::wrapper('orchid.layouts.composer-shell', [
+                'composer' => DiscussionComposerLayout::class,
+            ]);
         }
 
         $layouts[] = Layout::modal('timeTrackingModal', [HoursSpentTask::class])

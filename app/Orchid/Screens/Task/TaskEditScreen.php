@@ -57,6 +57,11 @@ class TaskEditScreen extends Screen
             'viewer_role' => 'admin',
             'show_time_link' => false,
             'time_route' => null,
+            'status_pipeline' => $task->exists
+                ? TaskStatusEnum::pipelineWithState((string) $task->status)
+                : [],
+            'status_actions' => [],
+            'status_hint' => null,
             'timeEntries' => $task->exists
                 ? $task->timeEntries()->with('user')->latest()->get()
                 : collect(),
@@ -120,7 +125,9 @@ class TaskEditScreen extends Screen
                 'Задача и обсуждение' => [
                     Layout::view('orchid.layouts.task-workspace'),
                     Layout::view('orchid.layouts.composer-anchor'),
-                    DiscussionComposerLayout::class,
+                    Layout::wrapper('orchid.layouts.composer-shell', [
+                        'composer' => DiscussionComposerLayout::class,
+                    ]),
                 ],
                 'Редактирование' => [
                     TaskEditLayout::class,

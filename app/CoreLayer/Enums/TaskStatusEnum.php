@@ -80,4 +80,96 @@ enum TaskStatusEnum: string
             self::CANCELED->value => self::CANCELED->label(),
         ];
     }
+
+    /**
+     * Короткий пайплайн исполнения для UI.
+     *
+     * @return list<array{value: string, short: string}>
+     */
+    public static function executionPipeline(): array
+    {
+        return [
+            ['value' => self::NEW->value, 'short' => 'Новая'],
+            ['value' => self::IN_PROGRESS->value, 'short' => 'В работе'],
+            ['value' => self::TESTING_STAGE->value, 'short' => 'Stage'],
+            ['value' => self::TESTING_PROD->value, 'short' => 'Prod'],
+            ['value' => self::DEMO->value, 'short' => 'Демо'],
+        ];
+    }
+
+    /**
+     * Переходы статуса для исполнителя.
+     *
+     * @return list<array{to: string, label: string, tone: string, confirm?: string}>
+     */
+    public static function executorTransitions(string $current): array
+    {
+        return match ($current) {
+            self::IN_PROGRESS->value => [
+                [
+                    'to' => self::TESTING_STAGE->value,
+                    'label' => '→ Stage',
+                    'tone' => 'next',
+                    'confirm' => 'Перевести задачу на тестирование stage?',
+                ],
+            ],
+            self::TESTING_STAGE->value => [
+                [
+                    'to' => self::IN_PROGRESS->value,
+                    'label' => '← В работу',
+                    'tone' => 'back',
+                    'confirm' => 'Вернуть задачу в работу?',
+                ],
+                [
+                    'to' => self::TESTING_PROD->value,
+                    'label' => '→ Prod',
+                    'tone' => 'next',
+                    'confirm' => 'Перевести на тестирование prod?',
+                ],
+            ],
+            self::TESTING_PROD->value => [
+                [
+                    'to' => self::TESTING_STAGE->value,
+                    'label' => '← Stage',
+                    'tone' => 'back',
+                    'confirm' => 'Вернуть на stage?',
+                ],
+                [
+                    'to' => self::DEMO->value,
+                    'label' => '→ Демо',
+                    'tone' => 'next',
+                    'confirm' => 'Отправить задачу на демо заказчику?',
+                ],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<array{value: string, short: string, state: string}>
+     */
+    public static function pipelineWithState(string $current): array
+    {
+        $pipeline = self::executionPipeline();
+        $values = array_column($pipeline, 'value');
+        $currentIndex = array_search($current, $values, true);
+
+        // До пайплайна (оценка и т.п.) — ничего не подсвечиваем как пройденное
+        if ($currentIndex === false) {
+            return array_map(
+                fn (array $step) => $step + ['state' => 'upcoming'],
+                $pipeline
+            );
+        }
+
+        return array_map(function (array $step, int $index) use ($currentIndex) {
+            $state = match (true) {
+                $index < $currentIndex => 'done',
+                $index === $currentIndex => 'current',
+                default => 'upcoming',
+            };
+
+            return $step + ['state' => $state];
+        }, $pipeline, array_keys($pipeline));
+    }
 }

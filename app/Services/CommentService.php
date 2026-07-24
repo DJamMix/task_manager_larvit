@@ -174,29 +174,111 @@ class CommentService
     public function normalizeQuill(mixed $quillData): array
     {
         if (is_array($quillData)) {
+            if (!empty($quillData['html']) && is_string($quillData['html'])) {
+                return $this->fromHtml($quillData['html']);
+            }
+
+            if (!empty($quillData['ops']) && is_array($quillData['ops'])) {
+                return $this->sanitizeDelta($quillData);
+            }
+
             return $quillData;
         }
 
         if (is_string($quillData) && json_validate($quillData)) {
-            return json_decode($quillData, true) ?: ['ops' => [['insert' => $quillData]]];
+            $decoded = json_decode($quillData, true);
+            if (is_array($decoded)) {
+                return $this->normalizeQuill($decoded);
+            }
+        }
+
+        $raw = (string) ($quillData ?? '');
+
+        if ($this->looksLikeHtml($raw)) {
+            return $this->fromHtml($raw);
         }
 
         return [
             'ops' => [
-                ['insert' => (string) ($quillData ?? '')],
+                ['insert' => $raw === '' || str_ends_with($raw, "\n") ? $raw : $raw . "\n"],
             ],
         ];
     }
 
     public function extractPlainText(array $quillContent): string
     {
+        if (!empty($quillContent['html']) && is_string($quillContent['html'])) {
+            return $this->htmlToPlain($quillContent['html']);
+        }
+
         $plainText = '';
         foreach ($quillContent['ops'] ?? [] as $op) {
-            if (is_string($op['insert'] ?? null)) {
-                $plainText .= $op['insert'];
+            if (!is_string($op['insert'] ?? null)) {
+                continue;
             }
+
+            $insert = $op['insert'];
+            $plainText .= $this->looksLikeHtml($insert)
+                ? $this->htmlToPlain($insert)
+                : $insert;
         }
 
         return trim(preg_replace('/\s+/', ' ', $plainText) ?? '');
+    }
+
+    private function fromHtml(string $html): array
+    {
+        $safe = $this->sanitizeHtml($html);
+
+        return [
+            'html' => $safe,
+            'ops' => [
+                ['insert' => $this->htmlToPlain($safe) . "\n"],
+            ],
+        ];
+    }
+
+    private function sanitizeDelta(array $delta): array
+    {
+        $ops = [];
+        foreach ($delta['ops'] ?? [] as $op) {
+            if (!is_array($op)) {
+                continue;
+            }
+
+            $insert = $op['insert'] ?? null;
+            if (is_string($insert) && $this->looksLikeHtml($insert)) {
+                return $this->fromHtml($insert);
+            }
+
+            $ops[] = $op;
+        }
+
+        $delta['ops'] = $ops;
+
+        return $delta;
+    }
+
+    private function looksLikeHtml(string $value): bool
+    {
+        return (bool) preg_match('/<\/?[a-z][\s\S]*>/i', $value);
+    }
+
+    private function htmlToPlain(string $html): string
+    {
+        $text = str_ireplace(['<br>', '<br/>', '<br />', '</p>', '</div>', '</li>'], "\n", $html);
+        $text = strip_tags($text);
+
+        return trim(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    private function sanitizeHtml(string $html): string
+    {
+        $allowed = '<p><br><br/><b><strong><i><em><u><ul><ol><li><a><span><h1><h2><h3><blockquote><code><pre>';
+        $clean = strip_tags($html, $allowed);
+        $clean = preg_replace('/\son\w+="[^"]*"/i', '', $clean) ?? $clean;
+        $clean = preg_replace("/\son\w+='[^']*'/i", '', $clean) ?? $clean;
+
+        return preg_replace('/javascript:/i', '', $clean) ?? $clean;
     }
 }

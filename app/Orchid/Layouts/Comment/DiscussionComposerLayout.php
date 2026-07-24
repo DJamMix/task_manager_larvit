@@ -24,29 +24,27 @@ class DiscussionComposerLayout extends Rows
                 ->id('comment-parent-id'),
 
             Quill::make('comment.text')
-                ->toolbar(['text', 'color', 'header', 'list', 'format', 'media'])
-                ->title('Сообщение')
-                ->placeholder('Напишите ответ коллегам или клиенту…')
-                ->help('Форматирование, вложения и ответ на сообщение — как в обычном таск-менеджере'),
+                ->toolbar(['text', 'list', 'format'])
+                ->height('120px')
+                ->placeholder('Написать сообщение…'),
 
             Upload::make('comment.attachments')
-                ->title('Прикрепить файлы или фото')
-                ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.psd,.fig,.txt')
+                ->title('Файлы')
+                ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt')
                 ->storage('public')
                 ->maxFileSize(50)
-                ->help('Скриншоты и документы до 50 МБ'),
+                ->maxFiles(5),
 
             Select::make('comment.notify_user_ids.')
                 ->options($participants)
                 ->multiple()
-                ->title('Уведомить дополнительно')
-                ->empty('Авто: участники / автор ответа')
-                ->help('При «Ответить» автор исходного сообщения получит уведомление сам'),
+                ->title('Уведомить')
+                ->empty('Авто'),
 
             Button::make('Отправить')
                 ->method('addComment')
                 ->icon('bs.send')
-                ->class('btn btn-primary btn-lg'),
+                ->class('btn btn-primary'),
         ];
     }
 }
