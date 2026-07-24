@@ -38,6 +38,9 @@ class ClientListTaskScreen extends Screen
 
         // Проверка доступа: проект должен быть привязан к клиенту
         $user = $request->user();
+        if ($user?->isClientContact() && !$user->hasAccess('platform.systems.tasks')) {
+            abort(403, 'Нет доступа к списку задач проекта');
+        }
         if (
             $user
             && !$user->hasAccess('platform.systems.tasks')

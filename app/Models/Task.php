@@ -277,17 +277,33 @@ class Task extends Model
             return true;
         }
 
-        if ($this->isObserver($userId)) {
-            return true;
-        }
-
         $user = User::find($userId);
         if ($user?->hasAccess('platform.systems.tasks')) {
             return true;
         }
 
-        // Клиент проекта
-        return $user?->projects()->where('projects.id', $this->project_id)->exists() ?? false;
+        // Контакт клиента — только наблюдатель и только в своих проектах
+        if ($user?->isClientContact()) {
+            return $this->isObserver($userId)
+                && $user->projects()->where('projects.id', $this->project_id)->exists();
+        }
+
+        if ($this->isObserver($userId)) {
+            return true;
+        }
+
+        // Клиент / заказчик проекта — все задачи проекта
+        if ($user?->isClientWithTaskAccess()) {
+            return $user->projects()->where('projects.id', $this->project_id)->exists();
+        }
+
+        return false;
+    }
+
+    /** Может открыть карточку задачи (в т.ч. из чата) */
+    public function canView(?int $userId = null): bool
+    {
+        return $this->canDiscuss($userId);
     }
 
     public function canManageTask(?int $userId = null): bool

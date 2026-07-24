@@ -318,12 +318,11 @@ class MyTasksViewScreen extends Screen
     private function authorizeAccess(Task $task): void
     {
         $user = auth()->user();
-        $ok = (int) $task->executor_id === (int) $user->id
-            || $task->isObserver((int) $user->id)
-            || $user->hasAccess('platform.systems.tasks');
 
-        if (!$ok) {
-            abort(403, 'Нет доступа к этой задаче');
+        if ($task->canView((int) $user->id)) {
+            return;
         }
+
+        abort(403, 'Нет доступа к этой задаче');
     }
 }

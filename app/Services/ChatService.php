@@ -106,7 +106,13 @@ class ChatService
 
         if ($user->hasAccess('platform.systems.tasks')) {
             // полный список
-        } elseif ($user->isClientAccount()) {
+        } elseif ($user->isClientContact()) {
+            // Контакт — только задачи, где он наблюдатель, в своих проектах
+            $uid = (int) $user->id;
+            $projectIds = $user->projects()->pluck('projects.id');
+            $query->whereIn('project_id', $projectIds)
+                ->whereRaw('JSON_CONTAINS(COALESCE(observers_ids, "[]"), ?)', [json_encode($uid)]);
+        } elseif ($user->isClientWithTaskAccess() || $user->isClientAccount()) {
             $projectIds = $user->projects()->pluck('projects.id');
             $query->whereIn('project_id', $projectIds);
         } else {
@@ -154,7 +160,7 @@ class ChatService
             return true;
         }
 
-        return $task->canDiscuss($user->id);
+        return $task->canView($user->id);
     }
 
     public function isClientSideUser(User $user): bool

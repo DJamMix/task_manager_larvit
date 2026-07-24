@@ -144,16 +144,25 @@
 
                             @if($message->task)
                                 @php
-                                    $taskHref = auth()->user()->hasAccess('platform.systems.tasks')
-                                        ? route('platform.systems.tasks.edit', $message->task)
-                                        : (auth()->user()->hasAccess('platform.systems.my_tasks')
-                                            ? route('platform.systems.my_tasks.view', $message->task)
-                                            : '#');
+                                    $viewer = auth()->user();
+                                    $linkedTask = $message->task;
+                                    $canOpenTask = $linkedTask->canView((int) $viewer->id);
+                                    $taskHref = $canOpenTask
+                                        ? app(\App\Services\DashboardNotifier::class)->taskUrlFor($viewer, $linkedTask)
+                                        : null;
                                 @endphp
-                                <a class="bx-task-card" href="{{ $taskHref }}">
-                                    <span class="bx-task-card__id">#{{ $message->task->id }}</span>
-                                    <span class="bx-task-card__name">{{ $message->task->name }}</span>
-                                </a>
+                                @if($taskHref)
+                                    <a class="bx-task-card" href="{{ $taskHref }}">
+                                        <span class="bx-task-card__id">#{{ $linkedTask->id }}</span>
+                                        <span class="bx-task-card__name">{{ $linkedTask->name }}</span>
+                                    </a>
+                                @else
+                                    <div class="bx-task-card bx-task-card--locked" title="Нет доступа к этой задаче">
+                                        <span class="bx-task-card__id">#{{ $linkedTask->id }}</span>
+                                        <span class="bx-task-card__name">{{ $linkedTask->name }}</span>
+                                        <span class="bx-task-card__lock">нет доступа</span>
+                                    </div>
+                                @endif
                             @endif
 
                             @if($message->attachment->isNotEmpty())

@@ -90,6 +90,20 @@ class User extends Authenticatable
         return $this->roles->pluck('slug')->intersect(RoleCatalog::CLIENT_SLUGS)->isNotEmpty();
     }
 
+    /** Контакт клиента — только чаты + наблюдение за выбранными задачами */
+    public function isClientContact(): bool
+    {
+        return $this->roles->pluck('slug')->contains('client_contact');
+    }
+
+    /** Клиент / заказчик — доступ к задачам своих проектов */
+    public function isClientWithTaskAccess(): bool
+    {
+        return $this->roles->pluck('slug')
+            ->intersect(['client', 'client_employer'])
+            ->isNotEmpty();
+    }
+
     public function displayName(): string
     {
         if ($this->position) {

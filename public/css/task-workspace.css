@@ -1347,6 +1347,16 @@
 }
 
 .bx-task-card__name { font-size: 0.85rem; }
+.bx-task-card--locked {
+    opacity: 0.72;
+    cursor: not-allowed;
+}
+.bx-task-card__lock {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 600;
+}
 
 /* Custom chat composer */
 .bx-composer {

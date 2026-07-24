@@ -34,11 +34,19 @@ class ClientViewTaskScreen extends Screen
     {
         $user = auth()->user();
 
+        // Контакты клиентов открывают задачи через «Мои задачи» (как наблюдатели)
+        if ($user->isClientContact() && !$user->hasAccess('platform.systems.tasks')) {
+            abort(403, 'Нет доступа к этой задаче');
+        }
+
         if (
             !$user->hasAccess('platform.systems.tasks')
-            && !$user->projects()->where('projects.id', $project->id)->exists()
+            && (
+                !$user->projects()->where('projects.id', $project->id)->exists()
+                || !$task->canView((int) $user->id)
+            )
         ) {
-            abort(403);
+            abort(403, 'Нет доступа к этой задаче');
         }
 
         $task->load(['project', 'executor', 'creator', 'category', 'attachment']);

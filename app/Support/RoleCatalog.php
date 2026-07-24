@@ -69,6 +69,8 @@ final class RoleCatalog
         $clientContact = [
             'platform.systems.attachment',
             'platform.systems.chats',
+            // Наблюдение за задачами, куда добавили наблюдателем
+            'platform.systems.my_tasks',
         ];
 
         return [
@@ -104,7 +106,7 @@ final class RoleCatalog
             ],
             'client_contact' => [
                 'name' => 'Контакт клиента',
-                'description' => 'Только чаты с командой — без доступа к задачам и проектам',
+                'description' => 'Чаты + наблюдение только за задачами, куда добавлен наблюдателем (в своих проектах)',
                 'permissions' => $clientContact,
             ],
         ];
