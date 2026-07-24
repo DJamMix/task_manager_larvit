@@ -46,7 +46,7 @@ class CommentField extends Field
     public function fromComment($comment): self
     {
         return $this
-            ->author($comment->user->name ?? 'Неизвестно')
+            ->author($comment->user?->displayName() ?? 'Неизвестно')
             ->date($comment->created_at ?? now())
             ->text($comment->text ?? '');
     }

@@ -5,7 +5,7 @@
         <div class="bg-white rounded-lg shadow p-4">
             <div class="flex justify-between items-start mb-2">
                 <div class="font-medium text-gray-900">
-                    {{ $comment->user->name }}
+                    {{ $comment->user?->displayName() ?? 'Неизвестно' }}
                 </div>
                 <div class="text-sm text-gray-500">
                     {{ $comment->created_at->format('d.m.Y H:i') }}

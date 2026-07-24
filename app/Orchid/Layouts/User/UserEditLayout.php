@@ -4,17 +4,14 @@ declare(strict_types=1);
 
 namespace App\Orchid\Layouts\User;
 
+use App\Support\RoleCatalog;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Layouts\Rows;
 
 class UserEditLayout extends Rows
 {
-    /**
-     * The screen's layout elements.
-     *
-     * @return Field[]
-     */
     public function fields(): array
     {
         return [
@@ -22,14 +19,22 @@ class UserEditLayout extends Rows
                 ->type('text')
                 ->max(255)
                 ->required()
-                ->title(__('project.name'))
-                ->placeholder(__('project.name')),
+                ->title('Имя')
+                ->placeholder('Например: Влад')
+                ->help('Только имя. Должность указывается отдельно — не пишите «Влад Бэкенд» в имени.'),
+
+            Select::make('user.position')
+                ->options(RoleCatalog::positionOptions())
+                ->empty('Не указана')
+                ->title('Должность')
+                ->help('Backend, Frontend, Designer и т.д. — видно рядом с именем в списках и комментариях')
+                ->allowAdd(),
 
             Input::make('user.email')
                 ->type('email')
                 ->required()
-                ->title(__('Email'))
-                ->placeholder(__('Email')),
+                ->title('Электронная почта')
+                ->placeholder('email@example.com'),
         ];
     }
 }

@@ -49,15 +49,12 @@ class UserEditScreen extends Screen
      */
     public function name(): ?string
     {
-        return $this->user->exists ? 'Edit User' : 'Create User';
+        return $this->user->exists ? 'Редактирование пользователя' : 'Новый пользователь';
     }
 
-    /**
-     * Display header description.
-     */
     public function description(): ?string
     {
-        return 'User profile and privileges, including their associated role.';
+        return 'Имя, должность, роли доступа и проекты клиента. Должность не пишите в имени.';
     }
 
     public function permission(): ?iterable
@@ -101,8 +98,8 @@ class UserEditScreen extends Screen
         $layouts = [
 
             Layout::block(UserEditLayout::class)
-                ->title(__('Profile Information'))
-                ->description(__('Update your account\'s profile information and email address.'))
+                ->title('Профиль')
+                ->description('Имя отдельно, должность отдельно — так в списках и комментариях сразу видно, кто это.')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
@@ -112,8 +109,8 @@ class UserEditScreen extends Screen
                 ),
 
             Layout::block(UserPasswordLayout::class)
-                ->title(__('Password'))
-                ->description(__('Ensure your account is using a long, random password to stay secure.'))
+                ->title('Пароль')
+                ->description('Оставьте пустым, если не нужно менять.')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
@@ -123,8 +120,8 @@ class UserEditScreen extends Screen
                 ),
 
             Layout::block(UserRoleLayout::class)
-                ->title(__('Roles'))
-                ->description(__('A Role defines a set of tasks a user assigned the role is allowed to perform.'))
+                ->title('Роли доступа')
+                ->description('Роль = набор прав. Должность (Backend/Frontend) — это не роль.')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
@@ -134,8 +131,8 @@ class UserEditScreen extends Screen
                 ),
 
             Layout::block(RolePermissionLayout::class)
-                ->title(__('Permissions'))
-                ->description(__('Allow the user to perform some actions that are not provided for by his roles'))
+                ->title('Доп. права')
+                ->description('Точечные права поверх ролей — только если нужно исключение.')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
@@ -148,8 +145,8 @@ class UserEditScreen extends Screen
 
         if ($this->user->exists) {
             $layouts[] = Layout::block(UserProjectsLayout::class)
-                ->title('Проекты клиента')
-                ->description('Назначьте проекты этому клиенту')
+                ->title('Проекты клиента / заказчика')
+                ->description('Нужны только для ролей Клиент и Заказчик. Для сотрудников проекты назначаются в карточке проекта (команда).')
                 ->commands(
                     Button::make(__('Save'))
                         ->type(Color::BASIC)
@@ -167,21 +164,23 @@ class UserEditScreen extends Screen
     public function save(User $user, Request $request)
     {
         $request->validate([
+            'user.name' => 'required|string|max:255',
+            'user.position' => 'nullable|string|max:100',
             'user.email' => [
                 'required',
                 Rule::unique(User::class, 'email')->ignore($user),
             ],
         ]);
 
-        if (!in_array('client', $user->roles->pluck('slug')->toArray())) {
-            $user->projects()->detach();
-        }
+        $roleSlugs = \App\Support\RoleCatalog::resolveSlugs($request->input('user.roles', []));
+        $isClientLike = collect($roleSlugs)->contains(fn ($slug) => \App\Support\RoleCatalog::isClientRole($slug));
 
-        if (in_array('client', $request->input('user.roles', []))) {
+        if ($isClientLike) {
             $request->validate([
                 'user.projects' => 'required|array|min:1',
             ], [
-                'user.projects.required' => 'Для клиента должен быть выбран хотя бы один проект',
+                'user.projects.required' => 'Для клиента / заказчика выберите хотя бы один проект',
+                'user.projects.min' => 'Для клиента / заказчика выберите хотя бы один проект',
             ]);
         }
 
@@ -195,18 +194,19 @@ class UserEditScreen extends Screen
         });
 
         $user
-            ->fill($request->collect('user')->except(['password', 'permissions', 'roles'])->toArray())
+            ->fill($request->collect('user')->except(['password', 'permissions', 'roles', 'projects'])->toArray())
             ->forceFill(['permissions' => $permissions])
             ->save();
 
         $user->replaceRoles($request->input('user.roles'));
 
-        // Синхронизируем проекты
-        if ($request->has('user.projects')) {
-            $user->projects()->sync($request->input('user.projects'));
+        if ($isClientLike) {
+            $user->projects()->sync($request->input('user.projects', []));
+        } else {
+            $user->projects()->detach();
         }
 
-        Toast::info(__('User was saved.'));
+        Toast::info('Пользователь сохранён');
 
         return redirect()->route('platform.systems.users');
     }

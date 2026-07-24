@@ -87,7 +87,11 @@ class ProjectContext
             return $query->get();
         }
 
-        if ($user->inRole('client') || $user->hasAccess('platform.systems.client.projects')) {
+        if (
+            $user->inRole('client')
+            || $user->inRole('client_employer')
+            || $user->hasAccess('platform.systems.client.projects')
+        ) {
             $query = $user->projects()->orderBy('name');
             if (\Illuminate\Support\Facades\Schema::hasColumn('projects', 'is_active')) {
                 $query->where('is_active', true);

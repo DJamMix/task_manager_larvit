@@ -62,7 +62,7 @@ class TaskExecutorFilter extends Filter
         $users = User::query()
             ->orderBy('name')
             ->get()
-            ->mapWithKeys(fn ($user) => [$user->id => $user->name])
+            ->mapWithKeys(fn ($user) => [$user->id => $user->displayName()])
             ->toArray();
 
         // Добавляем специальный пункт в начало массива

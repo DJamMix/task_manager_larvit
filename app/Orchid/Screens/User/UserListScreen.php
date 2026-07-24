@@ -45,7 +45,7 @@ class UserListScreen extends Screen
      */
     public function description(): ?string
     {
-        return 'Здесь можно настроить все аккаунты, как сотрудников, так и клиентов';
+        return 'Имя и должность отдельно. Роль = доступ (admin/pm/employee/client).';
     }
 
     public function permission(): ?iterable
@@ -100,6 +100,8 @@ class UserListScreen extends Screen
     public function saveUser(Request $request, User $user): void
     {
         $request->validate([
+            'user.name' => 'required|string|max:255',
+            'user.position' => 'nullable|string|max:100',
             'user.email' => [
                 'required',
                 Rule::unique(User::class, 'email')->ignore($user),
@@ -108,7 +110,7 @@ class UserListScreen extends Screen
 
         $user->fill($request->input('user'))->save();
 
-        Toast::info(__('User was saved.'));
+        Toast::info('Пользователь сохранён');
     }
 
     public function remove(Request $request): void

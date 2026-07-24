@@ -142,7 +142,8 @@ class UserProfileScreen extends Screen
     public function save(Request $request): void
     {
         $request->validate([
-            'user.name'  => 'required|string',
+            'user.name' => 'required|string|max:255',
+            'user.position' => 'nullable|string|max:100',
             'user.email' => [
                 'required',
                 Rule::unique(User::class, 'email')->ignore($request->user()),
@@ -150,10 +151,10 @@ class UserProfileScreen extends Screen
         ]);
 
         $request->user()
-            ->fill($request->get('user'))
+            ->fill($request->only(['user'])['user'] ?? $request->get('user'))
             ->save();
 
-        Toast::info(__('Profile updated.'));
+        Toast::info('Профиль обновлён');
     }
 
     public function changePassword(Request $request): void

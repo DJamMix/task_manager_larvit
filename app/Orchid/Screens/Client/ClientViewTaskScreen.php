@@ -50,7 +50,7 @@ class ClientViewTaskScreen extends Screen
     {
         return [
             'id' => $comment->id,
-            'user' => ['name' => $comment->user->name ?? 'Неизвестно'],
+            'user' => ['name' => $comment->user?->displayName() ?? 'Неизвестно'],
             'created_at' => $comment->created_at->format('d.m.Y H:i'),
             'text' => $comment->plain_text
         ];

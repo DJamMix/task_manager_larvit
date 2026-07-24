@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\RoleCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Orchid\Attachment\Attachable;
@@ -15,93 +16,59 @@ class User extends Authenticatable
 {
     use HasFactory, AsSource, Attachable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array
-     */
     protected $fillable = [
         'name',
+        'position',
         'email',
         'password',
         'telegram_id',
-        'telegram_verification_code'
+        'telegram_verification_code',
     ];
 
-    /**
-     * The attributes excluded from the model's JSON form.
-     *
-     * @var array
-     */
     protected $hidden = [
         'password',
         'remember_token',
         'permissions',
     ];
 
-    /**
-     * The attributes that should be cast to native types.
-     *
-     * @var array
-     */
     protected $casts = [
-        'permissions'          => 'array',
-        'email_verified_at'    => 'datetime',
+        'permissions' => 'array',
+        'email_verified_at' => 'datetime',
     ];
 
-    /**
-     * The attributes for which you can use filters in url.
-     *
-     * @var array
-     */
     protected $allowedFilters = [
-           'id'         => Where::class,
-           'name'       => Like::class,
-           'email'      => Like::class,
-           'updated_at' => WhereDateStartEnd::class,
-           'created_at' => WhereDateStartEnd::class,
+        'id' => Where::class,
+        'name' => Like::class,
+        'position' => Like::class,
+        'email' => Like::class,
+        'updated_at' => WhereDateStartEnd::class,
+        'created_at' => WhereDateStartEnd::class,
     ];
 
-    /**
-     * The attributes for which can use sort in url.
-     *
-     * @var array
-     */
     protected $allowedSorts = [
         'id',
         'name',
+        'position',
         'email',
         'updated_at',
         'created_at',
     ];
 
-    /**
-     * Получить все задачи, созданные пользователем.
-     */
     public function createdTasks(): HasMany
     {
         return $this->hasMany(Task::class, 'creator_id');
     }
 
-    /**
-     * Получить все задачи, в которых пользователь является исполнителем.
-     */
     public function assignedTasks(): HasMany
     {
         return $this->hasMany(Task::class, 'executor_id');
     }
 
-    /**
-     * Связь многие-ко-многим с проектами (клиент)
-     */
     public function projects()
     {
         return $this->belongsToMany(Project::class, 'client_project');
     }
 
-    /**
-     * Проекты, где пользователь — участник команды
-     */
     public function memberProjects()
     {
         return $this->belongsToMany(Project::class, 'project_members')
@@ -116,5 +83,42 @@ class User extends Authenticatable
     public function timeEntries()
     {
         return $this->hasMany(TrackingTime::class);
+    }
+
+    public function isClientAccount(): bool
+    {
+        return $this->roles->pluck('slug')->intersect(RoleCatalog::CLIENT_SLUGS)->isNotEmpty();
+    }
+
+    public function displayName(): string
+    {
+        if ($this->position) {
+            return trim($this->name . ' · ' . $this->position);
+        }
+
+        return (string) $this->name;
+    }
+
+    public function roleLabels(): string
+    {
+        return $this->roles->pluck('name')->filter()->implode(' / ');
+    }
+
+    /**
+     * Опции для Select: "Влад · Backend"
+     *
+     * @return array<int, string>
+     */
+    public static function optionsForSelect(?callable $queryCallback = null): array
+    {
+        $query = static::query()->orderBy('name');
+
+        if ($queryCallback) {
+            $queryCallback($query);
+        }
+
+        return $query->get(['id', 'name', 'position'])
+            ->mapWithKeys(fn (self $user) => [$user->id => $user->displayName()])
+            ->all();
     }
 }

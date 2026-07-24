@@ -109,24 +109,24 @@ class PlatformProvider extends OrchidServiceProvider
     public function permissions(): array
     {
         return [
-            ItemPermission::group(__('System'))
-                ->addPermission('platform.systems.roles', __('adminpanel.Roles'))
-                ->addPermission('platform.systems.users', __('adminpanel.Users'))
-                ->addPermission('platform.systems.attachment', 'Загрузка файлов')
-                ->addPermission('platform.systems.tasks', __('adminpanel.Tasks'))
-                ->addPermission('platform.systems.projects', __('adminpanel.Projects'))
-                ->addPermission('platform.systems.task_categories', __('adminpanel.TaskCategories')),
+            ItemPermission::group('Система')
+                ->addPermission('platform.systems.roles', 'Роли')
+                ->addPermission('platform.systems.users', 'Пользователи')
+                ->addPermission('platform.systems.attachment', 'Загрузка файлов'),
+
+            ItemPermission::group('Управление работой')
+                ->addPermission('platform.systems.tasks', 'Все задачи')
+                ->addPermission('platform.systems.projects', 'Проекты')
+                ->addPermission('platform.systems.task_categories', 'Категории задач')
+                ->addPermission('platform.systems.acts', 'Акты'),
 
             ItemPermission::group('Сотрудник')
-                ->addPermission('platform.systems.my_tasks', __('adminpanel.MyTasks')),
+                ->addPermission('platform.systems.my_tasks', 'Мои задачи / входящие / время'),
 
-            ItemPermission::group('Клиент')
-                ->addPermission('platform.systems.client.project.tasks', 'Просмотр списка задач')
-                ->addPermission('platform.systems.client.projects', 'Проекты клиента')
-                ->addPermission('platform.systems.client.project.tasks.view', 'Просмотр задач'),
-            
-            ItemPermission::group('Менеджер')
-                ->addPermission('platform.systems.acts', __('adminpanel.Acts'))
+            ItemPermission::group('Клиент / Заказчик')
+                ->addPermission('platform.systems.client.projects', 'Мои проекты')
+                ->addPermission('platform.systems.client.project.tasks', 'Список задач проекта')
+                ->addPermission('platform.systems.client.project.tasks.view', 'Карточка задачи'),
         ];
     }
 }

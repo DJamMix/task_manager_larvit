@@ -63,7 +63,7 @@ class TaskEditLayout extends Rows
                     ->width('50%'),
 
                 Select::make('task.creator_id')
-                    ->fromModel(User::class, 'name', 'id')
+                    ->options(User::optionsForSelect())
                     ->required()
                     ->title(__('task.creator_id'))
                     ->width('50%'),
@@ -71,7 +71,7 @@ class TaskEditLayout extends Rows
 
             Group::make([
                 Select::make('task.executor_id')
-                    ->fromModel(User::class, 'name', 'id')
+                    ->options(User::optionsForSelect())
                     ->title(__('task.executor_id'))
                     ->empty('Не выбран')
                     ->width('50%'),

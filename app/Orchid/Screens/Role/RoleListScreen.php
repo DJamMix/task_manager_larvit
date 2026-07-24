@@ -29,15 +29,12 @@ class RoleListScreen extends Screen
      */
     public function name(): ?string
     {
-        return 'Role Management';
+        return 'Роли доступа';
     }
 
-    /**
-     * Display header description.
-     */
     public function description(): ?string
     {
-        return 'A comprehensive list of all roles, including their permissions and associated users.';
+        return 'admin · pm · employee · client · client_employer. Права можно синхронизировать сидером без удаления пользователей.';
     }
 
     public function permission(): ?iterable

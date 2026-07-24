@@ -17,24 +17,40 @@ use Orchid\Screen\TD;
 
 class UserListLayout extends Table
 {
-    /**
-     * @var string
-     */
     public $target = 'users';
 
-    /**
-     * @return TD[]
-     */
     public function columns(): array
     {
         return [
-            TD::make('name', __('project.name'))
+            TD::make('name', 'Имя')
                 ->sort()
                 ->cantHide()
                 ->filter(Input::make())
                 ->render(fn (User $user) => new Persona($user->presenter())),
 
-            TD::make('email', __('Email'))
+            TD::make('position', 'Должность')
+                ->sort()
+                ->filter(Input::make())
+                ->width('140px')
+                ->render(fn (User $user) => $user->position
+                    ? '<span class="badge text-bg-light border">' . e($user->position) . '</span>'
+                    : '<span class="text-muted">—</span>'),
+
+            TD::make('roles', 'Роль')
+                ->cantHide()
+                ->width('180px')
+                ->render(function (User $user) {
+                    $roles = $user->roles->pluck('name')->filter();
+                    if ($roles->isEmpty()) {
+                        return '<span class="text-muted">Без роли</span>';
+                    }
+
+                    return $roles
+                        ->map(fn ($name) => '<span class="badge text-bg-secondary me-1">' . e($name) . '</span>')
+                        ->implode(' ');
+                }),
+
+            TD::make('email', 'Электронная почта')
                 ->sort()
                 ->cantHide()
                 ->filter(Input::make())
@@ -46,31 +62,24 @@ class UserListLayout extends Table
                         'user' => $user->id,
                     ])),
 
-            TD::make('created_at', __('Created'))
-                ->usingComponent(DateTimeSplit::class)
-                ->align(TD::ALIGN_RIGHT)
-                ->defaultHidden()
-                ->sort(),
-
-            TD::make('updated_at', __('Last edit'))
+            TD::make('updated_at', 'Последнее редактирование')
                 ->usingComponent(DateTimeSplit::class)
                 ->align(TD::ALIGN_RIGHT)
                 ->sort(),
 
-            TD::make(__('Actions'))
+            TD::make('Действия')
                 ->align(TD::ALIGN_CENTER)
                 ->width('100px')
                 ->render(fn (User $user) => DropDown::make()
                     ->icon('bs.three-dots-vertical')
                     ->list([
-
-                        Link::make(__('Edit'))
+                        Link::make('Изменить')
                             ->route('platform.systems.users.edit', $user->id)
                             ->icon('bs.pencil'),
 
-                        Button::make(__('Delete'))
+                        Button::make('Удалить')
                             ->icon('bs.trash3')
-                            ->confirm(__('Once the account is deleted, all of its resources and data will be permanently deleted. Before deleting your account, please download any data or information that you wish to retain.'))
+                            ->confirm('Удалить пользователя? Это действие необратимо.')
                             ->method('remove', [
                                 'id' => $user->id,
                             ]),
