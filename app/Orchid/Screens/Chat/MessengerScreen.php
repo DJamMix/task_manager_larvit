@@ -4,6 +4,7 @@ namespace App\Orchid\Screens\Chat;
 
 use App\Models\Chat;
 use App\Orchid\Layouts\Chat\ChatCreateLayout;
+use App\Orchid\Layouts\Chat\ChatEditLayout;
 use App\Orchid\Layouts\Chat\ChatMembersLayout;
 use App\Services\ChatService;
 use Illuminate\Http\Request;
@@ -22,6 +23,8 @@ class MessengerScreen extends Screen
     public $can_chat_clients = false;
 
     public $can_write = true;
+
+    public $can_edit_chat = false;
 
     public $member_options = [];
 
@@ -79,12 +82,15 @@ class MessengerScreen extends Screen
         $composerTasks = $chats->attachableTasksFor($user, null, 60);
 
         $isMuted = false;
+        $isPinned = false;
         $canWrite = true;
+        $canEditChat = false;
         if ($resolved) {
-            $isMuted = (bool) $resolved->members
-                ->firstWhere('id', $user->id)
-                ?->pivot
-                ?->is_muted;
+            $pivot = $resolved->members->firstWhere('id', $user->id)?->pivot;
+            $isMuted = (bool) ($pivot?->is_muted ?? false);
+            $isPinned = (bool) ($pivot?->is_pinned ?? false);
+            $canEditChat = $resolved->type !== 'direct'
+                && ($resolved->isOwner($user->id) || $chats->canCreate($user));
 
             try {
                 $chats->assertCanWriteInChat($resolved, $user);
@@ -100,6 +106,7 @@ class MessengerScreen extends Screen
             'can_create' => $chats->canCreate($user),
             'can_chat_clients' => $chats->canChatWithClients($user),
             'can_write' => $canWrite,
+            'can_edit_chat' => $canEditChat,
             'member_options' => $chats->chatMemberOptions($user->id),
             'direct_options' => $chats->directInterlocutorOptions($user),
             'staff_options' => $chats->directInterlocutorOptions($user),
@@ -108,6 +115,7 @@ class MessengerScreen extends Screen
             'composer_tasks' => $composerTasks,
             'composer_tasks_search_url' => route('platform.systems.chats.tasks'),
             'chat_is_muted' => $isMuted,
+            'chat_is_pinned' => $isPinned,
             'chats_poll_url' => route('platform.systems.chats.poll'),
         ];
     }
@@ -148,6 +156,11 @@ class MessengerScreen extends Screen
 
         if ($this->chat?->exists && $this->chat->type !== 'direct'
             && ($this->chat->isOwner() || $this->can_create)) {
+            $buttons[] = ModalToggle::make('Изменить')
+                ->modal('editChatModal')
+                ->method('saveChat')
+                ->icon('bs.pencil');
+
             $buttons[] = ModalToggle::make('Участники')
                 ->modal('membersModal')
                 ->method('saveMembers')
@@ -169,6 +182,11 @@ class MessengerScreen extends Screen
                 ->title('Новый групповой чат')
                 ->size(Modal::SIZE_LG)
                 ->applyButton('Создать'),
+
+            Layout::modal('editChatModal', [ChatEditLayout::class])
+                ->title('Настройки чата')
+                ->size(Modal::SIZE_LG)
+                ->applyButton('Сохранить'),
 
             Layout::modal('createDirectModal', [
                 Layout::rows([
@@ -200,6 +218,7 @@ class MessengerScreen extends Screen
         $data = $request->validate([
             'chat.title' => 'required|string|max:120',
             'chat.description' => 'nullable|string|max:1000',
+            'chat.avatar_path' => 'nullable|string|max:500',
             'chat.member_ids' => 'required|array|min:1',
             'chat.member_ids.*' => 'integer',
         ]);
@@ -208,7 +227,8 @@ class MessengerScreen extends Screen
             $request->user(),
             $data['chat']['title'],
             $data['chat']['member_ids'],
-            $data['chat']['description'] ?? null
+            $data['chat']['description'] ?? null,
+            $data['chat']['avatar_path'] ?? null
         );
 
         Toast::success('Чат создан');
@@ -256,6 +276,28 @@ class MessengerScreen extends Screen
     {
         $muted = $chats->toggleMute($chat, $request->user());
         Toast::info($muted ? 'Чат без звука' : 'Уведомления включены');
+
+        return redirect()->route('platform.systems.chats.view', $chat);
+    }
+
+    public function togglePin(Request $request, Chat $chat, ChatService $chats)
+    {
+        $pinned = $chats->togglePin($chat, $request->user());
+        Toast::info($pinned ? 'Чат закреплён' : 'Чат откреплён');
+
+        return redirect()->route('platform.systems.chats.view', $chat);
+    }
+
+    public function saveChat(Request $request, Chat $chat, ChatService $chats)
+    {
+        $data = $request->validate([
+            'chat.title' => 'required|string|max:120',
+            'chat.description' => 'nullable|string|max:1000',
+            'chat.avatar_path' => 'nullable|string|max:500',
+        ]);
+
+        $chats->updateChat($chat, $request->user(), $data['chat']);
+        Toast::success('Чат обновлён');
 
         return redirect()->route('platform.systems.chats.view', $chat);
     }

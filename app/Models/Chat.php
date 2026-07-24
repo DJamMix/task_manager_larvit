@@ -18,6 +18,7 @@ class Chat extends Model
         'type',
         'created_by',
         'description',
+        'avatar_path',
     ];
 
     public function creator(): BelongsTo
@@ -28,7 +29,7 @@ class Chat extends Model
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'chat_user')
-            ->withPivot(['role', 'last_read_at', 'is_muted'])
+            ->withPivot(['role', 'last_read_at', 'is_muted', 'is_pinned', 'pinned_at'])
             ->withTimestamps();
     }
 
@@ -69,6 +70,53 @@ class Chat extends Model
         }
 
         return $this->title ?: 'Групповой чат';
+    }
+
+    public function avatarUrl(?int $viewerId = null): string
+    {
+        if ($this->type === 'direct') {
+            return $this->otherMember($viewerId)?->avatarUrl() ?? '';
+        }
+
+        if (!empty($this->avatar_path)) {
+            $path = (string) $this->avatar_path;
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+                return $path;
+            }
+            if (str_starts_with($path, '/')) {
+                return url($path);
+            }
+
+            return asset('storage/' . ltrim($path, '/'));
+        }
+
+        return '';
+    }
+
+    public function avatarInitials(?int $viewerId = null): string
+    {
+        if ($this->type === 'direct') {
+            return $this->otherMember($viewerId)?->avatarInitials() ?? '?';
+        }
+
+        $title = trim($this->displayTitle($viewerId));
+
+        return $title !== '' ? mb_strtoupper(mb_substr($title, 0, 1)) : '#';
+    }
+
+    public function avatarColor(?int $viewerId = null): string
+    {
+        if ($this->type === 'direct') {
+            return $this->otherMember($viewerId)?->avatarColor() ?? '#64748b';
+        }
+
+        $palette = [
+            '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7',
+            '#ec4899', '#f43f5e', '#ef4444', '#f97316',
+            '#eab308', '#22c55e', '#14b8a6', '#06b6d4',
+        ];
+
+        return $palette[(int) $this->id % count($palette)];
     }
 
     public function otherMember(?int $viewerId = null): ?User

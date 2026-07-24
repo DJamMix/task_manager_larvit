@@ -1,11 +1,22 @@
-{{-- Bitrix-style avatar: initials + optional Gravatar --}}
+{{-- Avatar: custom photo / chat avatar / initials / Gravatar --}}
 @php
-    /** @var \App\Models\User|null $user */
     $size = $size ?? 'md';
-    $title = $user?->displayName() ?? 'Участник';
-    $initials = $user?->avatarInitials() ?? '?';
-    $color = $user?->avatarColor() ?? '#64748b';
-    $url = $user?->avatarUrl() ?? '';
+    /** @var \App\Models\User|null $user */
+    /** @var \App\Models\Chat|null $chat */
+    $chat = $chat ?? null;
+    $user = $user ?? null;
+
+    if ($chat) {
+        $title = $chat->displayTitle();
+        $initials = $chat->avatarInitials();
+        $color = $chat->avatarColor();
+        $url = $chat->avatarUrl();
+    } else {
+        $title = $user?->displayName() ?? 'Участник';
+        $initials = $user?->avatarInitials() ?? '?';
+        $color = $user?->avatarColor() ?? '#64748b';
+        $url = $user?->avatarUrl() ?? '';
+    }
 @endphp
 <span class="bx-avatar bx-avatar--{{ $size }}"
       style="--bx-avatar-bg: {{ $color }}"

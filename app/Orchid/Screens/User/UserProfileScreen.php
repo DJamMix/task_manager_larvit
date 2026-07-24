@@ -47,7 +47,7 @@ class UserProfileScreen extends Screen
      */
     public function description(): ?string
     {
-        return 'Обновите данные своей учетной записи, такие как имя, адрес электронной почты и пароль';
+        return 'Обновите имя, должность, аватар, email и пароль';
     }
 
     /**
@@ -144,6 +144,7 @@ class UserProfileScreen extends Screen
         $request->validate([
             'user.name' => 'required|string|max:255',
             'user.position' => 'nullable|string|max:100',
+            'user.avatar_path' => 'nullable|string|max:500',
             'user.email' => [
                 'required',
                 Rule::unique(User::class, 'email')->ignore($request->user()),
@@ -151,7 +152,7 @@ class UserProfileScreen extends Screen
         ]);
 
         $request->user()
-            ->fill($request->only(['user'])['user'] ?? $request->get('user'))
+            ->fill($request->input('user', []))
             ->save();
 
         Toast::info('Профиль обновлён');

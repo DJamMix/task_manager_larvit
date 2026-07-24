@@ -4,6 +4,7 @@ namespace App\Orchid\Layouts\Chat;
 
 use App\Services\ChatService;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Picture;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Fields\TextArea;
 use Orchid\Screen\Layouts\Rows;
@@ -17,6 +18,13 @@ class ChatCreateLayout extends Rows
         $options = app(ChatService::class)->chatMemberOptions(auth()->id());
 
         return [
+            Picture::make('chat.avatar_path')
+                ->title('Аватар чата')
+                ->storage('public')
+                ->path('chat-avatars')
+                ->targetRelativeUrl()
+                ->acceptedFiles('image/jpeg,image/png,image/webp,image/gif'),
+
             Input::make('chat.title')
                 ->title('Название чата')
                 ->placeholder('Например: Релиз 2.0')

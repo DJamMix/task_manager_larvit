@@ -963,11 +963,21 @@
     white-space: nowrap;
 }
 .bx-mute-btn:hover { background: #f8fafc; }
-.bx-mute-btn.is-muted {
-    background: #fff7ed;
-    border-color: #fed7aa;
-    color: #c2410c;
+.bx-messenger__header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
 }
+.bx-mute-btn.is-active {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+.bx-chat-item.is-pinned {
+    background: #f8fafc;
+}
+.bx-pin { color: #2563eb; margin-right: 0.15rem; }
 
 .bx-icon {
     width: 18px;

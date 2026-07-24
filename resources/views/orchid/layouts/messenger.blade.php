@@ -9,6 +9,8 @@
         $taskOptions = $composer_tasks ?? [];
         $mentionUsers = $mention_users ?? [];
         $isMuted = (bool) ($chat_is_muted ?? false);
+        $isPinned = (bool) ($chat_is_pinned ?? false);
+        $canEditChat = (bool) ($can_edit_chat ?? false);
     @endphp
 
     <aside class="bx-messenger__sidebar">
@@ -19,21 +21,19 @@
 
         <div class="bx-messenger__list">
             @forelse($chatList as $item)
-                @php
-                    $listAvatarUser = $item->type === 'direct' ? $item->otherMember() : null;
-                @endphp
                 <a href="{{ route('platform.systems.chats.view', $item) }}"
-                   class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }}">
-                    @if($listAvatarUser)
-                        @include('orchid.layouts.partials.bx-avatar', ['user' => $listAvatarUser, 'size' => 'md'])
+                   class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}">
+                    @if($item->type === 'direct')
+                        @include('orchid.layouts.partials.bx-avatar', ['user' => $item->otherMember(), 'size' => 'md'])
                     @else
-                        <div class="bx-chat-item__avatar">
-                            {{ mb_strtoupper(mb_substr($item->displayTitle(), 0, 1)) }}
-                        </div>
+                        @include('orchid.layouts.partials.bx-avatar', ['chat' => $item, 'size' => 'md'])
                     @endif
                     <div class="bx-chat-item__body">
                         <div class="bx-chat-item__top">
                             <strong>
+                                @if(!empty($item->is_pinned))
+                                    <svg class="bx-icon bx-icon--xs bx-pin" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                                @endif
                                 {{ $item->displayTitle() }}
                                 @if(!empty($item->is_muted))
                                     <svg class="bx-icon bx-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -58,15 +58,10 @@
         @if($active)
             <div class="bx-messenger__header">
                 <div class="bx-messenger__header-main">
-                    @php
-                        $headerAvatar = $active->type === 'direct' ? $active->otherMember() : null;
-                    @endphp
-                    @if($headerAvatar)
-                        @include('orchid.layouts.partials.bx-avatar', ['user' => $headerAvatar, 'size' => 'lg'])
+                    @if($active->type === 'direct')
+                        @include('orchid.layouts.partials.bx-avatar', ['user' => $active->otherMember(), 'size' => 'lg'])
                     @else
-                        <div class="bx-chat-item__avatar bx-chat-item__avatar--lg">
-                            {{ mb_strtoupper(mb_substr($active->displayTitle(), 0, 1)) }}
-                        </div>
+                        @include('orchid.layouts.partials.bx-avatar', ['chat' => $active, 'size' => 'lg'])
                     @endif
                     <div>
                         <h2 class="h5 mb-0">{{ $active->displayTitle() }}</h2>
@@ -80,19 +75,29 @@
                         </div>
                     </div>
                 </div>
-                <button type="submit"
-                        class="bx-mute-btn {{ $isMuted ? 'is-muted' : '' }}"
-                        formaction="{{ url()->current() }}/toggleMute"
-                        form="post-form"
-                        title="{{ $isMuted ? 'Включить звук' : 'Выключить звук' }}">
-                    @if($isMuted)
-                        <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                        <span>Без звука</span>
-                    @else
-                        <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
-                        <span>Звук</span>
-                    @endif
-                </button>
+                <div class="bx-messenger__header-actions">
+                    <button type="submit"
+                            class="bx-mute-btn {{ $isPinned ? 'is-active' : '' }}"
+                            formaction="{{ url()->current() }}/togglePin"
+                            form="post-form"
+                            title="{{ $isPinned ? 'Открепить' : 'Закрепить' }}">
+                        <svg class="bx-icon" viewBox="0 0 24 24" fill="{{ $isPinned ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                        <span>{{ $isPinned ? 'Закреплён' : 'Закрепить' }}</span>
+                    </button>
+                    <button type="submit"
+                            class="bx-mute-btn {{ $isMuted ? 'is-muted' : '' }}"
+                            formaction="{{ url()->current() }}/toggleMute"
+                            form="post-form"
+                            title="{{ $isMuted ? 'Включить звук' : 'Выключить звук' }}">
+                        @if($isMuted)
+                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                            <span>Без звука</span>
+                        @else
+                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+                            <span>Звук</span>
+                        @endif
+                    </button>
+                </div>
             </div>
 
             <div class="bx-messenger__feed" id="chat-feed">

@@ -19,6 +19,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'position',
+        'avatar_path',
         'email',
         'password',
         'telegram_id',
@@ -142,6 +143,18 @@ class User extends Authenticatable
 
     public function avatarUrl(): string
     {
+        if (!empty($this->avatar_path)) {
+            $path = (string) $this->avatar_path;
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+                return $path;
+            }
+            if (str_starts_with($path, '/')) {
+                return url($path);
+            }
+
+            return asset('storage/' . ltrim($path, '/'));
+        }
+
         $email = strtolower(trim((string) $this->email));
         if ($email === '') {
             return '';

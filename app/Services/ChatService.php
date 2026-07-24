@@ -230,6 +230,14 @@ class ChatService
                         "1970-01-01"
                     )', [$user->id]);
             }])
+            ->orderByRaw(
+                '(SELECT COALESCE(is_pinned, 0) FROM chat_user WHERE chat_user.chat_id = chats.id AND chat_user.user_id = ?) DESC',
+                [$user->id]
+            )
+            ->orderByRaw(
+                '(SELECT pinned_at FROM chat_user WHERE chat_user.chat_id = chats.id AND chat_user.user_id = ?) DESC',
+                [$user->id]
+            )
             ->orderByDesc(
                 ChatMessage::select('created_at')
                     ->whereColumn('chat_id', 'chats.id')
@@ -241,6 +249,7 @@ class ChatService
             ->each(function (Chat $chat) use ($user) {
                 $pivot = $chat->members->firstWhere('id', $user->id)?->pivot;
                 $chat->setAttribute('is_muted', (bool) ($pivot?->is_muted ?? false));
+                $chat->setAttribute('is_pinned', (bool) ($pivot?->is_pinned ?? false));
             });
     }
 
@@ -338,17 +347,55 @@ class ChatService
         return $next;
     }
 
+    public function togglePin(Chat $chat, User $user): bool
+    {
+        if (!$chat->isMember($user->id)) {
+            abort(403);
+        }
+
+        $current = (bool) $chat->members()->where('users.id', $user->id)->first()?->pivot?->is_pinned;
+        $next = !$current;
+        $chat->members()->updateExistingPivot($user->id, [
+            'is_pinned' => $next,
+            'pinned_at' => $next ? now() : null,
+        ]);
+
+        return $next;
+    }
+
+    public function updateChat(Chat $chat, User $actor, array $data): Chat
+    {
+        if ($chat->type === 'direct') {
+            abort(422, 'Личный чат нельзя редактировать');
+        }
+
+        if (!$chat->isOwner($actor->id) && !$actor->hasAccess('platform.systems.chats.create')) {
+            abort(403);
+        }
+
+        $chat->fill([
+            'title' => $data['title'] ?? $chat->title,
+            'description' => $data['description'] ?? $chat->description,
+            'avatar_path' => array_key_exists('avatar_path', $data) ? $data['avatar_path'] : $chat->avatar_path,
+        ])->save();
+
+        $this->postSystem($chat, $actor, "{$actor->displayName()} обновил(а) настройки чата");
+
+        return $chat->fresh(['members']);
+    }
+
     /**
      * @param  list<int>  $memberIds
      */
-    public function createGroup(User $actor, string $title, array $memberIds, ?string $description = null): Chat
+    public function createGroup(User $actor, string $title, array $memberIds, ?string $description = null, ?string $avatarPath = null): Chat
     {
-        return DB::transaction(function () use ($actor, $title, $memberIds, $description) {
+        return DB::transaction(function () use ($actor, $title, $memberIds, $description, $avatarPath) {
             $chat = Chat::query()->create([
                 'title' => trim($title) !== '' ? trim($title) : 'Групповой чат',
                 'type' => 'group',
                 'created_by' => $actor->id,
                 'description' => $description,
+                'avatar_path' => $avatarPath,
             ]);
 
             $ids = collect($memberIds)
@@ -364,6 +411,7 @@ class ChatService
                     'role' => (int) $id === (int) $actor->id ? 'owner' : 'member',
                     'last_read_at' => now(),
                     'is_muted' => false,
+                    'is_pinned' => false,
                 ];
             }
             $chat->members()->sync($sync);
@@ -399,8 +447,8 @@ class ChatService
             ]);
 
             $chat->members()->sync([
-                $actor->id => ['role' => 'owner', 'last_read_at' => now(), 'is_muted' => false],
-                $other->id => ['role' => 'member', 'last_read_at' => now(), 'is_muted' => false],
+                $actor->id => ['role' => 'owner', 'last_read_at' => now(), 'is_muted' => false, 'is_pinned' => false],
+                $other->id => ['role' => 'member', 'last_read_at' => now(), 'is_muted' => false, 'is_pinned' => false],
             ]);
 
             $this->postSystem($chat, $actor, 'Личный чат создан');
@@ -437,6 +485,8 @@ class ChatService
                 'role' => $existingRole === 'owner' || (int) $id === (int) $chat->created_by ? 'owner' : 'member',
                 'last_read_at' => $member?->pivot?->last_read_at ?? now(),
                 'is_muted' => (bool) ($member?->pivot?->is_muted ?? false),
+                'is_pinned' => (bool) ($member?->pivot?->is_pinned ?? false),
+                'pinned_at' => $member?->pivot?->pinned_at,
             ];
         }
 

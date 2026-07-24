@@ -7,6 +7,7 @@ namespace App\Orchid\Layouts\User;
 use App\Support\RoleCatalog;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Picture;
 use Orchid\Screen\Fields\Select;
 use Orchid\Screen\Layouts\Rows;
 
@@ -15,6 +16,14 @@ class UserEditLayout extends Rows
     public function fields(): array
     {
         return [
+            Picture::make('user.avatar_path')
+                ->title('Аватар')
+                ->storage('public')
+                ->path('avatars')
+                ->targetRelativeUrl()
+                ->acceptedFiles('image/jpeg,image/png,image/webp,image/gif')
+                ->help('Своя фотография. Если не загружена — инициалы или Gravatar.'),
+
             Input::make('user.name')
                 ->type('text')
                 ->max(255)
