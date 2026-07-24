@@ -27,7 +27,7 @@ class DiscussionComposerLayout extends Rows
             Quill::make('comment.text')
                 ->toolbar(['text', 'list', 'quote', 'format'])
                 ->height('110px')
-                ->placeholder('Сообщение… Можно вставить блок кода кнопкой «</>»'),
+                ->placeholder('Сообщение… Код: </> или ```php … ```'),
 
             Group::make([
                 Upload::make('comment.attachments')

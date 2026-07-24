@@ -27,6 +27,8 @@ final class RoleCatalog
             'platform.systems.projects',
             'platform.systems.task_categories',
             'platform.systems.my_tasks',
+            'platform.systems.chats',
+            'platform.systems.chats.create',
             'platform.systems.client.projects',
             'platform.systems.client.project.tasks',
             'platform.systems.client.project.tasks.view',
@@ -39,13 +41,16 @@ final class RoleCatalog
             'platform.systems.projects',
             'platform.systems.task_categories',
             'platform.systems.my_tasks',
+            'platform.systems.chats',
+            'platform.systems.chats.create',
             'platform.systems.acts',
-            'platform.systems.users', // назначение людей на проекты удобнее с доступом к юзерам
+            'platform.systems.users',
         ];
 
         $employee = [
             'platform.systems.attachment',
             'platform.systems.my_tasks',
+            'platform.systems.chats',
         ];
 
         $client = [

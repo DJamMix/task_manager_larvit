@@ -43,7 +43,13 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.inbox')
                 ->route('platform.systems.inbox')
                 ->permission('platform.systems.my_tasks')
-                ->badge(fn () => $this->inboxBadgeCount())
+                ->badge(fn () => $this->inboxBadgeCount()),
+
+            Menu::make('Чаты')
+                ->icon('bs.chat-dots')
+                ->route('platform.systems.chats')
+                ->permission('platform.systems.chats')
+                ->badge(fn () => $this->chatsBadgeCount())
                 ->divider(),
 
             Menu::make('Мои проекты')
@@ -101,6 +107,30 @@ class PlatformProvider extends OrchidServiceProvider
         return $count > 0 ? $count : null;
     }
 
+    private function chatsBadgeCount(): ?int
+    {
+        if (!auth()->check() || !auth()->user()->hasAccess('platform.systems.chats')) {
+            return null;
+        }
+
+        try {
+            $userId = auth()->id();
+
+            return \App\Models\ChatMessage::query()
+                ->whereIn('chat_id', function ($q) use ($userId) {
+                    $q->select('chat_id')->from('chat_user')->where('user_id', $userId);
+                })
+                ->where('user_id', '!=', $userId)
+                ->whereRaw('created_at > COALESCE(
+                    (SELECT last_read_at FROM chat_user WHERE chat_user.chat_id = chat_messages.chat_id AND chat_user.user_id = ?),
+                    "1970-01-01"
+                )', [$userId])
+                ->count() ?: null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     /**
      * Register permissions for the application.
      *
@@ -121,7 +151,9 @@ class PlatformProvider extends OrchidServiceProvider
                 ->addPermission('platform.systems.acts', 'Акты'),
 
             ItemPermission::group('Сотрудник')
-                ->addPermission('platform.systems.my_tasks', 'Мои задачи / входящие / время'),
+                ->addPermission('platform.systems.my_tasks', 'Мои задачи / входящие / время')
+                ->addPermission('platform.systems.chats', 'Чаты (участие)')
+                ->addPermission('platform.systems.chats.create', 'Чаты (создание)'),
 
             ItemPermission::group('Клиент / Заказчик')
                 ->addPermission('platform.systems.client.projects', 'Мои проекты')

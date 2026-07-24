@@ -264,3 +264,15 @@ Route::screen('inbox', InboxScreen::class)
     ->breadcrumbs(fn (Trail $trail) => $trail
         ->parent('platform.index')
         ->push('Входящие', route('platform.systems.inbox')));
+
+Route::screen('chats', \App\Orchid\Screens\Chat\MessengerScreen::class)
+    ->name('platform.systems.chats')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Чаты', route('platform.systems.chats')));
+
+Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
+    ->name('platform.systems.chats.view')
+    ->breadcrumbs(fn (Trail $trail, $chat) => $trail
+        ->parent('platform.systems.chats')
+        ->push($chat->displayTitle(), route('platform.systems.chats.view', $chat)));

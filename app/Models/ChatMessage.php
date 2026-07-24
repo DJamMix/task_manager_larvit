@@ -3,43 +3,43 @@
 namespace App\Models;
 
 use App\Services\MessageHtmlRenderer;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Orchid\Attachment\Attachable;
 use Orchid\Screen\AsSource;
 
-class Comment extends Model
+class ChatMessage extends Model
 {
-    use HasFactory, AsSource, Attachable;
+    use AsSource, Attachable;
 
     protected $fillable = [
+        'chat_id',
         'user_id',
-        'task_id',
         'parent_id',
         'text',
         'plain_text',
-        'is_system',
         'mentioned_user_ids',
+        'task_id',
+        'is_system',
     ];
 
     protected $casts = [
+        'text' => 'array',
+        'mentioned_user_ids' => 'array',
+        'is_system' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'text' => 'array',
-        'is_system' => 'boolean',
-        'mentioned_user_ids' => 'array',
     ];
+
+    public function chat(): BelongsTo
+    {
+        return $this->belongsTo(Chat::class);
+    }
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function task(): BelongsTo
-    {
-        return $this->belongsTo(Task::class);
     }
 
     public function parent(): BelongsTo
@@ -50,6 +50,11 @@ class Comment extends Model
     public function replies(): HasMany
     {
         return $this->hasMany(self::class, 'parent_id');
+    }
+
+    public function task(): BelongsTo
+    {
+        return $this->belongsTo(Task::class);
     }
 
     public function getFormattedTextAttribute(): string

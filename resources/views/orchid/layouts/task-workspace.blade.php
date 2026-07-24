@@ -209,3 +209,14 @@
         </section>
     </div>
 </div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+(() => {
+    if (!window.hljs) return;
+    document.querySelectorAll('.tw-codeblock code').forEach((el) => {
+        try { window.hljs.highlightElement(el); } catch (e) {}
+    });
+})();
+</script>
