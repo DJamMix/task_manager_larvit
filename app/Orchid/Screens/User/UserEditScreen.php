@@ -35,11 +35,13 @@ class UserEditScreen extends Screen
      */
     public function query(User $user): iterable
     {
-        $user->load(['roles', 'projects']);
+        if ($user->exists) {
+            $user->load(['roles', 'projects']);
+        }
 
         return [
             'user'       => $user,
-            'permission' => $user->getStatusPermission(),
+            'permission' => $user->exists ? $user->getStatusPermission() : [],
         ];
     }
 
