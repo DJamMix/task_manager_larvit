@@ -137,11 +137,15 @@
                         <a href="{{ $fileUrl }}"
                            class="bx-msg__image"
                            data-bx-lightbox="{{ $fileUrl }}"
-                           title="{{ $file->original_name }}">
+                           title="{{ $file->original_name }}"
+                           style="width:96px;height:96px;max-width:96px;max-height:96px;flex:0 0 96px;display:block;overflow:hidden;border-radius:10px;line-height:0;">
                             <img src="{{ $fileUrl }}"
                                  alt="{{ $file->original_name }}"
+                                 width="96"
+                                 height="96"
                                  loading="lazy"
-                                 decoding="async">
+                                 decoding="async"
+                                 style="width:96px;height:96px;object-fit:cover;object-position:center;display:block;">
                         </a>
                     @else
                         <a href="{{ $downloadUrl }}" class="badge text-bg-light border text-decoration-none">
