@@ -94,9 +94,8 @@
                             );
                         @endphp
                         <button type="button"
-                                class="bx-chat-meta"
-                                id="bx-open-members"
-                                title="Участники чата">
+                                class="bx-chat-subtitle"
+                                id="bx-open-members">
                             @if($active->type === 'direct')
                                 Личный чат
                             @else
@@ -361,31 +360,28 @@
     </section>
 
     @if($active)
-        <div class="bx-members-sheet" id="bx-members-sheet" hidden>
-            <button type="button" class="bx-members-sheet__backdrop" id="bx-members-close-bg" aria-label="Закрыть"></button>
-            <div class="bx-members-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-members-title">
-                <div class="bx-members-sheet__head">
-                    <div>
-                        <strong id="bx-members-title">Участники</strong>
-                        <div class="bx-members-sheet__count">{{ $active->members->count() }}</div>
-                    </div>
-                    <button type="button" class="bx-members-sheet__close" id="bx-members-close" aria-label="Закрыть">×</button>
+        <div class="bx-members-modal" id="bx-members-sheet" hidden>
+            <button type="button" class="bx-members-modal__backdrop" id="bx-members-close-bg" aria-label="Закрыть"></button>
+            <div class="bx-members-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="bx-members-title">
+                <div class="bx-members-modal__head">
+                    <strong id="bx-members-title">Участники · {{ $active->members->count() }}</strong>
+                    <button type="button" class="bx-members-modal__close" id="bx-members-close" aria-label="Закрыть">×</button>
                 </div>
-                <ul class="bx-members-sheet__list">
+                <ul class="bx-members-modal__list">
                     @foreach($active->members->sortBy(fn ($u) => mb_strtolower($u->displayName())) as $member)
-                        <li class="bx-members-sheet__item">
+                        <li class="bx-members-modal__item">
                             @include('orchid.layouts.partials.bx-avatar', [
                                 'avatarUser' => $member,
                                 'avatarChat' => null,
                                 'size' => 'md',
                                 'shape' => 'round',
                             ])
-                            <div class="bx-members-sheet__meta">
-                                <div class="bx-members-sheet__name">{{ $member->displayName() }}</div>
+                            <div class="bx-members-modal__meta">
+                                <div class="bx-members-modal__name">{{ $member->displayName() }}</div>
                                 @if($member->pivot?->role === 'owner')
-                                    <div class="bx-members-sheet__role">владелец</div>
+                                    <div class="bx-members-modal__role">владелец</div>
                                 @elseif($member->position)
-                                    <div class="bx-members-sheet__role">{{ $member->position }}</div>
+                                    <div class="bx-members-modal__role">{{ $member->position }}</div>
                                 @endif
                             </div>
                         </li>
