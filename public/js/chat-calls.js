@@ -1,10 +1,14 @@
 /**
  * Групповые звонки через LiveKit (SFU).
- * Шифрование медиа: DTLS-SRTP. Сигналинг: WSS.
+ * Микрофон/камера, экран, громкость по участникам.
  */
 (function () {
     const root = document.querySelector('.bx-messenger');
     if (!root || root.getAttribute('data-calls-enabled') !== '1') return;
+
+    const MIC_KEY = 'bx_chat_mic_device';
+    const CAM_KEY = 'bx_call_cam_device';
+    const VOL_KEY = 'bx_call_vol_';
 
     const csrf = root.getAttribute('data-csrf')
         || document.querySelector('meta[name="csrf_token"]')?.content
@@ -29,13 +33,20 @@
     const endAllBtn = document.getElementById('bx-call-end-all');
     const micBtn = document.getElementById('bx-call-mic');
     const camBtn = document.getElementById('bx-call-cam');
+    const screenBtn = document.getElementById('bx-call-screen');
+    const devicesBtn = document.getElementById('bx-call-devices');
+    const devicesPanel = document.getElementById('bx-call-devices-panel');
+    const micSelect = document.getElementById('bx-call-mic-select');
+    const camSelect = document.getElementById('bx-call-cam-select');
 
+    let LK = null;
     let room = null;
     let roomGen = 0;
     let callId = null;
     let isStarter = false;
     let micOn = true;
     let camOn = false;
+    let screenOn = false;
     let timerSec = 0;
     let timerIv = null;
     let ringingCallId = null;
@@ -63,20 +74,47 @@
 
     const callUrl = (id, action) => joinTpl.replace('__ID__', String(id)).replace('/join', '/' + action);
 
+    const getSaved = (key) => {
+        try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+    };
+    const setSaved = (key, val) => {
+        try { localStorage.setItem(key, val || ''); } catch (e) {}
+    };
+
+    const getVol = (id) => {
+        const n = parseInt(getSaved(VOL_KEY + id), 10);
+        if (Number.isFinite(n)) return Math.max(0, Math.min(100, n));
+        return 100;
+    };
+    const setVol = (id, pct) => setSaved(VOL_KEY + id, String(pct));
+
     const ensureLivekit = () => {
         if (window.LivekitClient || window.LiveKit) {
-            return Promise.resolve(window.LivekitClient || window.LiveKit);
+            LK = window.LivekitClient || window.LiveKit;
+            return Promise.resolve(LK);
         }
         if (livekitReady) return livekitReady;
         livekitReady = new Promise((resolve, reject) => {
             const s = document.createElement('script');
             s.src = 'https://cdn.jsdelivr.net/npm/livekit-client@2.9.8/dist/livekit-client.umd.min.js';
-            s.onload = () => resolve(window.LivekitClient || window.LiveKit);
+            s.onload = () => {
+                LK = window.LivekitClient || window.LiveKit;
+                resolve(LK);
+            };
             s.onerror = () => reject(new Error('Не удалось загрузить LiveKit client'));
             document.head.appendChild(s);
         });
         return livekitReady;
     };
+
+    const isScreenSource = (publication, track) => {
+        const src = publication?.source || track?.source;
+        const ScreenShare = LK?.Track?.Source?.ScreenShare || 'screen_share';
+        const ScreenShareAudio = LK?.Track?.Source?.ScreenShareAudio || 'screen_share_audio';
+        return src === ScreenShare || src === ScreenShareAudio || src === 'screen_share' || src === 'screen_share_audio';
+    };
+
+    const tileKey = (identity, isScreen) => (isScreen ? String(identity) + ':screen' : String(identity));
 
     const parseMeta = (participant) => {
         const id = String(participant?.identity || '');
@@ -122,6 +160,17 @@
         }
     };
 
+    const applyAudioVolume = (tile, identity) => {
+        const audio = tile?.querySelector('.bx-call-tile__audio');
+        if (!audio) return;
+        const pct = getVol(identity);
+        audio.volume = pct / 100;
+        const range = tile.querySelector('.bx-call-tile__vol-range');
+        if (range) range.value = String(pct);
+        const label = tile.querySelector('.bx-call-tile__vol-val');
+        if (label) label.textContent = pct + '%';
+    };
+
     const updateCount = () => {
         if (!countEl || !room) return;
         const n = 1 + (room.remoteParticipants?.size || 0);
@@ -133,44 +182,77 @@
         const hasVideo = tile.classList.contains('has-video');
         const avatar = tile.querySelector('.bx-call-tile__avatar');
         const video = tile.querySelector('.bx-call-tile__video');
-        if (avatar) avatar.hidden = hasVideo;
-        if (video) video.classList.toggle('is-on', hasVideo);
+        if (avatar) avatar.hidden = !!hasVideo;
+        if (video) video.classList.toggle('is-on', !!hasVideo);
     };
 
-    const tileEl = (identity, meta) => {
+    const tileEl = (identity, meta, opts = {}) => {
+        const isScreen = !!opts.screen;
         const id = String(identity);
-        let el = grid?.querySelector('[data-id="' + id + '"]');
+        const key = tileKey(id, isScreen);
+        let el = grid?.querySelector('[data-id="' + key + '"]');
         const info = { ...(metaById[id] || {}), ...(meta || {}) };
         metaById[id] = info;
 
         if (!el) {
             el = document.createElement('div');
-            el.className = 'bx-call-tile';
-            el.setAttribute('data-id', id);
+            el.className = 'bx-call-tile' + (isScreen ? ' is-screen' : '');
+            el.setAttribute('data-id', key);
+            el.setAttribute('data-user', id);
             el.innerHTML = [
                 '<div class="bx-call-tile__avatar"></div>',
                 '<video class="bx-call-tile__video" playsinline autoplay muted></video>',
                 '<audio class="bx-call-tile__audio" autoplay></audio>',
                 '<div class="bx-call-tile__shade"></div>',
-                '<div class="bx-call-tile__name"></div>',
+                '<div class="bx-call-tile__footer">',
+                '  <div class="bx-call-tile__name"></div>',
+                '  <label class="bx-call-tile__vol" title="Громкость у вас">',
+                '    <span class="bx-call-tile__vol-ico" aria-hidden="true">♪</span>',
+                '    <input type="range" class="bx-call-tile__vol-range" min="0" max="100" step="5" value="100">',
+                '    <span class="bx-call-tile__vol-val">100%</span>',
+                '  </label>',
+                '</div>',
                 '<div class="bx-call-tile__pulse" aria-hidden="true"></div>',
             ].join('');
             grid?.appendChild(el);
+
+            const range = el.querySelector('.bx-call-tile__vol-range');
+            range?.addEventListener('input', () => {
+                const pct = parseInt(range.value, 10) || 0;
+                setVol(id, pct);
+                applyAudioVolume(el, id);
+                // если есть экранный тайл того же юзера — та же громкость для screen audio
+                const screenTile = grid?.querySelector('[data-id="' + tileKey(id, true) + '"]');
+                if (screenTile && screenTile !== el) applyAudioVolume(screenTile, id);
+            });
         }
 
         const isLocal = id === String(room?.localParticipant?.identity);
-        const label = (isLocal ? 'Вы · ' : '') + (info.name || id);
         const nameEl = el.querySelector('.bx-call-tile__name');
-        if (nameEl) nameEl.textContent = label;
-        renderAvatar(el.querySelector('.bx-call-tile__avatar'), info);
+        const volWrap = el.querySelector('.bx-call-tile__vol');
+        if (nameEl) {
+            nameEl.textContent = isScreen
+                ? ((isLocal ? 'Ваш экран' : (info.name || id) + ' · экран'))
+                : ((isLocal ? 'Вы · ' : '') + (info.name || id));
+        }
+        if (volWrap) volWrap.hidden = !!isLocal;
+
+        if (!isScreen) {
+            renderAvatar(el.querySelector('.bx-call-tile__avatar'), info);
+        } else {
+            const av = el.querySelector('.bx-call-tile__avatar');
+            if (av) av.innerHTML = '<span class="bx-call-tile__screen-ico">▣</span>';
+        }
+        applyAudioVolume(el, id);
         syncTileMediaState(el);
         return el;
     };
 
-    const attachTrack = (track, participant) => {
+    const attachTrack = (track, participant, publication) => {
         const id = String(participant.identity);
+        const screen = isScreenSource(publication, track);
         const meta = parseMeta(participant);
-        const tile = tileEl(id, meta);
+        const tile = tileEl(id, meta, { screen });
         const video = tile.querySelector('.bx-call-tile__video');
         const audio = tile.querySelector('.bx-call-tile__audio');
         const isLocal = id === String(room?.localParticipant?.identity);
@@ -179,29 +261,29 @@
             track.attach(video);
             video.muted = true;
             video.playsInline = true;
-            if (isLocal) video.style.transform = 'scaleX(-1)';
-            else video.style.transform = '';
+            video.style.transform = (isLocal && !screen) ? 'scaleX(-1)' : '';
             tile.classList.add('has-video');
             syncTileMediaState(tile);
             video.play?.().catch(() => {});
         }
 
         if (track.kind === 'audio' && audio) {
-            if (isLocal) {
-                // свой звук не играем
+            if (isLocal && !screen) {
                 try { track.detach(audio); } catch (e) {}
                 audio.srcObject = null;
             } else {
                 track.attach(audio);
+                applyAudioVolume(tile, id);
                 audio.play?.().catch(() => {});
             }
         }
         updateCount();
     };
 
-    const detachTrack = (track, participant) => {
+    const detachTrack = (track, participant, publication) => {
         const id = String(participant.identity);
-        const tile = grid?.querySelector('[data-id="' + id + '"]');
+        const screen = isScreenSource(publication, track);
+        const tile = grid?.querySelector('[data-id="' + tileKey(id, screen) + '"]');
         if (!tile) return;
         const video = tile.querySelector('.bx-call-tile__video');
         const audio = tile.querySelector('.bx-call-tile__audio');
@@ -209,6 +291,7 @@
             track.detach(video);
             tile.classList.remove('has-video');
             syncTileMediaState(tile);
+            if (screen) tile.remove();
         }
         if (track.kind === 'audio' && audio) {
             track.detach(audio);
@@ -217,9 +300,70 @@
 
     const setSpeaking = (speakers) => {
         const ids = new Set((speakers || []).map((s) => String(s.identity)));
-        grid?.querySelectorAll('.bx-call-tile').forEach((tile) => {
-            tile.classList.toggle('is-speaking', ids.has(tile.getAttribute('data-id')));
+        grid?.querySelectorAll('.bx-call-tile:not(.is-screen)').forEach((tile) => {
+            tile.classList.toggle('is-speaking', ids.has(tile.getAttribute('data-user')));
         });
+    };
+
+    const fillDeviceSelect = (select, devices, savedId) => {
+        if (!select) return;
+        const prev = select.value || savedId || '';
+        select.innerHTML = '';
+        if (!devices.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Нет устройств';
+            select.appendChild(opt);
+            return;
+        }
+        devices.forEach((d, i) => {
+            const opt = document.createElement('option');
+            opt.value = d.deviceId;
+            opt.textContent = d.label || (('Устройство ') + (i + 1));
+            select.appendChild(opt);
+        });
+        if (prev && [...select.options].some((o) => o.value === prev)) {
+            select.value = prev;
+        }
+    };
+
+    const refreshDevices = async () => {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        try {
+            // labels появляются после разрешения
+            try {
+                const tmp = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                tmp.getTracks().forEach((t) => t.stop());
+            } catch (e) {
+                try {
+                    const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    tmp.getTracks().forEach((t) => t.stop());
+                } catch (e2) {}
+            }
+            const all = await navigator.mediaDevices.enumerateDevices();
+            fillDeviceSelect(
+                micSelect,
+                all.filter((d) => d.kind === 'audioinput'),
+                getSaved(MIC_KEY)
+            );
+            fillDeviceSelect(
+                camSelect,
+                all.filter((d) => d.kind === 'videoinput'),
+                getSaved(CAM_KEY)
+            );
+        } catch (e) {
+            console.warn('devices', e);
+        }
+    };
+
+    const micOptions = () => {
+        const id = getSaved(MIC_KEY);
+        return id ? { deviceId: id } : {};
+    };
+    const camOptions = () => {
+        const id = getSaved(CAM_KEY);
+        const base = { resolution: { width: 960, height: 540, frameRate: 24 } };
+        return id ? { ...base, deviceId: id } : base;
     };
 
     const startTimer = () => {
@@ -239,13 +383,16 @@
         clearInterval(timerIv);
         if (stage) stage.hidden = true;
         if (grid) grid.innerHTML = '';
+        if (devicesPanel) devicesPanel.hidden = true;
         document.body.classList.remove('bx-call-open');
         callId = null;
         isStarter = false;
         room = null;
+        screenOn = false;
         if (endAllBtn) endAllBtn.hidden = true;
         micBtn?.classList.remove('is-off');
         camBtn?.classList.remove('is-off');
+        screenBtn?.classList.remove('is-on');
         if (countEl) countEl.textContent = '';
     };
 
@@ -283,7 +430,7 @@
     const publishLocalMedia = async (wantVideo) => {
         if (!room) return;
         try {
-            await room.localParticipant.setMicrophoneEnabled(true);
+            await room.localParticipant.setMicrophoneEnabled(true, micOptions());
             micOn = true;
             micBtn?.classList.remove('is-off');
         } catch (e) {
@@ -293,9 +440,7 @@
         }
 
         try {
-            await room.localParticipant.setCameraEnabled(!!wantVideo, {
-                resolution: { width: 960, height: 540, frameRate: 24 },
-            });
+            await room.localParticipant.setCameraEnabled(!!wantVideo, camOptions());
             camOn = !!wantVideo;
             camBtn?.classList.toggle('is-off', !camOn);
         } catch (e) {
@@ -304,32 +449,76 @@
             camBtn?.classList.add('is-off');
         }
 
-        // локальный тайл сразу
         tileEl(room.localParticipant.identity, parseMeta(room.localParticipant));
-        room.localParticipant.trackPublications?.forEach?.((pub) => {
-            if (pub.track) attachTrack(pub.track, room.localParticipant);
-        });
-        // Map API в LK 2.x
         if (room.localParticipant.videoTrackPublications) {
             room.localParticipant.videoTrackPublications.forEach((pub) => {
-                if (pub.track) attachTrack(pub.track, room.localParticipant);
+                if (pub.track) attachTrack(pub.track, room.localParticipant, pub);
             });
         }
         if (room.localParticipant.audioTrackPublications) {
             room.localParticipant.audioTrackPublications.forEach((pub) => {
-                if (pub.track) attachTrack(pub.track, room.localParticipant);
+                if (pub.track) attachTrack(pub.track, room.localParticipant, pub);
             });
+        }
+        refreshDevices();
+    };
+
+    const switchMic = async (deviceId) => {
+        setSaved(MIC_KEY, deviceId);
+        if (!room) return;
+        try {
+            if (typeof room.switchActiveDevice === 'function') {
+                await room.switchActiveDevice('audioinput', deviceId);
+            } else {
+                await room.localParticipant.setMicrophoneEnabled(false);
+                await room.localParticipant.setMicrophoneEnabled(micOn, { deviceId });
+            }
+        } catch (e) {
+            alert('Не удалось переключить микрофон');
+        }
+    };
+
+    const switchCam = async (deviceId) => {
+        setSaved(CAM_KEY, deviceId);
+        if (!room || !camOn) return;
+        try {
+            if (typeof room.switchActiveDevice === 'function') {
+                await room.switchActiveDevice('videoinput', deviceId);
+            } else {
+                await room.localParticipant.setCameraEnabled(false);
+                await room.localParticipant.setCameraEnabled(true, camOptions());
+            }
+        } catch (e) {
+            alert('Не удалось переключить камеру');
+        }
+    };
+
+    const toggleScreen = async () => {
+        if (!room) return;
+        try {
+            const next = !screenOn;
+            await room.localParticipant.setScreenShareEnabled(next, {
+                audio: true,
+                selfBrowserSurface: 'include',
+            });
+            screenOn = next;
+            screenBtn?.classList.toggle('is-on', screenOn);
+        } catch (e) {
+            screenOn = false;
+            screenBtn?.classList.remove('is-on');
+            if (e?.name !== 'NotAllowedError') {
+                alert('Не удалось показать экран. Разрешите доступ в браузере.');
+            }
         }
     };
 
     const connectRoom = async (payload) => {
-        // уже в этом же звонке — не переподключаемся (иначе сбрасывает)
         if (callId && Number(callId) === Number(payload.call_id) && room) {
             return;
         }
 
-        const LK = await ensureLivekit();
-        if (!LK?.Room) throw new Error('LiveKit client недоступен');
+        const client = await ensureLivekit();
+        if (!client?.Room) throw new Error('LiveKit client недоступен');
         if (!payload.ws_url) throw new Error('LiveKit URL пустой. Проверьте LIVEKIT_URL в .env');
 
         rememberRoster(payload);
@@ -340,67 +529,92 @@
         isStarter = !!payload.is_starter;
         camOn = !!payload.video;
         micOn = true;
+        screenOn = false;
+        screenBtn?.classList.remove('is-on');
         if (titleEl) titleEl.textContent = payload.video ? 'Видеозвонок' : 'Аудиозвонок';
         if (stage) stage.hidden = false;
         document.body.classList.add('bx-call-open');
         if (incoming) incoming.hidden = true;
         if (activeBar) activeBar.hidden = true;
         if (endAllBtn) endAllBtn.hidden = !isStarter;
+        if (devicesPanel) devicesPanel.hidden = true;
         if (grid) grid.innerHTML = '';
         startTimer();
 
-        const VideoPresets = LK.VideoPresets || {};
-        room = new LK.Room({
+        const VideoPresets = client.VideoPresets || {};
+        room = new client.Room({
             adaptiveStream: true,
             dynacast: true,
             videoCaptureDefaults: {
                 resolution: VideoPresets.h540?.resolution || { width: 960, height: 540, frameRate: 24 },
+                deviceId: getSaved(CAM_KEY) || undefined,
+            },
+            audioCaptureDefaults: {
+                deviceId: getSaved(MIC_KEY) || undefined,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
             },
             publishDefaults: {
                 videoSimulcast: true,
                 videoCodec: 'vp8',
                 dtx: true,
                 red: true,
+                screenShareEncoding: { maxBitrate: 3_000_000, maxFramerate: 30 },
             },
         });
 
-        room.on(LK.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        room.on(client.RoomEvent.TrackSubscribed, (track, publication, participant) => {
             if (gen !== roomGen) return;
-            attachTrack(track, participant);
+            attachTrack(track, participant, publication);
         });
-        room.on(LK.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        room.on(client.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
             if (gen !== roomGen) return;
-            detachTrack(track, participant);
+            detachTrack(track, participant, publication);
         });
-        room.on(LK.RoomEvent.TrackMuted, (publication, participant) => {
+        room.on(client.RoomEvent.TrackMuted, (publication, participant) => {
             if (gen !== roomGen || publication.kind !== 'video') return;
-            const tile = grid?.querySelector('[data-id="' + participant.identity + '"]');
+            const screen = isScreenSource(publication);
+            const tile = grid?.querySelector('[data-id="' + tileKey(participant.identity, screen) + '"]');
             tile?.classList.remove('has-video');
             syncTileMediaState(tile);
         });
-        room.on(LK.RoomEvent.TrackUnmuted, (publication, participant) => {
+        room.on(client.RoomEvent.TrackUnmuted, (publication, participant) => {
             if (gen !== roomGen || publication.kind !== 'video') return;
-            if (publication.track) attachTrack(publication.track, participant);
+            if (publication.track) attachTrack(publication.track, participant, publication);
         });
-        room.on(LK.RoomEvent.LocalTrackPublished, (publication, participant) => {
+        room.on(client.RoomEvent.LocalTrackPublished, (publication, participant) => {
             if (gen !== roomGen) return;
-            if (publication.track) attachTrack(publication.track, participant);
+            if (publication.track) attachTrack(publication.track, participant, publication);
+            if (isScreenSource(publication)) {
+                screenOn = true;
+                screenBtn?.classList.add('is-on');
+            }
         });
-        room.on(LK.RoomEvent.ParticipantConnected, (participant) => {
+        room.on(client.RoomEvent.LocalTrackUnpublished, (publication) => {
+            if (gen !== roomGen) return;
+            if (isScreenSource(publication)) {
+                screenOn = false;
+                screenBtn?.classList.remove('is-on');
+                grid?.querySelector('[data-id="' + tileKey(room.localParticipant.identity, true) + '"]')?.remove();
+            }
+        });
+        room.on(client.RoomEvent.ParticipantConnected, (participant) => {
             if (gen !== roomGen) return;
             tileEl(participant.identity, parseMeta(participant));
             updateCount();
         });
-        room.on(LK.RoomEvent.ParticipantDisconnected, (participant) => {
+        room.on(client.RoomEvent.ParticipantDisconnected, (participant) => {
             if (gen !== roomGen) return;
-            grid?.querySelector('[data-id="' + participant.identity + '"]')?.remove();
+            grid?.querySelector('[data-id="' + tileKey(participant.identity, false) + '"]')?.remove();
+            grid?.querySelector('[data-id="' + tileKey(participant.identity, true) + '"]')?.remove();
             updateCount();
         });
-        room.on(LK.RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        room.on(client.RoomEvent.ActiveSpeakersChanged, (speakers) => {
             if (gen !== roomGen) return;
             setSpeaking(speakers);
         });
-        room.on(LK.RoomEvent.Disconnected, () => {
+        room.on(client.RoomEvent.Disconnected, () => {
             if (disconnecting) return;
             if (gen !== roomGen) return;
             stopCallUi(gen);
@@ -410,16 +624,12 @@
             await room.connect(payload.ws_url, payload.token);
         } catch (err) {
             stopCallUi(gen);
-            const hint = [
-                'Не удалось подключиться к сигналингу LiveKit (' + payload.ws_url + ').',
-                'Проверьте LiveKit, LIVEKIT_URL (wss:// на HTTPS) и ключи API.',
-            ].join('\n');
-            throw new Error((err && err.message ? err.message + '\n\n' : '') + hint);
+            throw new Error((err && err.message ? err.message + '\n\n' : '')
+                + 'Не удалось подключиться к LiveKit (' + payload.ws_url + ').');
         }
 
         if (gen !== roomGen) return;
 
-        // локальный участник + уже в комнате
         tileEl(room.localParticipant.identity, {
             ...parseMeta(room.localParticipant),
             ...(payload.me || {}),
@@ -428,7 +638,7 @@
         room.remoteParticipants.forEach((p) => {
             tileEl(p.identity, parseMeta(p));
             p.trackPublications.forEach((pub) => {
-                if (pub.track) attachTrack(pub.track, p);
+                if (pub.track) attachTrack(pub.track, p, pub);
             });
         });
         updateCount();
@@ -439,12 +649,9 @@
 
     const startCall = async (video) => {
         if (callId && room) {
-            // уже в звонке — только переключить камеру, не создавать новый
             try {
                 camOn = !!video;
-                await room.localParticipant.setCameraEnabled(camOn, {
-                    resolution: { width: 960, height: 540, frameRate: 24 },
-                });
+                await room.localParticipant.setCameraEnabled(camOn, camOptions());
                 camBtn?.classList.toggle('is-off', !camOn);
             } catch (e) {
                 alert(e.message || 'Не удалось переключить камеру');
@@ -496,11 +703,24 @@
     document.getElementById('bx-call-video')?.addEventListener('click', () => startCall(true));
     document.getElementById('bx-call-hang')?.addEventListener('click', () => hangup());
     endAllBtn?.addEventListener('click', () => endForAll());
+    screenBtn?.addEventListener('click', () => toggleScreen());
+    devicesBtn?.addEventListener('click', async () => {
+        if (!devicesPanel) return;
+        const open = devicesPanel.hidden;
+        devicesPanel.hidden = !open;
+        if (open) await refreshDevices();
+    });
+    micSelect?.addEventListener('change', () => switchMic(micSelect.value));
+    camSelect?.addEventListener('change', () => switchCam(camSelect.value));
+    navigator.mediaDevices?.addEventListener?.('devicechange', () => {
+        if (callId) refreshDevices();
+    });
+
     micBtn?.addEventListener('click', async () => {
         if (!room) return;
         try {
             micOn = !micOn;
-            await room.localParticipant.setMicrophoneEnabled(micOn);
+            await room.localParticipant.setMicrophoneEnabled(micOn, micOptions());
             micBtn.classList.toggle('is-off', !micOn);
         } catch (e) {
             alert('Микрофон недоступен');
@@ -510,11 +730,9 @@
         if (!room) return;
         try {
             camOn = !camOn;
-            await room.localParticipant.setCameraEnabled(camOn, {
-                resolution: { width: 960, height: 540, frameRate: 24 },
-            });
+            await room.localParticipant.setCameraEnabled(camOn, camOptions());
             camBtn.classList.toggle('is-off', !camOn);
-            const tile = grid?.querySelector('[data-id="' + room.localParticipant.identity + '"]');
+            const tile = grid?.querySelector('[data-id="' + tileKey(room.localParticipant.identity, false) + '"]');
             if (!camOn) {
                 tile?.classList.remove('has-video');
                 syncTileMediaState(tile);
@@ -533,12 +751,8 @@
         if (!Array.isArray(calls)) return;
 
         if (callId) {
-            // если звонок завершили для всех — закрыть UI
             const still = calls.find((c) => Number(c.id) === Number(callId));
-            if (!still) {
-                // не рвём мгновенно: LiveKit сам пришлёт Disconnected; только спрячем входящие
-                if (incoming) incoming.hidden = true;
-            }
+            if (!still && incoming) incoming.hidden = true;
             return;
         }
 

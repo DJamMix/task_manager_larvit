@@ -425,9 +425,21 @@
         </div>
     </div>
     <div class="bx-call-stage__grid" id="bx-call-grid"></div>
+    <div id="bx-call-devices-panel" class="bx-call-devices" hidden>
+        <label class="bx-call-devices__row">
+            <span>Микрофон</span>
+            <select id="bx-call-mic-select"></select>
+        </label>
+        <label class="bx-call-devices__row">
+            <span>Камера</span>
+            <select id="bx-call-cam-select"></select>
+        </label>
+    </div>
     <div class="bx-call-stage__bar">
         <button type="button" class="bx-call-ctrl" id="bx-call-mic" title="Микрофон">Микрофон</button>
         <button type="button" class="bx-call-ctrl" id="bx-call-cam" title="Камера">Камера</button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-screen" title="Демонстрация экрана">Экран</button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-devices" title="Устройства">Устройства</button>
         <button type="button" class="bx-call-ctrl bx-call-ctrl--danger" id="bx-call-hang" title="Выйти из звонка">Выйти</button>
         <button type="button" class="bx-call-ctrl bx-call-ctrl--end-all" id="bx-call-end-all" title="Завершить для всех" hidden>Завершить для всех</button>
     </div>
@@ -2025,5 +2037,5 @@
 })();
 </script>
 @if(!empty($calls_enabled))
-<script src="{{ asset('js/chat-calls.js') }}?v=20260725i"></script>
+<script src="{{ asset('js/chat-calls.js') }}?v=20260725j"></script>
 @endif
