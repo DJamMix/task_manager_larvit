@@ -1615,27 +1615,30 @@
     margin-bottom: 0.35rem;
 }
 
-.bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.4rem; align-items: flex-start; }
+.bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; align-items: flex-start; }
 
 .bx-msg__image {
     display: block;
-    max-width: min(260px, 72vw);
+    width: 112px;
+    height: 112px;
+    flex: 0 0 112px;
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid rgba(15, 23, 42, 0.08);
-    background: #0f172a0a;
+    background: #e8eef5;
     line-height: 0;
     cursor: zoom-in;
 }
 .bx-msg__image img {
     display: block;
     width: 100%;
-    height: auto;
-    max-height: 320px;
+    height: 100%;
     object-fit: cover;
+    object-position: center;
 }
 .bx-msg--mine .bx-msg__image {
     border-color: rgba(34, 197, 94, 0.25);
+    background: #e8f5e9;
 }
 
 .bx-lightbox {
