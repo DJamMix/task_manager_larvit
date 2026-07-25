@@ -80,10 +80,10 @@ class ActService
             ->map(function (Task $task) use ($selectedMap) {
                 $spent = round((float) ($task->hours_spent ?? 0), 2);
                 $estimate = round((float) ($task->estimation_hours ?? 0), 2);
-                $defaultHours = $spent > 0 ? $spent : ($estimate > 0 ? $estimate : 1.0);
+                $defaultHours = $spent > 0 ? $spent : max(0, $estimate);
 
                 $selected = array_key_exists((int) $task->id, $selectedMap);
-                $hours = $selected ? max(0.01, $selectedMap[(int) $task->id]) : $defaultHours;
+                $hours = $selected ? max(0, $selectedMap[(int) $task->id]) : $defaultHours;
 
                 $usedInActs = $task->acts->map(fn (Act $a) => [
                     'id' => (int) $a->id,
@@ -135,9 +135,9 @@ class ActService
                 continue;
             }
 
-            $hours = round((float) ($row['hours'] ?? 0), 2);
-            if ($hours < 0.01) {
-                $hours = 0.01;
+            $hours = round((float) str_replace(',', '.', (string) ($row['hours'] ?? 0)), 2);
+            if ($hours < 0) {
+                $hours = 0;
             }
 
             $selectedTasks[$taskId] = ['hours' => $hours];

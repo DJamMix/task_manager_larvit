@@ -191,11 +191,12 @@
                                    class="form-control form-control-sm act-hours-input"
                                    name="lines[{{ $tid }}][hours]"
                                    form="post-form"
-                                   min="0.01"
-                                   step="0.25"
+                                   min="0"
+                                   step="0.01"
+                                   inputmode="decimal"
                                    value="{{ number_format((float)$task['hours'], 2, '.', '') }}"
-                                   data-spent="{{ $task['hours_spent'] }}"
-                                   data-estimate="{{ $task['estimation_hours'] }}">
+                                   data-spent="{{ number_format((float)$task['hours_spent'], 2, '.', '') }}"
+                                   data-estimate="{{ number_format((float)$task['estimation_hours'], 2, '.', '') }}">
                         </td>
                     </tr>
                 @empty
@@ -255,7 +256,16 @@
         });
     };
 
+    const normalizeHours = (input) => {
+        if (!input) return;
+        let raw = String(input.value || '').replace(',', '.').trim();
+        let v = parseFloat(raw);
+        if (!isFinite(v) || v < 0) v = 0;
+        input.value = (Math.round(v * 100) / 100).toFixed(2);
+    };
+
     root.addEventListener('change', (e) => {
+        if (e.target.matches('.act-hours-input')) normalizeHours(e.target);
         if (e.target.matches('.act-row-check, .act-hours-input')) recalc();
     });
     root.addEventListener('input', (e) => {
@@ -286,8 +296,8 @@
         rows().forEach((row) => {
             const input = row.querySelector('.act-hours-input');
             if (!input) return;
-            let v = parseFloat(input.getAttribute(attr) || '0') || 0;
-            if (v < 0.01) v = 0.01;
+            let v = parseFloat(String(input.getAttribute(attr) || '0').replace(',', '.')) || 0;
+            if (v < 0) v = 0;
             input.value = (Math.round(v * 100) / 100).toFixed(2);
         });
         recalc();
