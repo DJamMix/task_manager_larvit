@@ -125,7 +125,13 @@
                     t.classList.toggle('is-speaking', ids.has(t.getAttribute('data-id')));
                 });
             });
-            room.on(LK.RoomEvent.Disconnected, () => leave());
+        room.on(LK.RoomEvent.DataReceived, (payload) => {
+            try {
+                const msg = JSON.parse(new TextDecoder().decode(payload));
+                if (msg && msg.type === 'call_ended') leave();
+            } catch (e) {}
+        });
+        room.on(LK.RoomEvent.Disconnected, () => leave());
 
             await room.connect(payload.ws_url, payload.token);
             lobby.style.display = 'none';

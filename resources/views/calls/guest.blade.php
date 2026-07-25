@@ -151,6 +151,6 @@ window.BX_GUEST_CALL = {
     defaultVideo: @json((bool) $video),
 };
 </script>
-<script src="{{ asset('js/call-guest.js') }}?v=20260725k"></script>
+<script src="{{ asset('js/call-guest.js') }}?v=20260725m"></script>
 </body>
 </html>

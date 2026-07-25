@@ -21,6 +21,12 @@
 
     const stage = document.getElementById('bx-call-stage');
     const grid = document.getElementById('bx-call-grid');
+    const focusEl = document.getElementById('bx-call-focus');
+    const pipLayer = document.getElementById('bx-call-pip-layer');
+    const stripWrap = document.getElementById('bx-call-strip-wrap');
+    const stripEl = document.getElementById('bx-call-strip');
+    const stripToggle = document.getElementById('bx-call-strip-toggle');
+    const stripLabel = document.getElementById('bx-call-strip-label');
     const titleEl = document.getElementById('bx-call-title');
     const timerEl = document.getElementById('bx-call-timer');
     const countEl = document.getElementById('bx-call-count');
@@ -56,6 +62,7 @@
     let micOn = true;
     let camOn = false;
     let screenOn = false;
+    let stripHidden = false;
     let timerSec = 0;
     let timerIv = null;
     let ringingCallId = null;
@@ -63,6 +70,7 @@
     let livekitReady = null;
     let disconnecting = false;
     const metaById = {};
+    const decoder = new TextDecoder();
 
     const postJson = async (url, body) => {
         const res = await fetch(url, {
@@ -141,6 +149,113 @@
 
     const tileKey = (identity, isScreen) => (isScreen ? String(identity) + ':screen' : String(identity));
 
+    const findTile = (key) =>
+        focusEl?.querySelector('[data-id="' + key + '"]')
+        || stripEl?.querySelector('[data-id="' + key + '"]')
+        || pipLayer?.querySelector('[data-id="' + key + '"]')
+        || grid?.querySelector('[data-id="' + key + '"]');
+
+    const allTiles = () => [
+        ...(focusEl ? [...focusEl.querySelectorAll('.bx-call-tile')] : []),
+        ...(stripEl ? [...stripEl.querySelectorAll('.bx-call-tile')] : []),
+        ...(pipLayer ? [...pipLayer.querySelectorAll('.bx-call-tile')] : []),
+        ...(grid ? [...grid.querySelectorAll('.bx-call-tile')] : []),
+    ];
+
+    const makeDraggable = (el) => {
+        if (!el || el._bxDragBound) return;
+        el._bxDragBound = true;
+        let ox = 0;
+        let oy = 0;
+        let dragging = false;
+        const onDown = (e) => {
+            if (e.target.closest('input,label,button,a')) return;
+            dragging = true;
+            const point = e.touches ? e.touches[0] : e;
+            const rect = el.getBoundingClientRect();
+            ox = point.clientX - rect.left;
+            oy = point.clientY - rect.top;
+            el.classList.add('is-dragging');
+            e.preventDefault();
+        };
+        const onMove = (e) => {
+            if (!dragging) return;
+            const point = e.touches ? e.touches[0] : e;
+            const parent = pipLayer?.getBoundingClientRect() || { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+            let left = point.clientX - parent.left - ox;
+            let top = point.clientY - parent.top - oy;
+            left = Math.max(8, Math.min(parent.width - el.offsetWidth - 8, left));
+            top = Math.max(8, Math.min(parent.height - el.offsetHeight - 8, top));
+            el.style.left = left + 'px';
+            el.style.top = top + 'px';
+            el.style.right = 'auto';
+            el.style.bottom = 'auto';
+        };
+        const onUp = () => {
+            dragging = false;
+            el.classList.remove('is-dragging');
+        };
+        el.addEventListener('mousedown', onDown);
+        el.addEventListener('touchstart', onDown, { passive: false });
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchend', onUp);
+    };
+
+    const refreshLayout = () => {
+        if (!stage) return;
+        const screens = allTiles().filter((t) => t.classList.contains('is-screen'));
+        const hasScreen = screens.length > 0;
+        stage.classList.toggle('has-screen', hasScreen);
+
+        if (!hasScreen) {
+            if (stripWrap) stripWrap.hidden = true;
+            stage.classList.remove('strip-collapsed');
+            allTiles().forEach((t) => {
+                t.classList.remove('is-pip');
+                t.style.left = '';
+                t.style.top = '';
+                t.style.right = '';
+                t.style.bottom = '';
+                grid?.appendChild(t);
+            });
+            return;
+        }
+
+        if (stripWrap) {
+            stripWrap.hidden = false;
+            stripWrap.classList.toggle('is-collapsed', !!stripHidden);
+            if (stripLabel) stripLabel.textContent = stripHidden ? 'Показать участников' : 'Скрыть участников';
+        }
+
+        const sharerIds = new Set(screens.map((s) => s.getAttribute('data-user')));
+        screens.forEach((s) => focusEl?.appendChild(s));
+
+        allTiles().forEach((t) => {
+            if (t.classList.contains('is-screen')) return;
+            const uid = t.getAttribute('data-user');
+            if (sharerIds.has(uid) && t.classList.contains('has-video')) {
+                t.classList.add('is-pip');
+                if (!t.style.left && !t.style.top) {
+                    t.style.right = '16px';
+                    t.style.bottom = '16px';
+                    t.style.left = 'auto';
+                    t.style.top = 'auto';
+                }
+                pipLayer?.appendChild(t);
+                makeDraggable(t);
+            } else {
+                t.classList.remove('is-pip');
+                t.style.left = '';
+                t.style.top = '';
+                t.style.right = '';
+                t.style.bottom = '';
+                stripEl?.appendChild(t);
+            }
+        });
+    };
+
     const parseMeta = (participant) => {
         const id = String(participant?.identity || '');
         let meta = metaById[id] || {};
@@ -215,7 +330,7 @@
         const isScreen = !!opts.screen;
         const id = String(identity);
         const key = tileKey(id, isScreen);
-        let el = grid?.querySelector('[data-id="' + key + '"]');
+        let el = findTile(key);
         const info = { ...(metaById[id] || {}), ...(meta || {}) };
         metaById[id] = info;
 
@@ -239,15 +354,14 @@
                 '</div>',
                 '<div class="bx-call-tile__pulse" aria-hidden="true"></div>',
             ].join('');
-            grid?.appendChild(el);
+            (isScreen ? focusEl : grid)?.appendChild(el);
 
             const range = el.querySelector('.bx-call-tile__vol-range');
             range?.addEventListener('input', () => {
                 const pct = parseInt(range.value, 10) || 0;
                 setVol(id, pct);
                 applyAudioVolume(el, id);
-                // если есть экранный тайл того же юзера — та же громкость для screen audio
-                const screenTile = grid?.querySelector('[data-id="' + tileKey(id, true) + '"]');
+                const screenTile = findTile(tileKey(id, true));
                 if (screenTile && screenTile !== el) applyAudioVolume(screenTile, id);
             });
         }
@@ -270,6 +384,7 @@
         }
         applyAudioVolume(el, id);
         syncTileMediaState(el);
+        refreshLayout();
         return el;
     };
 
@@ -303,12 +418,13 @@
             }
         }
         updateCount();
+        refreshLayout();
     };
 
     const detachTrack = (track, participant, publication) => {
         const id = String(participant.identity);
         const screen = isScreenSource(publication, track);
-        const tile = grid?.querySelector('[data-id="' + tileKey(id, screen) + '"]');
+        const tile = findTile(tileKey(id, screen));
         if (!tile) return;
         const video = tile.querySelector('.bx-call-tile__video');
         const audio = tile.querySelector('.bx-call-tile__audio');
@@ -321,11 +437,12 @@
         if (track.kind === 'audio' && audio) {
             track.detach(audio);
         }
+        refreshLayout();
     };
 
     const setSpeaking = (speakers) => {
         const ids = new Set((speakers || []).map((s) => String(s.identity)));
-        grid?.querySelectorAll('.bx-call-tile:not(.is-screen)').forEach((tile) => {
+        allTiles().filter((tile) => !tile.classList.contains('is-screen')).forEach((tile) => {
             tile.classList.toggle('is-speaking', ids.has(tile.getAttribute('data-user')));
         });
     };
@@ -406,8 +523,15 @@
     const stopCallUi = (gen) => {
         if (typeof gen === 'number' && gen !== roomGen) return;
         clearInterval(timerIv);
-        if (stage) stage.hidden = true;
+        if (stage) {
+            stage.hidden = true;
+            stage.classList.remove('has-screen', 'strip-collapsed');
+        }
         if (grid) grid.innerHTML = '';
+        if (focusEl) focusEl.innerHTML = '';
+        if (pipLayer) pipLayer.innerHTML = '';
+        if (stripEl) stripEl.innerHTML = '';
+        if (stripWrap) stripWrap.hidden = true;
         if (devicesPanel) devicesPanel.hidden = true;
         document.body.classList.remove('bx-call-open');
         callId = null;
@@ -417,6 +541,7 @@
         guestUrl = '';
         room = null;
         screenOn = false;
+        stripHidden = false;
         if (endAllBtn) endAllBtn.hidden = true;
         syncGuestUi();
         micBtn?.classList.remove('is-off');
@@ -436,6 +561,12 @@
         disconnecting = false;
     };
 
+    const forceCallEnded = async () => {
+        const gen = roomGen;
+        await disconnectRoom();
+        stopCallUi(gen);
+    };
+
     const hangup = async () => {
         const id = callId;
         const gen = roomGen;
@@ -449,11 +580,21 @@
     const endForAll = async () => {
         const id = callId;
         const gen = roomGen;
-        await disconnectRoom();
-        stopCallUi(gen);
+        // Сначала сигнал участникам в LiveKit, потом API, потом свой выход
+        try {
+            if (room?.localParticipant && id) {
+                const payload = new TextEncoder().encode(JSON.stringify({
+                    type: 'call_ended',
+                    call_id: id,
+                }));
+                await room.localParticipant.publishData(payload, { reliable: true });
+            }
+        } catch (e) {}
         if (id) {
             try { await postJson(callUrl(id, 'end'), {}); } catch (e) {}
         }
+        await disconnectRoom();
+        stopCallUi(gen);
     };
 
     const publishLocalMedia = async (wantVideo) => {
@@ -571,6 +712,11 @@
         if (activeBar) activeBar.hidden = true;
         if (devicesPanel) devicesPanel.hidden = true;
         if (grid) grid.innerHTML = '';
+        if (focusEl) focusEl.innerHTML = '';
+        if (pipLayer) pipLayer.innerHTML = '';
+        if (stripEl) stripEl.innerHTML = '';
+        if (stripWrap) stripWrap.hidden = true;
+        stripHidden = false;
         startTimer();
 
         const VideoPresets = client.VideoPresets || {};
@@ -607,9 +753,10 @@
         room.on(client.RoomEvent.TrackMuted, (publication, participant) => {
             if (gen !== roomGen || publication.kind !== 'video') return;
             const screen = isScreenSource(publication);
-            const tile = grid?.querySelector('[data-id="' + tileKey(participant.identity, screen) + '"]');
+            const tile = findTile(tileKey(participant.identity, screen));
             tile?.classList.remove('has-video');
             syncTileMediaState(tile);
+            refreshLayout();
         });
         room.on(client.RoomEvent.TrackUnmuted, (publication, participant) => {
             if (gen !== roomGen || publication.kind !== 'video') return;
@@ -628,7 +775,8 @@
             if (isScreenSource(publication)) {
                 screenOn = false;
                 screenBtn?.classList.remove('is-on');
-                grid?.querySelector('[data-id="' + tileKey(room.localParticipant.identity, true) + '"]')?.remove();
+                findTile(tileKey(room.localParticipant.identity, true))?.remove();
+                refreshLayout();
             }
         });
         room.on(client.RoomEvent.ParticipantConnected, (participant) => {
@@ -638,13 +786,23 @@
         });
         room.on(client.RoomEvent.ParticipantDisconnected, (participant) => {
             if (gen !== roomGen) return;
-            grid?.querySelector('[data-id="' + tileKey(participant.identity, false) + '"]')?.remove();
-            grid?.querySelector('[data-id="' + tileKey(participant.identity, true) + '"]')?.remove();
+            findTile(tileKey(participant.identity, false))?.remove();
+            findTile(tileKey(participant.identity, true))?.remove();
             updateCount();
+            refreshLayout();
         });
         room.on(client.RoomEvent.ActiveSpeakersChanged, (speakers) => {
             if (gen !== roomGen) return;
             setSpeaking(speakers);
+        });
+        room.on(client.RoomEvent.DataReceived, (payload) => {
+            if (gen !== roomGen) return;
+            try {
+                const msg = JSON.parse(decoder.decode(payload));
+                if (msg && msg.type === 'call_ended') {
+                    forceCallEnded();
+                }
+            } catch (e) {}
         });
         room.on(client.RoomEvent.Disconnected, () => {
             if (disconnecting) return;
@@ -816,11 +974,12 @@
             camOn = !camOn;
             await room.localParticipant.setCameraEnabled(camOn, camOptions());
             camBtn.classList.toggle('is-off', !camOn);
-            const tile = grid?.querySelector('[data-id="' + tileKey(room.localParticipant.identity, false) + '"]');
+            const tile = findTile(tileKey(room.localParticipant.identity, false));
             if (!camOn) {
                 tile?.classList.remove('has-video');
                 syncTileMediaState(tile);
             }
+            refreshLayout();
         } catch (e) {
             camOn = false;
             camBtn.classList.add('is-off');
@@ -830,13 +989,20 @@
     document.getElementById('bx-incoming-accept')?.addEventListener('click', () => joinById(ringingCallId));
     document.getElementById('bx-incoming-decline')?.addEventListener('click', () => declineIncoming());
     document.getElementById('bx-active-call-join')?.addEventListener('click', () => joinById(joinableCallId));
+    stripToggle?.addEventListener('click', () => {
+        stripHidden = !stripHidden;
+        refreshLayout();
+    });
 
     window.bxHandleCallsPoll = function (calls) {
         if (!Array.isArray(calls)) return;
 
         if (callId) {
             const still = calls.find((c) => Number(c.id) === Number(callId));
-            if (!still && incoming) incoming.hidden = true;
+            if (!still) {
+                // звонок завершили для всех (или он пропал) — выходим у всех
+                forceCallEnded();
+            }
             return;
         }
 
