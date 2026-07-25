@@ -226,18 +226,18 @@
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    <div class="bx-voice-record d-none" id="bx-voice-bar" aria-live="polite">
-                        <div class="bx-voice-record__main">
-                            <span class="bx-voice-record__dot" aria-hidden="true"></span>
-                            <span class="bx-voice-record__label">Запись</span>
-                            <span class="bx-voice-record__timer" id="bx-voice-timer">0:00</span>
-                            <span class="bx-voice-record__limit">/ 3:00</span>
-                        </div>
-                        <div class="bx-voice-record__actions">
-                            <button type="button" class="bx-voice-record__btn" id="bx-voice-cancel">Отмена</button>
-                            <button type="button" class="bx-voice-record__btn bx-voice-record__btn--send" id="bx-voice-stop">Отправить</button>
-                        </div>
+                <div class="bx-voice-record d-none" id="bx-voice-bar" aria-live="polite">
+                    <div class="bx-voice-record__main">
+                        <span class="bx-voice-record__dot" aria-hidden="true"></span>
+                        <span class="bx-voice-record__label">Запись</span>
+                        <span class="bx-voice-record__timer" id="bx-voice-timer">0:00</span>
+                        <span class="bx-voice-record__limit">/ 3:00</span>
+                    </div>
+                    <div class="bx-voice-record__actions">
+                        <button type="button" class="bx-voice-record__btn" id="bx-voice-cancel">Отмена</button>
+                        <button type="button" class="bx-voice-record__btn bx-voice-record__btn--send" id="bx-voice-stop">Отправить</button>
                     </div>
                 </div>
             </div>
@@ -301,6 +301,17 @@
     if (feed) feed.scrollTop = feed.scrollHeight;
 
     const root = document.querySelector('.bx-messenger');
+    const lockMessengerHeight = () => {
+        if (!root) return;
+        // Фиксируем высоту относительно окна — иначе Orchid-layout раздувает блок сообщениями
+        const top = root.getBoundingClientRect().top;
+        const available = Math.max(320, window.innerHeight - top - 24);
+        root.style.height = available + 'px';
+        root.style.maxHeight = available + 'px';
+    };
+    lockMessengerHeight();
+    window.addEventListener('resize', lockMessengerHeight);
+    window.addEventListener('orientationchange', () => setTimeout(lockMessengerHeight, 200));
     const input = document.getElementById('bx-composer-input');
     const parentInput = document.getElementById('chat-message-parent-id');
     const replyBanner = document.getElementById('bx-reply-banner');
@@ -928,6 +939,13 @@
             alert('Браузер не поддерживает запись голоса');
             return;
         }
+
+        // Сразу показываем панель, чтобы на мобильных не «пропадало» поле ввода
+        voiceBar?.classList.remove('d-none');
+        voiceBtn?.classList.add('is-recording');
+        composer?.classList.add('is-voice-recording');
+        if (voiceTimer) voiceTimer.textContent = '0:00';
+
         try {
             mediaStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
@@ -968,12 +986,8 @@
             try {
                 mediaRecorder.start(1000);
             } catch (e) {
-                // iOS иногда не любит timeslice
                 mediaRecorder.start();
             }
-            voiceBar?.classList.remove('d-none');
-            voiceBtn?.classList.add('is-recording');
-            composer?.classList.add('is-voice-recording');
             voiceTick = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - voiceStartedAt) / 1000);
                 if (voiceTimer) voiceTimer.textContent = formatVoiceTime(elapsed);

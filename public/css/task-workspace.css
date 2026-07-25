@@ -852,15 +852,22 @@
 .bx-messenger {
     display: grid;
     grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-content: stretch;
     gap: 0;
-    height: min(72vh, 720px);
-    max-height: min(72vh, 720px);
-    min-height: 420px;
+    height: 70vh;
+    max-height: 70vh;
+    min-height: 0;
     border: 1px solid #e6eaf0;
     border-radius: 14px;
     overflow: hidden;
     background: #fff;
     margin-bottom: 0.75rem;
+}
+.bx-messenger > * {
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
 }
 
 .bx-messenger__sidebar {
@@ -869,6 +876,7 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    height: 100%;
     overflow: hidden;
 }
 
@@ -883,7 +891,7 @@
 
 .bx-messenger__list {
     overflow: auto;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
     -webkit-overflow-scrolling: touch;
 }
@@ -1302,6 +1310,9 @@
 
 .bx-composer.is-voice-recording .bx-composer__box {
     display: none;
+}
+.bx-composer.is-voice-recording .bx-voice-record {
+    display: flex !important;
 }
 
 .bx-voice-record {
@@ -1871,12 +1882,14 @@
 @media (max-width: 900px) {
     .bx-messenger {
         grid-template-columns: 1fr;
-        height: min(78vh, 680px);
-        max-height: min(78vh, 680px);
-        min-height: 360px;
+        grid-template-rows: minmax(0, 150px) minmax(0, 1fr);
+        height: calc(100vh - 160px);
+        max-height: calc(100vh - 160px);
+        min-height: 0;
     }
     .bx-messenger__sidebar {
-        max-height: 160px;
+        max-height: none;
+        height: 100%;
         border-right: 0;
         border-bottom: 1px solid #e6eaf0;
     }
