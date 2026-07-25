@@ -23,7 +23,7 @@ class LiveKitTokenService
     }
 
     /**
-     * @param  array{room: string, identity: string, name?: string, can_publish?: bool, can_subscribe?: bool, ttl?: int}  $opts
+     * @param  array{room: string, identity: string, name?: string, metadata?: array<string, mixed>, can_publish?: bool, can_subscribe?: bool, ttl?: int}  $opts
      */
     public function createAccessToken(array $opts): string
     {
@@ -44,6 +44,10 @@ class LiveKitTokenService
             'canPublishData' => true,
         ];
 
+        $meta = array_merge([
+            'user_id' => $opts['identity'],
+        ], $opts['metadata'] ?? []);
+
         $payload = [
             'iss' => $apiKey,
             'sub' => $opts['identity'],
@@ -51,9 +55,7 @@ class LiveKitTokenService
             'exp' => $now + max(60, $ttl),
             'name' => $opts['name'] ?? $opts['identity'],
             'video' => $videoGrant,
-            'metadata' => json_encode([
-                'user_id' => $opts['identity'],
-            ], JSON_UNESCAPED_UNICODE),
+            'metadata' => json_encode($meta, JSON_UNESCAPED_UNICODE),
         ];
 
         return $this->encodeJwt($payload, $apiSecret);

@@ -396,8 +396,13 @@
 
 <div id="bx-incoming-call" class="bx-incoming-call" hidden>
     <div class="bx-incoming-call__card">
-        <div class="bx-incoming-call__title" id="bx-incoming-title">Входящий звонок</div>
-        <div class="bx-incoming-call__sub" id="bx-incoming-sub"></div>
+        <div class="bx-incoming-call__row">
+            <div class="bx-incoming-call__avatar" id="bx-incoming-avatar"></div>
+            <div>
+                <div class="bx-incoming-call__title" id="bx-incoming-title">Входящий звонок</div>
+                <div class="bx-incoming-call__sub" id="bx-incoming-sub"></div>
+            </div>
+        </div>
         <div class="bx-incoming-call__actions">
             <button type="button" class="btn btn-success" id="bx-incoming-accept">Ответить</button>
             <button type="button" class="btn btn-outline-danger" id="bx-incoming-decline">Отклонить</button>
@@ -409,12 +414,15 @@
     <div class="bx-call-stage__top">
         <div>
             <div class="bx-call-stage__title" id="bx-call-title">Звонок</div>
-            <div class="bx-call-stage__secure" title="Шифрование медиа DTLS-SRTP, канал WSS/TLS — как в Telegram/Bitrix WebRTC">
+            <div class="bx-call-stage__secure" title="Шифрование медиа DTLS-SRTP, канал WSS/TLS">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-                Защищённый звонок · DTLS-SRTP
+                Защищённый звонок
             </div>
         </div>
-        <div class="bx-call-stage__timer" id="bx-call-timer">00:00</div>
+        <div class="bx-call-stage__meta">
+            <span class="bx-call-stage__count" id="bx-call-count"></span>
+            <span class="bx-call-stage__timer" id="bx-call-timer">00:00</span>
+        </div>
     </div>
     <div class="bx-call-stage__grid" id="bx-call-grid"></div>
     <div class="bx-call-stage__bar">
@@ -2017,5 +2025,5 @@
 })();
 </script>
 @if(!empty($calls_enabled))
-<script src="{{ asset('js/chat-calls.js') }}?v=20260725h"></script>
+<script src="{{ asset('js/chat-calls.js') }}?v=20260725i"></script>
 @endif

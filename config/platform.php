@@ -129,7 +129,7 @@ return [
         'stylesheets' => [
             '/css/footer.css',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260725h',
+            '/css/task-workspace.css?v=20260725i',
             '/css/act-composer.css',
         ],
         'scripts'     => [

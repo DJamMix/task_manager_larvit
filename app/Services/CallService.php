@@ -55,6 +55,8 @@ class CallService
             $chat = $call->chat;
             $mine = $call->participants->firstWhere('user_id', $user->id);
 
+            $starter = $call->starter;
+
             return [
                 'id' => (int) $call->id,
                 'chat_id' => (int) $call->chat_id,
@@ -62,7 +64,10 @@ class CallService
                 'status' => $call->status,
                 'video' => (bool) $call->video_enabled,
                 'started_by' => (int) $call->started_by,
-                'starter_name' => $call->starter?->displayName() ?? 'Участник',
+                'starter_name' => $starter?->name ?? $starter?->displayName() ?? 'Участник',
+                'starter_avatar' => $starter?->avatarUrl() ?: '',
+                'starter_initials' => $starter?->avatarInitials() ?? '?',
+                'starter_color' => $starter?->avatarColor() ?? '#64748b',
                 'is_mine' => (int) $call->started_by === (int) $user->id,
                 'my_status' => $mine?->status ?? ChatCallParticipant::STATUS_INVITED,
                 'participants' => $call->participants
@@ -221,8 +226,33 @@ class CallService
         $token = $this->livekit->createAccessToken([
             'room' => $call->room_name,
             'identity' => (string) $actor->id,
-            'name' => $actor->displayName(),
+            'name' => $actor->name ?: $actor->displayName(),
+            'metadata' => [
+                'user_id' => (string) $actor->id,
+                'name' => $actor->name ?: $actor->displayName(),
+                'avatar' => $actor->avatarUrl() ?: '',
+                'initials' => $actor->avatarInitials(),
+                'color' => $actor->avatarColor(),
+            ],
         ]);
+
+        $call->loadMissing(['participants.user']);
+
+        $roster = $call->participants
+            ->where('status', ChatCallParticipant::STATUS_JOINED)
+            ->map(function (ChatCallParticipant $p) {
+                $u = $p->user;
+
+                return [
+                    'id' => (int) $p->user_id,
+                    'name' => $u?->name ?: ($u?->displayName() ?? 'Участник'),
+                    'avatar' => $u?->avatarUrl() ?: '',
+                    'initials' => $u?->avatarInitials() ?? '?',
+                    'color' => $u?->avatarColor() ?? '#64748b',
+                ];
+            })
+            ->values()
+            ->all();
 
         return [
             'call_id' => (int) $call->id,
@@ -233,12 +263,18 @@ class CallService
             'ws_url' => $this->livekit->wsUrl(),
             'token' => $token,
             'is_starter' => (int) $call->started_by === (int) $actor->id,
-            // Ключ комнаты по HTTPS (для будущей клиентской E2EE)
+            'me' => [
+                'id' => (int) $actor->id,
+                'name' => $actor->name ?: $actor->displayName(),
+                'avatar' => $actor->avatarUrl() ?: '',
+                'initials' => $actor->avatarInitials(),
+                'color' => $actor->avatarColor(),
+            ],
+            'roster' => $roster,
             'e2ee_key' => $call->e2ee_key,
             'encryption' => [
                 'media' => 'DTLS-SRTP (стандарт WebRTC / LiveKit)',
                 'signaling' => 'TLS (HTTPS + WSS)',
-                'note' => 'Медиа шифруется на уровне WebRTC на всех платформах (web / desktop / mobile SDK).',
             ],
         ];
     }
