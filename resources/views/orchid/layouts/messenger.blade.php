@@ -1,6 +1,7 @@
 <div class="bx-messenger"
      data-poll-url="{{ $chats_poll_url ?? route('platform.systems.chats.poll') }}"
-     data-active-chat="{{ $active_chat_id ?? '' }}">
+     data-active-chat="{{ $active_chat_id ?? '' }}"
+     data-send-url="{{ ($active_chat_id ?? null) ? url()->current() . '/sendMessage' : '' }}">
     @php
         $chatList = $chats ?? collect();
         $active = $chat ?? null;
@@ -131,139 +132,13 @@
 
             <div class="bx-messenger__feed" id="chat-feed">
                 @forelse($feed as $message)
-                    @php
-                        $mine = (int)$message->user_id === (int)auth()->id();
-                        $readers = [];
-                        $readStatus = null;
-                        if (!$message->is_system && $mine) {
-                            $readers = $active->readersForMessage($message);
-                            $othersCount = $active->members
-                                ->reject(fn ($u) => (int) $u->id === (int) $message->user_id)
-                                ->count();
-                            if ($othersCount === 0 || count($readers) === 0) {
-                                $readStatus = 'sent';
-                            } elseif (count($readers) >= $othersCount) {
-                                $readStatus = 'read';
-                            } else {
-                                $readStatus = 'partial';
-                            }
-                        }
-                    @endphp
-                    <article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }}"
-                             id="chat-msg-{{ $message->id }}">
-                        @unless($message->is_system)
-                            <div class="bx-msg__avatar">
-                                @include('orchid.layouts.partials.bx-avatar', [
-                                    'avatarUser' => $message->user,
-                                    'avatarChat' => null,
-                                    'size' => 'sm',
-                                    'shape' => 'round',
-                                ])
-                            </div>
-                        @endunless
-
-                        <div class="bx-msg__bubble">
-                            @if($message->parent)
-                                <div class="bx-msg__reply">
-                                    Ответ на {{ $message->parent->user?->displayName() }}:
-                                    {{ \Illuminate\Support\Str::limit(strip_tags($message->parent->plain_text ?? ''), 70) }}
-                                </div>
-                            @endif
-
-                            @unless($message->is_system)
-                                <div class="bx-msg__meta">
-                                    <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
-                                    <span>{{ $message->created_at?->format('d.m H:i') }}</span>
-                                </div>
-                            @endunless
-
-                            <div class="bx-msg__body tw-msg__body">
-                                {!! $message->formatted_text !!}
-                            </div>
-
-                            @if($message->task)
-                                @php
-                                    $viewer = auth()->user();
-                                    $linkedTask = $message->task;
-                                    $canOpenTask = $linkedTask->canView((int) $viewer->id);
-                                    $taskHref = $canOpenTask
-                                        ? app(\App\Services\DashboardNotifier::class)->taskUrlFor($viewer, $linkedTask)
-                                        : null;
-                                @endphp
-                                @if($taskHref)
-                                    <a class="bx-task-card" href="{{ $taskHref }}">
-                                        <span class="bx-task-card__id">#{{ $linkedTask->id }}</span>
-                                        <span class="bx-task-card__name">{{ $linkedTask->name }}</span>
-                                    </a>
-                                @else
-                                    <div class="bx-task-card bx-task-card--locked" title="Нет доступа к этой задаче">
-                                        <span class="bx-task-card__id">#{{ $linkedTask->id }}</span>
-                                        <span class="bx-task-card__name">{{ $linkedTask->name }}</span>
-                                        <span class="bx-task-card__lock">нет доступа</span>
-                                    </div>
-                                @endif
-                            @endif
-
-                            @if($message->attachment->isNotEmpty())
-                                <div class="bx-msg__files">
-                                    @foreach($message->attachment as $file)
-                                        <a href="{{ route('platform.task.attachment.download', $file) }}" class="badge text-bg-light border text-decoration-none">
-                                            {{ $file->original_name }}
-                                        </a>
-                                    @endforeach
-                                </div>
-                            @endif
-
-                            <div class="bx-msg__footer">
-                                @unless($message->is_system)
-                                    <button type="button"
-                                            class="bx-msg__reply-btn"
-                                            data-parent-id="{{ $message->id }}"
-                                            data-author="{{ $message->user?->displayName() ?? 'участник' }}">
-                                        Ответить
-                                    </button>
-                                @endunless
-
-                                @if($mine && $readStatus)
-                                    <div class="bx-msg__receipt bx-msg__receipt--{{ $readStatus }}" tabindex="0">
-                                        <span class="bx-msg__checks" aria-hidden="true">
-                                            @if($readStatus === 'sent')
-                                                <svg viewBox="0 0 16 12" width="16" height="12"><path fill="currentColor" d="M5.5 9.5L1.8 5.8l1-1L5.5 7.4 12.2.7l1 1z"/></svg>
-                                            @else
-                                                <svg viewBox="0 0 22 12" width="20" height="12"><path fill="currentColor" d="M15.2 1.2l1 1-7.7 7.7L5 6.4l1-1 2.5 2.5 6.7-6.7zm-5 0l1 1-7.7 7.7L.1 6.4l1-1 2.5 2.5L10.2 1.2z"/></svg>
-                                            @endif
-                                        </span>
-                                        @if(count($readers))
-                                            <div class="bx-msg__receipt-tip" role="tooltip">
-                                                <div class="bx-msg__receipt-tip-title">
-                                                    {{ $readStatus === 'read' ? 'Прочитано всеми' : 'Прочитали' }}
-                                                    · {{ count($readers) }}
-                                                </div>
-                                                <ul class="bx-msg__receipt-list">
-                                                    @foreach($readers as $reader)
-                                                        <li>
-                                                            <span class="bx-avatar bx-avatar--xs" style="--bx-avatar-bg: {{ $reader['color'] }}">
-                                                                <span class="bx-avatar__initials">{{ $reader['initials'] }}</span>
-                                                            </span>
-                                                            <span class="bx-msg__receipt-name">{{ $reader['name'] }}</span>
-                                                            <span class="bx-msg__receipt-time">{{ $reader['read_at'] }}</span>
-                                                        </li>
-                                                    @endforeach
-                                                </ul>
-                                            </div>
-                                        @else
-                                            <div class="bx-msg__receipt-tip" role="tooltip">
-                                                <div class="bx-msg__receipt-tip-title">Отправлено</div>
-                                                <div class="bx-msg__receipt-empty">Ещё никто не просмотрел</div>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </article>
+                    @include('orchid.layouts.partials.bx-message', [
+                        'message' => $message,
+                        'chat' => $active,
+                        'viewer' => auth()->user(),
+                    ])
                 @empty
-                    <div class="text-muted text-center py-5">Начните переписку</div>
+                    <div class="text-muted text-center py-5" id="bx-feed-empty">Начните переписку</div>
                 @endforelse
             </div>
 
@@ -305,8 +180,15 @@
                                        class="d-none"
                                        form="post-form"
                                        multiple
-                                       accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css">
+                                       accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,audio/*">
                             </label>
+
+                            <button type="button" class="bx-composer__tool" id="bx-tool-voice" title="Голосовое сообщение (до 3 мин)">
+                                <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                                    <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+                                </svg>
+                            </button>
 
                             <div class="bx-composer__dropdown">
                                 <button type="button" class="bx-composer__tool" data-bx-drop="task" title="Задача">
@@ -335,11 +217,17 @@
                         </div>
 
                         <div class="bx-composer__right">
+                            <div class="bx-voice-bar d-none" id="bx-voice-bar">
+                                <span class="bx-voice-bar__dot" aria-hidden="true"></span>
+                                <span class="bx-voice-bar__timer" id="bx-voice-timer">0:00</span>
+                                <button type="button" class="bx-voice-bar__btn" id="bx-voice-cancel">Отмена</button>
+                                <button type="button" class="bx-voice-bar__btn bx-voice-bar__btn--send" id="bx-voice-stop">Отправить</button>
+                            </div>
                             <span class="bx-composer__files-label d-none" id="bx-files-label"></span>
-                            <button type="submit"
+                            <button type="button"
                                     class="bx-composer__send"
-                                    formaction="{{ url()->current() }}/sendMessage"
-                                    form="post-form">
+                                    id="bx-composer-send"
+                                    data-send-url="{{ url()->current() }}/sendMessage">
                                 Отправить
                             </button>
                         </div>
@@ -710,7 +598,7 @@
 
     autosize();
 
-    /* Members sheet (Telegram-style) */
+    /* Members modal */
     const membersSheet = document.getElementById('bx-members-sheet');
     const openMembers = () => membersSheet?.removeAttribute('hidden');
     const closeMembers = () => membersSheet?.setAttribute('hidden', '');
@@ -723,13 +611,239 @@
         }
     });
 
-    /* Sound — one short click; singleton poll (no stacking on Turbo navigations) */
+    const csrf = document.querySelector('meta[name="csrf_token"]')?.content
+        || document.querySelector('meta[name="csrf-token"]')?.content
+        || document.querySelector('input[name="_token"]')?.value
+        || '';
+    const sendUrl = root?.getAttribute('data-send-url')
+        || document.getElementById('bx-composer-send')?.getAttribute('data-send-url')
+        || '';
+
+    const feedMaxId = () => Math.max(
+        0,
+        ...[...document.querySelectorAll('#chat-feed [id^="chat-msg-"]')]
+            .map((el) => parseInt(el.id.replace('chat-msg-', ''), 10) || 0)
+    );
+
+    const highlightCodes = (scope) => {
+        if (!window.hljs) return;
+        (scope || document).querySelectorAll('.tw-codeblock code').forEach((el) => {
+            try { window.hljs.highlightElement(el); } catch (e) {}
+        });
+    };
+
+    const appendMessage = (payload) => {
+        if (!feed || !payload?.html || !payload?.id) return false;
+        if (document.getElementById('chat-msg-' + payload.id)) return false;
+        document.getElementById('bx-feed-empty')?.remove();
+        const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
+        feed.insertAdjacentHTML('beforeend', payload.html);
+        const node = document.getElementById('chat-msg-' + payload.id);
+        if (node) highlightCodes(node);
+        if (nearBottom) feed.scrollTop = feed.scrollHeight;
+
+        const activeChat = root?.getAttribute('data-active-chat') || '';
+        if (activeChat && payload.preview != null) {
+            const link = document.querySelector('.bx-chat-item[href*="/chats/' + activeChat + '"]');
+            const preview = link?.querySelector('.bx-chat-item__preview');
+            if (preview) preview.textContent = payload.preview;
+        }
+        return true;
+    };
+
+    const resetComposer = () => {
+        if (input) {
+            input.value = '';
+            autosize();
+        }
+        if (parentInput) parentInput.value = '';
+        replyBanner?.classList.add('d-none');
+        if (taskIdInput) taskIdInput.value = '';
+        taskPicked?.classList.add('d-none');
+        if (taskPicked) taskPicked.innerHTML = '';
+        if (filesInput) filesInput.value = '';
+        filesLabel?.classList.add('d-none');
+        if (filesLabel) filesLabel.textContent = '';
+        hideMentionMenu();
+    };
+
+    let sending = false;
+    const sendMessageAjax = async (extraFormData = null) => {
+        if (!sendUrl || sending) return;
+        const text = (input?.value || '').trim();
+        const hasFiles = filesInput?.files?.length > 0;
+        const hasTask = !!(taskIdInput?.value);
+        const hasVoice = extraFormData && extraFormData.has('message_voice');
+        if (!text && !hasFiles && !hasTask && !hasVoice) return;
+
+        sending = true;
+        const btn = document.getElementById('bx-composer-send');
+        if (btn) btn.disabled = true;
+
+        try {
+            const fd = extraFormData || new FormData();
+            if (!extraFormData) {
+                fd.append('message[text]', input?.value || '');
+                if (parentInput?.value) fd.append('message[parent_id]', parentInput.value);
+                if (taskIdInput?.value) fd.append('message[task_id]', taskIdInput.value);
+                if (filesInput?.files) {
+                    [...filesInput.files].forEach((f) => fd.append('message_files[]', f));
+                }
+            }
+            if (csrf && !fd.has('_token')) fd.append('_token', csrf);
+
+            const res = await fetch(sendUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                },
+                credentials: 'same-origin',
+                body: fd,
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert(err.message || 'Не удалось отправить сообщение');
+                return;
+            }
+            const data = await res.json();
+            if (data.message) {
+                appendMessage(data.message);
+                const id = parseInt(data.message.id, 10) || 0;
+                if (id > since) {
+                    since = id;
+                    localStorage.setItem(storageKey, String(since));
+                }
+                if (id > lastBeepMaxId) {
+                    lastBeepMaxId = id;
+                    sessionStorage.setItem(beepKey, String(lastBeepMaxId));
+                }
+            }
+            resetComposer();
+        } catch (e) {
+            alert('Не удалось отправить сообщение');
+        } finally {
+            sending = false;
+            if (btn) btn.disabled = false;
+        }
+    };
+
+    document.getElementById('bx-composer-send')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        sendMessageAjax();
+    });
+
+    /* Voice recording — max 3 minutes */
+    const VOICE_MAX_SEC = 180;
+    const voiceBtn = document.getElementById('bx-tool-voice');
+    const voiceBar = document.getElementById('bx-voice-bar');
+    const voiceTimer = document.getElementById('bx-voice-timer');
+    let mediaRecorder = null;
+    let mediaStream = null;
+    let voiceChunks = [];
+    let voiceStartedAt = 0;
+    let voiceTick = null;
+    let voiceCancelled = false;
+
+    const formatVoiceTime = (sec) => {
+        const s = Math.max(0, Math.floor(sec));
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    };
+
+    const stopVoiceTracks = () => {
+        mediaStream?.getTracks().forEach((t) => t.stop());
+        mediaStream = null;
+    };
+
+    const endVoiceUi = () => {
+        clearInterval(voiceTick);
+        voiceTick = null;
+        voiceBar?.classList.add('d-none');
+        voiceBtn?.classList.remove('is-recording');
+        if (voiceTimer) voiceTimer.textContent = '0:00';
+    };
+
+    const startVoice = async () => {
+        if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+            alert('Браузер не поддерживает запись голоса');
+            return;
+        }
+        try {
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus'
+                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+            mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+            voiceChunks = [];
+            voiceCancelled = false;
+            voiceStartedAt = Date.now();
+            mediaRecorder.ondataavailable = (ev) => {
+                if (ev.data && ev.data.size > 0) voiceChunks.push(ev.data);
+            };
+            mediaRecorder.onstop = async () => {
+                const duration = Math.min(VOICE_MAX_SEC, Math.round((Date.now() - voiceStartedAt) / 1000));
+                stopVoiceTracks();
+                endVoiceUi();
+                if (voiceCancelled || !voiceChunks.length || duration < 1) return;
+                const blobType = mediaRecorder?.mimeType || 'audio/webm';
+                const blob = new Blob(voiceChunks, { type: blobType });
+                const ext = blobType.includes('ogg') ? 'ogg' : 'webm';
+                const file = new File([blob], 'voice.' + ext, { type: blobType });
+                const fd = new FormData();
+                fd.append('message_voice', file);
+                fd.append('message[voice_duration]', String(duration));
+                fd.append('message[text]', '');
+                if (parentInput?.value) fd.append('message[parent_id]', parentInput.value);
+                await sendMessageAjax(fd);
+            };
+            mediaRecorder.start(250);
+            voiceBar?.classList.remove('d-none');
+            voiceBtn?.classList.add('is-recording');
+            voiceTick = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - voiceStartedAt) / 1000);
+                if (voiceTimer) voiceTimer.textContent = formatVoiceTime(elapsed);
+                if (elapsed >= VOICE_MAX_SEC) {
+                    mediaRecorder?.state === 'recording' && mediaRecorder.stop();
+                }
+            }, 200);
+        } catch (e) {
+            stopVoiceTracks();
+            alert('Нет доступа к микрофону');
+        }
+    };
+
+    const stopVoice = (cancel = false) => {
+        voiceCancelled = cancel;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+        } else {
+            stopVoiceTracks();
+            endVoiceUi();
+        }
+    };
+
+    voiceBtn?.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            stopVoice(false);
+            return;
+        }
+        startVoice();
+    });
+    document.getElementById('bx-voice-stop')?.addEventListener('click', () => stopVoice(false));
+    document.getElementById('bx-voice-cancel')?.addEventListener('click', () => stopVoice(true));
+
+    /* Live poll */
     const pollUrl = root?.getAttribute('data-poll-url');
     const storageKey = 'bx_chat_poll_since';
     const beepKey = 'bx_chat_last_beep_id';
-    let since = parseInt(localStorage.getItem(storageKey) || '0', 10) || 0;
+    let since = Math.max(
+        parseInt(localStorage.getItem(storageKey) || '0', 10) || 0,
+        feedMaxId()
+    );
     let lastBeepMaxId = parseInt(sessionStorage.getItem(beepKey) || String(since), 10) || since;
     let lastBeepAt = 0;
+    localStorage.setItem(storageKey, String(since));
 
     if (window.__bxMessengerPollTimer) {
         clearInterval(window.__bxMessengerPollTimer);
@@ -789,6 +903,9 @@
             if (!res.ok) return;
             const data = await res.json();
             const maxId = parseInt(data.max_id || '0', 10) || 0;
+
+            (data.messages || []).forEach((m) => appendMessage(m));
+
             if (data.sound && maxId > lastBeepMaxId) {
                 const now = Date.now();
                 if (now - lastBeepAt > 1200) {
@@ -815,6 +932,10 @@
                     b.textContent = String(c.unread);
                 } else if (b) {
                     b.remove();
+                }
+                if (c.preview != null) {
+                    const preview = link.querySelector('.bx-chat-item__preview');
+                    if (preview) preview.textContent = c.preview || 'Нет сообщений';
                 }
             });
 
@@ -853,7 +974,7 @@
 
     if (pollUrl) {
         poll();
-        window.__bxMessengerPollTimer = setInterval(poll, 5000);
+        window.__bxMessengerPollTimer = setInterval(poll, 2000);
     }
 })();
 </script>

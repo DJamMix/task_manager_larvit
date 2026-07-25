@@ -289,9 +289,60 @@ class ChatService
                 'id' => (int) $chat->id,
                 'unread' => (int) ($chat->unread_count ?? 0),
                 'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
+                'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? '', 48),
                 'muted' => (bool) $chat->is_muted,
             ])->values()->all(),
+            'messages' => $this->messagesPayload($user, $activeChatId, $sinceMessageId),
             'receipts' => $this->receiptsPayload($user, $activeChatId),
+        ];
+    }
+
+    /**
+     * Новые сообщения активного чата для live-ленты.
+     *
+     * @return list<array{id: int, html: string, preview: string}>
+     */
+    public function messagesPayload(User $user, ?int $activeChatId, ?int $sinceMessageId): array
+    {
+        if (!$activeChatId || !$sinceMessageId || $sinceMessageId <= 0) {
+            return [];
+        }
+
+        $chat = Chat::query()->with('members')->find($activeChatId);
+        if (!$chat || !$chat->isMember($user->id)) {
+            return [];
+        }
+
+        $messages = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->where('id', '>', $sinceMessageId)
+            ->with(['user', 'parent.user', 'task', 'attachment'])
+            ->orderBy('id')
+            ->limit(50)
+            ->get();
+
+        return $messages
+            ->map(fn (ChatMessage $message) => $this->renderMessagePayload($chat, $message, $user))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array{id: int, html: string, preview: string}
+     */
+    public function renderMessagePayload(Chat $chat, ChatMessage $message, User $viewer): array
+    {
+        $chat->loadMissing('members');
+        $message->loadMissing(['user', 'parent.user', 'task', 'attachment']);
+
+        return [
+            'id' => (int) $message->id,
+            'html' => view('orchid.layouts.partials.bx-message', [
+                'message' => $message,
+                'chat' => $chat,
+                'viewer' => $viewer,
+            ])->render(),
+            'preview' => \Illuminate\Support\Str::limit((string) ($message->plain_text ?? ''), 48),
         ];
     }
 
@@ -529,6 +580,34 @@ class ChatService
         }
 
         $attachmentIds = collect($request->input('message.attachments', []))->filter();
+        $isVoice = false;
+        $voiceDuration = min(180, max(0, (int) $request->input('message.voice_duration', 0)));
+
+        if ($request->hasFile('message_voice')) {
+            $uploaded = $request->file('message_voice');
+            if ($uploaded && $uploaded->isValid()) {
+                $mime = (string) $uploaded->getMimeType();
+                $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+                $allowedExt = ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'];
+                if (!str_starts_with($mime, 'audio/') && !in_array($ext, $allowedExt, true)) {
+                    abort(422, 'Голосовое сообщение должно быть аудиофайлом');
+                }
+                // ~3 мин при типичном bitrate webm/opus — жёсткий потолок размера
+                if ($uploaded->getSize() > 8 * 1024 * 1024) {
+                    abort(422, 'Голосовое сообщение слишком большое (макс. 3 минуты)');
+                }
+                if ($voiceDuration > 180) {
+                    abort(422, 'Голосовое сообщение не длиннее 3 минут');
+                }
+
+                $file = new \Orchid\Attachment\File($uploaded, 'public');
+                $attachment = $file->load();
+                $attachment->group = 'voice';
+                $attachment->save();
+                $attachmentIds->push($attachment->id);
+                $isVoice = true;
+            }
+        }
 
         if ($request->hasFile('message_files')) {
             foreach ((array) $request->file('message_files') as $uploaded) {
@@ -543,6 +622,12 @@ class ChatService
 
         if ($plain === '' && $attachmentIds->isEmpty() && !$task) {
             abort(422, 'Напишите сообщение, прикрепите файл или задачу');
+        }
+
+        if ($isVoice && $plain === '') {
+            $plain = 'Голосовое сообщение' . ($voiceDuration > 0
+                ? ' · ' . sprintf('%d:%02d', intdiv($voiceDuration, 60), $voiceDuration % 60)
+                : '');
         }
 
         $parentId = $request->input('message.parent_id');

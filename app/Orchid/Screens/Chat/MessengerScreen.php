@@ -266,7 +266,19 @@ class MessengerScreen extends Screen
 
     public function sendMessage(Request $request, Chat $chat, ChatService $chats)
     {
-        $chats->addMessage($chat, $request->user(), $request);
+        $message = $chats->addMessage($chat, $request->user(), $request);
+
+        if ($request->expectsJson() || $request->ajax() || $request->wantsJson()) {
+            $payload = $chats->renderMessagePayload($chat, $message->fresh([
+                'user', 'parent.user', 'task', 'attachment',
+            ]), $request->user());
+
+            return response()->json([
+                'ok' => true,
+                'message' => $payload,
+            ]);
+        }
+
         Toast::success('Отправлено');
 
         return redirect()->route('platform.systems.chats.view', $chat);

@@ -132,6 +132,16 @@ Route::get('task/attachment/download/{attachment}', function (Attachment $attach
         abort(404);
     }
 
+    $mime = (string) ($attachment->mime ?: mime_content_type($path) ?: 'application/octet-stream');
+    $inline = request()->boolean('inline') || str_starts_with($mime, 'audio/') || str_starts_with($mime, 'image/');
+
+    if ($inline) {
+        return response()->file($path, [
+            'Content-Type' => $mime,
+            'Content-Disposition' => 'inline; filename="' . addslashes((string) $attachment->original_name) . '"',
+        ]);
+    }
+
     return response()->download($path, $attachment->original_name);
 })->name('platform.task.attachment.download');
 
