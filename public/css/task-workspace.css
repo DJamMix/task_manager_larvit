@@ -2173,39 +2173,113 @@ body.bx-lightbox-open { overflow: hidden; }
 }
 
 @media (max-width: 900px) {
+    body.bx-messenger-mobile .header,
+    body.bx-messenger-mobile .aside,
+    body.bx-messenger-mobile .command-bar-wrapper {
+        /* оставляем нативную шапку Orchid — мессенджер занимает остаток высоты */
+    }
+    body.bx-messenger-mobile main .container-fluid,
+    body.bx-messenger-mobile .layout .wrapper > .content,
+    body.bx-messenger-mobile .workspace {
+        padding-left: 0.35rem !important;
+        padding-right: 0.35rem !important;
+    }
+    body.bx-messenger-mobile h1,
+    body.bx-messenger-mobile .page-header,
+    body.bx-messenger-mobile .header-bar .btn-link {
+        font-size: 1rem;
+    }
+
     .bx-messenger {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 150px) minmax(0, 1fr);
-        height: calc(100vh - 160px);
-        max-height: calc(100vh - 160px);
+        grid-template-rows: minmax(0, 1fr);
+        height: calc(100dvh - 110px);
+        max-height: calc(100dvh - 110px);
         min-height: 0;
+        border-radius: 10px;
+        margin-bottom: 0;
+    }
+    .bx-messenger.is-chat-open .bx-messenger__sidebar {
+        display: none !important;
+    }
+    .bx-messenger.is-list-open .bx-messenger__main {
+        display: none !important;
     }
     .bx-messenger__sidebar {
         max-height: none;
         height: 100%;
         border-right: 0;
-        border-bottom: 1px solid #e6eaf0;
+        border-bottom: 0;
     }
     .bx-messenger__header {
-        flex-wrap: wrap;
-        gap: 0.5rem;
+        flex-wrap: nowrap;
+        gap: 0.4rem;
+        padding: 0.55rem 0.65rem;
+        align-items: center;
+    }
+    .bx-messenger__header-main {
+        min-width: 0;
+        flex: 1 1 auto;
+        gap: 0.45rem;
+    }
+    .bx-messenger__header-main h2,
+    .bx-messenger__header-main .h5 {
+        font-size: 1rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 46vw;
+    }
+    .bx-back-chat {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        color: #334155;
+        background: #f1f5f9;
+        flex-shrink: 0;
+        text-decoration: none !important;
     }
     .bx-messenger__header-actions {
-        width: 100%;
-        justify-content: flex-start;
+        width: auto;
+        flex-shrink: 0;
+        gap: 0.25rem;
         overflow-x: auto;
+        max-width: 42%;
     }
+    .bx-notify-vol span:last-child,
     .bx-mute-btn span { display: none; }
+    .bx-notify-vol input[type="range"] { width: 64px; }
+    .bx-composer {
+        padding: 0.45rem 0.55rem calc(0.45rem + env(safe-area-inset-bottom, 0px));
+    }
+    .bx-composer__input {
+        font-size: 16px; /* без автозума iOS */
+        min-height: 40px;
+    }
     .bx-composer__toolbar {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        gap: 0.25rem;
     }
     .bx-composer__send {
-        min-height: 40px;
-        padding: 0.45rem 0.9rem;
+        min-height: 42px;
+        padding: 0.45rem 0.85rem;
     }
     .bx-composer__tool {
         width: 40px;
         height: 40px;
+        flex-shrink: 0;
+    }
+    .bx-messenger__feed {
+        padding: 0.55rem 0.55rem 0.75rem;
+    }
+    .bx-msg {
+        max-width: 100%;
+    }
+    .bx-msg__bubble {
+        max-width: min(100%, 92vw);
     }
     .bx-voice {
         max-width: 100%;
@@ -2214,7 +2288,11 @@ body.bx-lightbox-open { overflow: hidden; }
     .bx-voice-record {
         flex-direction: column;
         align-items: stretch;
-        gap: 0.65rem;
+        gap: 0.55rem;
+    }
+    .bx-voice-record__mic .bx-mic-select {
+        max-width: none;
+        width: 100%;
     }
     .bx-voice-record__actions {
         display: grid;
@@ -2224,4 +2302,44 @@ body.bx-lightbox-open { overflow: hidden; }
         width: 100%;
         min-height: 44px;
     }
+    .bx-mic-gate__card {
+        width: min(100%, 94vw);
+        max-height: 90dvh;
+        overflow: auto;
+    }
+    .bx-members-modal__dialog {
+        width: min(100%, 96vw);
+        max-height: 88dvh;
+    }
+    .bx-feed-older {
+        padding: 0.35rem 0 0.55rem;
+    }
+}
+
+.bx-back-chat {
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.bx-feed-older {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0 0.65rem;
+}
+.bx-feed-older__btn {
+    border: 1px solid #dbe3ee;
+    background: #f8fafc;
+    color: #475569;
+    border-radius: 999px;
+    padding: 0.35rem 0.9rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+.bx-feed-older__btn:active { transform: scale(0.98); }
+.bx-feed-older__spin {
+    font-size: 0.8rem;
+    color: #94a3b8;
 }

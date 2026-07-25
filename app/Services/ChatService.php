@@ -410,6 +410,119 @@ class ChatService
     }
 
     /**
+     * Последние N сообщений (или окно вокруг focusMessageId для перехода из поиска).
+     *
+     * @return array{messages: \Illuminate\Support\Collection, has_more: bool, oldest_id: int|null}
+     */
+    public function feedForChat(Chat $chat, User $viewer, ?int $focusMessageId = null, int $limit = 40): array
+    {
+        $chat->loadMissing('members');
+        if (!$chat->isMember($viewer->id)) {
+            abort(403);
+        }
+
+        $with = ['user', 'parent.user', 'task', 'attachment'];
+        $limit = max(10, min(100, $limit));
+
+        if ($focusMessageId) {
+            $focus = ChatMessage::query()
+                ->where('chat_id', $chat->id)
+                ->whereKey($focusMessageId)
+                ->first();
+
+            if ($focus) {
+                $before = ChatMessage::query()
+                    ->where('chat_id', $chat->id)
+                    ->where('id', '<=', $focus->id)
+                    ->with($with)
+                    ->orderByDesc('id')
+                    ->limit($limit)
+                    ->get()
+                    ->sortBy('id')
+                    ->values();
+
+                $after = ChatMessage::query()
+                    ->where('chat_id', $chat->id)
+                    ->where('id', '>', $focus->id)
+                    ->with($with)
+                    ->orderBy('id')
+                    ->limit(20)
+                    ->get();
+
+                $messages = $before->concat($after)->unique('id')->sortBy('id')->values();
+                $oldestId = $messages->first()?->id ? (int) $messages->first()->id : null;
+                $hasMore = $oldestId
+                    ? ChatMessage::query()->where('chat_id', $chat->id)->where('id', '<', $oldestId)->exists()
+                    : false;
+
+                return [
+                    'messages' => $messages,
+                    'has_more' => $hasMore,
+                    'oldest_id' => $oldestId,
+                ];
+            }
+        }
+
+        $messages = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->with($with)
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->sortBy('id')
+            ->values();
+
+        $oldestId = $messages->first()?->id ? (int) $messages->first()->id : null;
+        $hasMore = $oldestId
+            ? ChatMessage::query()->where('chat_id', $chat->id)->where('id', '<', $oldestId)->exists()
+            : false;
+
+        return [
+            'messages' => $messages,
+            'has_more' => $hasMore,
+            'oldest_id' => $oldestId,
+        ];
+    }
+
+    /**
+     * Более старые сообщения для бесконечного скролла вверх.
+     *
+     * @return array{messages: list<array>, has_more: bool, oldest_id: int|null}
+     */
+    public function historyPayload(User $user, Chat $chat, int $beforeId, int $limit = 40): array
+    {
+        $chat->loadMissing('members');
+        if (!$chat->isMember($user->id)) {
+            abort(403);
+        }
+
+        $limit = max(10, min(100, $limit));
+        $batch = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->where('id', '<', $beforeId)
+            ->with(['user', 'parent.user', 'task', 'attachment'])
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->sortBy('id')
+            ->values();
+
+        $oldestId = $batch->first()?->id ? (int) $batch->first()->id : null;
+        $hasMore = $oldestId
+            ? ChatMessage::query()->where('chat_id', $chat->id)->where('id', '<', $oldestId)->exists()
+            : false;
+
+        return [
+            'messages' => $batch
+                ->map(fn (ChatMessage $message) => $this->renderMessagePayload($chat, $message, $user))
+                ->values()
+                ->all(),
+            'has_more' => $hasMore,
+            'oldest_id' => $oldestId,
+        ];
+    }
+
+    /**
      * @return array{id: int, html: string, preview: string}
      */
     public function renderMessagePayload(Chat $chat, ChatMessage $message, User $viewer): array

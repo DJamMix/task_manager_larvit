@@ -1,7 +1,10 @@
-<div class="bx-messenger"
+<div class="bx-messenger {{ ($active_chat_id ?? null) ? 'is-chat-open' : 'is-list-open' }}"
      data-poll-url="{{ $chats_poll_url ?? route('platform.systems.chats.poll') }}"
      data-active-chat="{{ $active_chat_id ?? '' }}"
-     data-send-url="{{ ($active_chat_id ?? null) ? url()->current() . '/sendMessage' : '' }}">
+     data-send-url="{{ ($active_chat_id ?? null) ? url()->current() . '/sendMessage' : '' }}"
+     data-messages-url="{{ $chats_messages_url ?? '' }}"
+     data-has-more="{{ !empty($messages_has_more) ? '1' : '0' }}"
+     data-oldest-id="{{ $messages_oldest_id ?? '' }}">
     @php
         $chatList = $chats ?? collect();
         $active = $chat ?? null;
@@ -90,6 +93,9 @@
         @if($active)
             <div class="bx-messenger__header">
                 <div class="bx-messenger__header-main">
+                    <a href="{{ route('platform.systems.chats') }}" class="bx-back-chat" title="К списку чатов" aria-label="Назад">
+                        <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </a>
                     @if($active->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
                             'avatarUser' => $active->otherMember(),
@@ -157,6 +163,10 @@
             </div>
 
             <div class="bx-messenger__feed" id="chat-feed">
+                <div class="bx-feed-older {{ !empty($messages_has_more) ? '' : 'd-none' }}" id="bx-feed-older">
+                    <button type="button" class="bx-feed-older__btn" id="bx-load-older">Загрузить ещё</button>
+                    <span class="bx-feed-older__spin d-none" id="bx-load-older-spin">Загрузка…</span>
+                </div>
                 @forelse($feed as $message)
                     @include('orchid.layouts.partials.bx-message', [
                         'message' => $message,
@@ -371,15 +381,19 @@
     const root = document.querySelector('.bx-messenger');
     const lockMessengerHeight = () => {
         if (!root) return;
-        // Фиксируем высоту относительно окна — иначе Orchid-layout раздувает блок сообщениями
         const top = root.getBoundingClientRect().top;
-        const available = Math.max(320, window.innerHeight - top - 24);
+        const mobile = window.matchMedia('(max-width: 900px)').matches;
+        const bottomPad = mobile ? 6 : 24;
+        const available = Math.max(mobile ? 260 : 320, window.innerHeight - top - bottomPad);
         root.style.height = available + 'px';
         root.style.maxHeight = available + 'px';
+        document.body.classList.toggle('bx-messenger-mobile', mobile);
     };
+    document.body.classList.add('bx-messenger-page');
     lockMessengerHeight();
     window.addEventListener('resize', lockMessengerHeight);
-    window.addEventListener('orientationchange', () => setTimeout(lockMessengerHeight, 200));
+    window.addEventListener('orientationchange', () => setTimeout(lockMessengerHeight, 250));
+    window.visualViewport?.addEventListener('resize', lockMessengerHeight);
     const input = document.getElementById('bx-composer-input');
     const parentInput = document.getElementById('chat-message-parent-id');
     const replyBanner = document.getElementById('bx-reply-banner');
@@ -989,6 +1003,75 @@
         }
         return true;
     };
+
+    /* Подгрузка старых сообщений (скролл вверх) */
+    let oldestId = parseInt(root?.getAttribute('data-oldest-id') || '0', 10) || 0;
+    let hasMoreOlder = root?.getAttribute('data-has-more') === '1';
+    let loadingOlder = false;
+    const messagesUrl = root?.getAttribute('data-messages-url') || '';
+    const olderWrap = document.getElementById('bx-feed-older');
+    const olderBtn = document.getElementById('bx-load-older');
+    const olderSpin = document.getElementById('bx-load-older-spin');
+
+    const setOlderUi = () => {
+        if (!olderWrap) return;
+        if (hasMoreOlder) olderWrap.classList.remove('d-none');
+        else olderWrap.classList.add('d-none');
+    };
+
+    const prependMessages = (items) => {
+        if (!feed || !items?.length) return;
+        const prevHeight = feed.scrollHeight;
+        const prevTop = feed.scrollTop;
+        const html = items.map((m) => m.html).join('');
+        const anchor = olderWrap || feed.firstChild;
+        if (anchor && anchor.insertAdjacentHTML) {
+            anchor.insertAdjacentHTML('afterend', html);
+        } else {
+            feed.insertAdjacentHTML('afterbegin', html);
+        }
+        items.forEach((m) => {
+            const node = document.getElementById('chat-msg-' + m.id);
+            if (node) {
+                highlightCodes(node);
+                initVoicePlayers(node);
+            }
+        });
+        feed.scrollTop = feed.scrollHeight - prevHeight + prevTop;
+    };
+
+    const loadOlderMessages = async () => {
+        if (!messagesUrl || !hasMoreOlder || loadingOlder || !oldestId) return;
+        loadingOlder = true;
+        olderBtn?.classList.add('d-none');
+        olderSpin?.classList.remove('d-none');
+        try {
+            const url = messagesUrl + '?before=' + encodeURIComponent(String(oldestId)) + '&limit=40';
+            const res = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const items = data.messages || [];
+            prependMessages(items);
+            hasMoreOlder = !!data.has_more;
+            oldestId = parseInt(data.oldest_id || String(oldestId), 10) || oldestId;
+            root?.setAttribute('data-has-more', hasMoreOlder ? '1' : '0');
+            root?.setAttribute('data-oldest-id', String(oldestId || ''));
+            setOlderUi();
+        } catch (e) {
+        } finally {
+            loadingOlder = false;
+            olderSpin?.classList.add('d-none');
+            if (hasMoreOlder) olderBtn?.classList.remove('d-none');
+        }
+    };
+
+    olderBtn?.addEventListener('click', () => loadOlderMessages());
+    feed?.addEventListener('scroll', () => {
+        if (feed.scrollTop < 60) loadOlderMessages();
+    }, { passive: true });
 
     initVoicePlayers(document);
 

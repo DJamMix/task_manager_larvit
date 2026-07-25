@@ -57,13 +57,11 @@ class MessengerScreen extends Screen
             $chats->markRead($resolved, $user);
         }
 
-        $messages = $resolved
-            ? $resolved->messages()
-                ->with(['user', 'parent.user', 'task', 'attachment'])
-                ->orderBy('created_at')
-                ->limit(200)
-                ->get()
-            : collect();
+        $focusMessageId = request()->integer('msg') ?: null;
+        $feedMeta = $resolved
+            ? $chats->feedForChat($resolved, $user, $focusMessageId, 40)
+            : ['messages' => collect(), 'has_more' => false, 'oldest_id' => null];
+        $messages = $feedMeta['messages'];
 
         $mentionUsers = $resolved?->members
             ?->reject(fn ($u) => (int) $u->id === (int) $user->id)
@@ -103,6 +101,8 @@ class MessengerScreen extends Screen
             'chats' => $list,
             'chat' => $resolved,
             'messages' => $messages,
+            'messages_has_more' => (bool) ($feedMeta['has_more'] ?? false),
+            'messages_oldest_id' => $feedMeta['oldest_id'] ?? null,
             'can_create' => $chats->canCreate($user),
             'can_chat_clients' => $chats->canChatWithClients($user),
             'can_write' => $canWrite,
@@ -118,6 +118,9 @@ class MessengerScreen extends Screen
             'chat_is_pinned' => $isPinned,
             'chats_poll_url' => route('platform.systems.chats.poll'),
             'chats_search_url' => route('platform.systems.chats.search'),
+            'chats_messages_url' => $resolved
+                ? route('platform.systems.chats.messages', $resolved)
+                : null,
         ];
     }
 

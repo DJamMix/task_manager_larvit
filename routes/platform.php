@@ -367,6 +367,21 @@ Route::get('chats-search', function (\Illuminate\Http\Request $request, \App\Ser
     );
 })->name('platform.systems.chats.search');
 
+Route::get('chats/{chat}/messages', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    $before = $request->integer('before');
+    abort_unless($before > 0, 422, 'before required');
+
+    return response()->json(
+        $chats->historyPayload($request->user(), $chat, $before, $request->integer('limit') ?: 40)
+    );
+})->name('platform.systems.chats.messages');
+
 Route::get('chats-tasks', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
     abort_unless($chats->canAccessMessenger($request->user()), 403);
 
