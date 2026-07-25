@@ -217,12 +217,6 @@
                         </div>
 
                         <div class="bx-composer__right">
-                            <div class="bx-voice-bar d-none" id="bx-voice-bar">
-                                <span class="bx-voice-bar__dot" aria-hidden="true"></span>
-                                <span class="bx-voice-bar__timer" id="bx-voice-timer">0:00</span>
-                                <button type="button" class="bx-voice-bar__btn" id="bx-voice-cancel">Отмена</button>
-                                <button type="button" class="bx-voice-bar__btn bx-voice-bar__btn--send" id="bx-voice-stop">Отправить</button>
-                            </div>
                             <span class="bx-composer__files-label d-none" id="bx-files-label"></span>
                             <button type="button"
                                     class="bx-composer__send"
@@ -230,6 +224,19 @@
                                     data-send-url="{{ url()->current() }}/sendMessage">
                                 Отправить
                             </button>
+                        </div>
+                    </div>
+
+                    <div class="bx-voice-record d-none" id="bx-voice-bar" aria-live="polite">
+                        <div class="bx-voice-record__main">
+                            <span class="bx-voice-record__dot" aria-hidden="true"></span>
+                            <span class="bx-voice-record__label">Запись</span>
+                            <span class="bx-voice-record__timer" id="bx-voice-timer">0:00</span>
+                            <span class="bx-voice-record__limit">/ 3:00</span>
+                        </div>
+                        <div class="bx-voice-record__actions">
+                            <button type="button" class="bx-voice-record__btn" id="bx-voice-cancel">Отмена</button>
+                            <button type="button" class="bx-voice-record__btn bx-voice-record__btn--send" id="bx-voice-stop">Отправить</button>
                         </div>
                     </div>
                 </div>
@@ -897,7 +904,23 @@
         voiceTick = null;
         voiceBar?.classList.add('d-none');
         voiceBtn?.classList.remove('is-recording');
+        composer?.classList.remove('is-voice-recording');
         if (voiceTimer) voiceTimer.textContent = '0:00';
+    };
+
+    const pickVoiceMime = () => {
+        if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) {
+            return '';
+        }
+        const candidates = [
+            'audio/mp4',
+            'audio/aac',
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/ogg',
+        ];
+        return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || '';
     };
 
     const startVoice = async () => {
@@ -906,11 +929,17 @@
             return;
         }
         try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-                ? 'audio/webm;codecs=opus'
-                : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
-            mediaRecorder = mime ? new MediaRecorder(mediaStream, { mimeType: mime }) : new MediaRecorder(mediaStream);
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+            });
+            const mime = pickVoiceMime();
+            mediaRecorder = mime
+                ? new MediaRecorder(mediaStream, { mimeType: mime })
+                : new MediaRecorder(mediaStream);
             voiceChunks = [];
             voiceCancelled = false;
             voiceStartedAt = Date.now();
@@ -922,9 +951,12 @@
                 stopVoiceTracks();
                 endVoiceUi();
                 if (voiceCancelled || !voiceChunks.length || duration < 1) return;
-                const blobType = mediaRecorder?.mimeType || 'audio/webm';
+                const blobType = (mediaRecorder?.mimeType || mime || 'audio/webm').split(';')[0];
                 const blob = new Blob(voiceChunks, { type: blobType });
-                const ext = blobType.includes('ogg') ? 'ogg' : 'webm';
+                let ext = 'webm';
+                if (blobType.includes('mp4') || blobType.includes('aac') || blobType.includes('m4a')) ext = 'm4a';
+                else if (blobType.includes('ogg')) ext = 'ogg';
+                else if (blobType.includes('mpeg') || blobType.includes('mp3')) ext = 'mp3';
                 const file = new File([blob], 'voice.' + ext, { type: blobType });
                 const fd = new FormData();
                 fd.append('message_voice', file);
@@ -933,9 +965,15 @@
                 if (parentInput?.value) fd.append('message[parent_id]', parentInput.value);
                 await sendMessageAjax(fd);
             };
-            mediaRecorder.start(250);
+            try {
+                mediaRecorder.start(1000);
+            } catch (e) {
+                // iOS иногда не любит timeslice
+                mediaRecorder.start();
+            }
             voiceBar?.classList.remove('d-none');
             voiceBtn?.classList.add('is-recording');
+            composer?.classList.add('is-voice-recording');
             voiceTick = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - voiceStartedAt) / 1000);
                 if (voiceTimer) voiceTimer.textContent = formatVoiceTime(elapsed);
@@ -945,7 +983,8 @@
             }, 200);
         } catch (e) {
             stopVoiceTracks();
-            alert('Нет доступа к микрофону');
+            endVoiceUi();
+            alert('Нет доступа к микрофону. Разрешите запись в настройках браузера.');
         }
     };
 

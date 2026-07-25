@@ -586,10 +586,13 @@ class ChatService
         if ($request->hasFile('message_voice')) {
             $uploaded = $request->file('message_voice');
             if ($uploaded && $uploaded->isValid()) {
-                $mime = (string) $uploaded->getMimeType();
+                $mime = strtolower((string) $uploaded->getMimeType());
                 $ext = strtolower((string) $uploaded->getClientOriginalExtension());
-                $allowedExt = ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'];
-                if (!str_starts_with($mime, 'audio/') && !in_array($ext, $allowedExt, true)) {
+                $allowedExt = ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'mp4', 'wav', 'aac', 'opus'];
+                $okMime = str_starts_with($mime, 'audio/')
+                    || $mime === 'video/mp4'
+                    || $mime === 'application/octet-stream';
+                if (!$okMime && !in_array($ext, $allowedExt, true)) {
                     abort(422, 'Голосовое сообщение должно быть аудиофайлом');
                 }
                 // ~3 мин при типичном bitrate webm/opus — жёсткий потолок размера

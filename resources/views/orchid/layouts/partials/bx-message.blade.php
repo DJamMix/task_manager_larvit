@@ -22,12 +22,12 @@
 
     $isVoiceAttachment = function ($file): bool {
         $mime = strtolower((string) ($file->mime ?? ''));
-        if (str_starts_with($mime, 'audio/')) {
+        if (str_starts_with($mime, 'audio/') || $mime === 'video/mp4') {
             return true;
         }
         $ext = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
 
-        return in_array($ext, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true);
+        return in_array($ext, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'mp4', 'wav', 'aac', 'opus'], true);
     };
 @endphp
 <article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }}"

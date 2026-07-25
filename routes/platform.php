@@ -133,7 +133,10 @@ Route::get('task/attachment/download/{attachment}', function (Attachment $attach
     }
 
     $mime = (string) ($attachment->mime ?: mime_content_type($path) ?: 'application/octet-stream');
-    $inline = request()->boolean('inline') || str_starts_with($mime, 'audio/') || str_starts_with($mime, 'image/');
+    $inline = request()->boolean('inline')
+        || str_starts_with($mime, 'audio/')
+        || str_starts_with($mime, 'image/')
+        || $mime === 'video/mp4';
 
     if ($inline) {
         return response()->file($path, [
