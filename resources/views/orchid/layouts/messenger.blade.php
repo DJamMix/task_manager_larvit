@@ -79,11 +79,11 @@
         <div class="bx-search-panel d-none" id="bx-search-panel" hidden>
             <div class="bx-search-panel__section" id="bx-search-chats-wrap">
                 <div class="bx-search-panel__title">Чаты</div>
-                <div id="bx-search-chats"></div>
+                <div class="bx-search-panel__list" id="bx-search-chats"></div>
             </div>
             <div class="bx-search-panel__section" id="bx-search-msgs-wrap">
                 <div class="bx-search-panel__title">Сообщения</div>
-                <div id="bx-search-msgs"></div>
+                <div class="bx-search-panel__list" id="bx-search-msgs"></div>
             </div>
             <div class="bx-search-panel__empty d-none" id="bx-search-empty">Ничего не найдено</div>
         </div>
@@ -1779,24 +1779,81 @@
     const renderSearchResults = (data) => {
         const chats = data.chats || [];
         const msgs = data.messages || [];
+        const q = data.query || (searchInput?.value || '').trim();
+
+        const avatarHtml = (av) => {
+            const a = av || {};
+            const shape = a.shape === 'square' ? 'square' : 'round';
+            const color = escapeHtmlSearch(a.color || '#64748b');
+            const initials = escapeHtmlSearch(a.initials || '?');
+            const img = a.url
+                ? '<img class="bx-avatar__img" src="' + escapeHtmlSearch(a.url) + '" alt="" loading="lazy" onerror="this.remove()">'
+                : '';
+            return '<span class="bx-avatar bx-avatar--md bx-avatar--' + shape + '" style="--bx-avatar-bg:' + color + '">'
+                + '<span class="bx-avatar__initials">' + initials + '</span>'
+                + img
+                + '</span>';
+        };
+
+        const highlight = (text) => {
+            const raw = String(text || '');
+            if (!q || q.length < 2) return escapeHtmlSearch(raw);
+            const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            try {
+                return escapeHtmlSearch(raw).replace(
+                    new RegExp('(' + esc + ')', 'ig'),
+                    '<mark class="bx-search-mark">$1</mark>'
+                );
+            } catch (e) {
+                return escapeHtmlSearch(raw);
+            }
+        };
+
         if (searchChatsEl) {
-            searchChatsEl.innerHTML = chats.map((c) =>
-                '<a class="bx-search-hit" href="' + escapeHtmlSearch(c.url) + '">'
-                + '<div class="bx-search-hit__title">' + escapeHtmlSearch(c.title) + '</div>'
-                + '<div class="bx-search-hit__preview">' + escapeHtmlSearch(c.preview) + '</div>'
-                + '</a>'
-            ).join('');
+            searchChatsEl.innerHTML = chats.map((c) => {
+                const kind = c.type === 'direct' ? 'Личный' : 'Группа';
+                const unread = c.unread > 0
+                    ? '<span class="bx-search-hit__badge">' + escapeHtmlSearch(String(c.unread)) + '</span>'
+                    : '';
+                return '<a class="bx-search-hit bx-search-hit--chat" href="' + escapeHtmlSearch(c.url) + '">'
+                    + avatarHtml(c.avatar)
+                    + '<div class="bx-search-hit__body">'
+                    +   '<div class="bx-search-hit__top">'
+                    +     '<span class="bx-search-hit__title">' + highlight(c.title) + '</span>'
+                    +     '<span class="bx-search-hit__time">' + escapeHtmlSearch(c.at || '') + '</span>'
+                    +   '</div>'
+                    +   '<div class="bx-search-hit__row">'
+                    +     '<span class="bx-search-hit__kind">' + kind + '</span>'
+                    +     '<span class="bx-search-hit__preview">' + highlight(c.preview) + '</span>'
+                    +     unread
+                    +   '</div>'
+                    + '</div>'
+                    + '</a>';
+            }).join('');
         }
+
         if (searchMsgsEl) {
-            searchMsgsEl.innerHTML = msgs.map((m) =>
-                '<a class="bx-search-hit bx-search-hit--msg" href="' + escapeHtmlSearch(m.url) + '">'
-                + '<div class="bx-search-hit__meta">' + escapeHtmlSearch(m.chat_title)
-                + ' · ' + escapeHtmlSearch(m.author)
-                + ' · ' + escapeHtmlSearch(m.at) + '</div>'
-                + '<div class="bx-search-hit__preview">' + escapeHtmlSearch(m.preview) + '</div>'
-                + '</a>'
-            ).join('');
+            searchMsgsEl.innerHTML = msgs.map((m) => {
+                const isDirect = m.chat_type === 'direct';
+                const previewLine = isDirect
+                    ? highlight(m.preview)
+                    : '<span class="bx-search-hit__from">' + escapeHtmlSearch(m.author) + ':</span> ' + highlight(m.preview);
+                return '<a class="bx-search-hit bx-search-hit--msg" href="' + escapeHtmlSearch(m.url) + '">'
+                    + avatarHtml(m.avatar)
+                    + '<div class="bx-search-hit__body">'
+                    +   '<div class="bx-search-hit__top">'
+                    +     '<span class="bx-search-hit__title">' + escapeHtmlSearch(m.chat_title) + '</span>'
+                    +     '<span class="bx-search-hit__time">' + escapeHtmlSearch(m.at || '') + '</span>'
+                    +   '</div>'
+                    +   '<div class="bx-search-hit__row">'
+                    +     '<span class="bx-search-hit__tag">Сообщение</span>'
+                    +     '<span class="bx-search-hit__preview">' + previewLine + '</span>'
+                    +   '</div>'
+                    + '</div>'
+                    + '</a>';
+            }).join('');
         }
+
         if (searchChatsWrap) searchChatsWrap.classList.toggle('d-none', !chats.length);
         if (searchMsgsWrap) searchMsgsWrap.classList.toggle('d-none', !msgs.length);
         if (searchEmptyEl) searchEmptyEl.classList.toggle('d-none', chats.length + msgs.length > 0);

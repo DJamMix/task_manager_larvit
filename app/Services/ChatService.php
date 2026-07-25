@@ -332,14 +332,20 @@ class ChatService
                 return false;
             })
             ->take($limit)
-            ->map(fn (Chat $chat) => [
-                'id' => (int) $chat->id,
-                'title' => $chat->displayTitle($user->id),
-                'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? 'Нет сообщений', 64),
-                'type' => $chat->type,
-                'url' => route('platform.systems.chats.view', $chat),
-                'unread' => (int) ($chat->unread_count ?? 0),
-            ])
+            ->map(function (Chat $chat) use ($user) {
+                $latest = $chat->latestMessage;
+
+                return [
+                    'id' => (int) $chat->id,
+                    'title' => $chat->displayTitle($user->id),
+                    'preview' => \Illuminate\Support\Str::limit($latest?->plain_text ?? 'Нет сообщений', 72),
+                    'type' => $chat->type,
+                    'url' => route('platform.systems.chats.view', $chat),
+                    'unread' => (int) ($chat->unread_count ?? 0),
+                    'at' => $latest?->created_at?->format('d.m') ?? '',
+                    'avatar' => $this->chatAvatarPayload($chat, $user),
+                ];
+            })
             ->values()
             ->all();
 
@@ -363,10 +369,13 @@ class ChatService
                     'id' => (int) $message->id,
                     'chat_id' => (int) $message->chat_id,
                     'chat_title' => $chat->displayTitle($user->id),
+                    'chat_type' => $chat->type,
                     'author' => $message->user?->displayName() ?? 'Участник',
-                    'preview' => \Illuminate\Support\Str::limit((string) $message->plain_text, 90),
+                    'preview' => \Illuminate\Support\Str::limit((string) $message->plain_text, 100),
                     'at' => $message->created_at?->format('d.m H:i') ?? '',
                     'url' => route('platform.systems.chats.view', $chat) . '?msg=' . $message->id,
+                    // Личка → аватар собеседника; группа → аватар чата
+                    'avatar' => $this->chatAvatarPayload($chat, $user),
                 ];
             })
             ->filter()
@@ -376,6 +385,20 @@ class ChatService
         return [
             'chats' => $matchedChats,
             'messages' => $messages,
+            'query' => $q,
+        ];
+    }
+
+    /**
+     * @return array{url: string, initials: string, color: string, shape: string}
+     */
+    private function chatAvatarPayload(Chat $chat, User $viewer): array
+    {
+        return [
+            'url' => $chat->avatarUrl($viewer->id),
+            'initials' => $chat->avatarInitials($viewer->id),
+            'color' => $chat->avatarColor($viewer->id),
+            'shape' => $chat->type === 'direct' ? 'round' : 'square',
         ];
     }
 
