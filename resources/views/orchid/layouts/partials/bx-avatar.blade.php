@@ -1,25 +1,25 @@
-{{-- Avatar: custom photo / chat avatar / initials --}}
+{{-- Avatar: pass avatarUser OR avatarChat — never ambient $chat/$user (Blade inherits parent scope) --}}
 @php
     $size = $size ?? 'md';
-    /** @var \App\Models\User|null $user */
-    /** @var \App\Models\Chat|null $chat */
-    $chat = $chat ?? null;
-    $user = $user ?? null;
     $shape = $shape ?? null;
+    /** @var \App\Models\User|null $avatarUser */
+    /** @var \App\Models\Chat|null $avatarChat */
+    $avatarUser = $avatarUser ?? null;
+    $avatarChat = $avatarChat ?? null;
 
-    if ($chat) {
-        $title = $chat->displayTitle();
-        $initials = $chat->avatarInitials();
-        $color = $chat->avatarColor();
-        $url = $chat->avatarUrl();
+    if ($avatarChat) {
+        $title = $avatarChat->displayTitle();
+        $initials = $avatarChat->avatarInitials();
+        $color = $avatarChat->avatarColor();
+        $url = $avatarChat->avatarUrl();
         if ($shape === null) {
-            $shape = $chat->type === 'direct' ? 'round' : 'square';
+            $shape = $avatarChat->type === 'direct' ? 'round' : 'square';
         }
     } else {
-        $title = $user?->displayName() ?? 'Участник';
-        $initials = $user?->avatarInitials() ?? '?';
-        $color = $user?->avatarColor() ?? '#64748b';
-        $url = $user?->avatarUrl() ?? '';
+        $title = $avatarUser?->displayName() ?? 'Участник';
+        $initials = $avatarUser?->avatarInitials() ?? '?';
+        $color = $avatarUser?->avatarColor() ?? '#64748b';
+        $url = $avatarUser?->avatarUrl() ?? '';
         if ($shape === null) {
             $shape = 'round';
         }

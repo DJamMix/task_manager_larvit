@@ -25,13 +25,15 @@
                    class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}">
                     @if($item->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
-                            'user' => $item->otherMember(),
+                            'avatarUser' => $item->otherMember(),
+                            'avatarChat' => null,
                             'size' => 'md',
                             'shape' => 'round',
                         ])
                     @else
                         @include('orchid.layouts.partials.bx-avatar', [
-                            'chat' => $item,
+                            'avatarChat' => $item,
+                            'avatarUser' => null,
                             'size' => 'md',
                             'shape' => 'square',
                         ])
@@ -68,27 +70,39 @@
                 <div class="bx-messenger__header-main">
                     @if($active->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
-                            'user' => $active->otherMember(),
+                            'avatarUser' => $active->otherMember(),
+                            'avatarChat' => null,
                             'size' => 'lg',
                             'shape' => 'round',
                         ])
                     @else
                         @include('orchid.layouts.partials.bx-avatar', [
-                            'chat' => $active,
+                            'avatarChat' => $active,
+                            'avatarUser' => null,
                             'size' => 'lg',
                             'shape' => 'square',
                         ])
                     @endif
                     <div>
                         <h2 class="h5 mb-0">{{ $active->displayTitle() }}</h2>
-                        <div class="small text-muted">
-                            {{ $active->type === 'direct' ? 'Личный чат' : 'Группа' }}
-                            ·
-                            {{ $active->members->count() }} уч.
-                            ·
-                            {{ $active->members->take(4)->map->displayName()->implode(', ') }}
-                            @if($active->members->count() > 4)…@endif
-                        </div>
+                        @php
+                            $memberCount = $active->members->count();
+                            $memberWord = $memberCount === 1 ? 'участник' : (
+                                ($memberCount % 10 >= 2 && $memberCount % 10 <= 4 && !in_array($memberCount % 100, [12, 13, 14], true))
+                                    ? 'участника'
+                                    : 'участников'
+                            );
+                        @endphp
+                        <button type="button"
+                                class="bx-chat-meta"
+                                id="bx-open-members"
+                                title="Участники чата">
+                            @if($active->type === 'direct')
+                                Личный чат
+                            @else
+                                {{ $memberCount }} {{ $memberWord }}
+                            @endif
+                        </button>
                     </div>
                 </div>
                 <div class="bx-messenger__header-actions">
@@ -140,7 +154,12 @@
                              id="chat-msg-{{ $message->id }}">
                         @unless($message->is_system)
                             <div class="bx-msg__avatar">
-                                @include('orchid.layouts.partials.bx-avatar', ['user' => $message->user, 'size' => 'sm'])
+                                @include('orchid.layouts.partials.bx-avatar', [
+                                    'avatarUser' => $message->user,
+                                    'avatarChat' => null,
+                                    'size' => 'sm',
+                                    'shape' => 'round',
+                                ])
                             </div>
                         @endunless
 
@@ -340,6 +359,41 @@
             </div>
         @endif
     </section>
+
+    @if($active)
+        <div class="bx-members-sheet" id="bx-members-sheet" hidden>
+            <button type="button" class="bx-members-sheet__backdrop" id="bx-members-close-bg" aria-label="Закрыть"></button>
+            <div class="bx-members-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-members-title">
+                <div class="bx-members-sheet__head">
+                    <div>
+                        <strong id="bx-members-title">Участники</strong>
+                        <div class="bx-members-sheet__count">{{ $active->members->count() }}</div>
+                    </div>
+                    <button type="button" class="bx-members-sheet__close" id="bx-members-close" aria-label="Закрыть">×</button>
+                </div>
+                <ul class="bx-members-sheet__list">
+                    @foreach($active->members->sortBy(fn ($u) => mb_strtolower($u->displayName())) as $member)
+                        <li class="bx-members-sheet__item">
+                            @include('orchid.layouts.partials.bx-avatar', [
+                                'avatarUser' => $member,
+                                'avatarChat' => null,
+                                'size' => 'md',
+                                'shape' => 'round',
+                            ])
+                            <div class="bx-members-sheet__meta">
+                                <div class="bx-members-sheet__name">{{ $member->displayName() }}</div>
+                                @if($member->pivot?->role === 'owner')
+                                    <div class="bx-members-sheet__role">владелец</div>
+                                @elseif($member->position)
+                                    <div class="bx-members-sheet__role">{{ $member->position }}</div>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        </div>
+    @endif
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -660,49 +714,71 @@
 
     autosize();
 
-    /* Sound notifications — short click, once per new max_id */
+    /* Members sheet (Telegram-style) */
+    const membersSheet = document.getElementById('bx-members-sheet');
+    const openMembers = () => membersSheet?.removeAttribute('hidden');
+    const closeMembers = () => membersSheet?.setAttribute('hidden', '');
+    document.getElementById('bx-open-members')?.addEventListener('click', openMembers);
+    document.getElementById('bx-members-close')?.addEventListener('click', closeMembers);
+    document.getElementById('bx-members-close-bg')?.addEventListener('click', closeMembers);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && membersSheet && !membersSheet.hasAttribute('hidden')) {
+            closeMembers();
+        }
+    });
+
+    /* Sound — one short click; singleton poll (no stacking on Turbo navigations) */
     const pollUrl = root?.getAttribute('data-poll-url');
     const storageKey = 'bx_chat_poll_since';
+    const beepKey = 'bx_chat_last_beep_id';
     let since = parseInt(localStorage.getItem(storageKey) || '0', 10) || 0;
-    let soundUnlocked = false;
-    let audioCtx = null;
-    let lastBeepMaxId = since;
+    let lastBeepMaxId = parseInt(sessionStorage.getItem(beepKey) || String(since), 10) || since;
+    let lastBeepAt = 0;
+
+    if (window.__bxMessengerPollTimer) {
+        clearInterval(window.__bxMessengerPollTimer);
+        window.__bxMessengerPollTimer = null;
+    }
 
     const unlockSound = () => {
-        soundUnlocked = true;
+        window.__bxChatSoundUnlocked = true;
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) return;
-            audioCtx = audioCtx || new Ctx();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            window.__bxChatAudioCtx = window.__bxChatAudioCtx || new Ctx();
+            if (window.__bxChatAudioCtx.state === 'suspended') {
+                window.__bxChatAudioCtx.resume();
+            }
         } catch (e) {}
     };
     document.addEventListener('click', unlockSound, { once: true });
     document.addEventListener('keydown', unlockSound, { once: true });
 
     const playNotifySound = () => {
-        if (!soundUnlocked) return;
+        if (!window.__bxChatSoundUnlocked) return;
         try {
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) return;
-            audioCtx = audioCtx || new Ctx();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const t = audioCtx.currentTime;
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.type = 'sine';
-            o.frequency.value = 1400;
-            g.gain.setValueAtTime(0.1, t);
-            g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+            const ctx = window.__bxChatAudioCtx = window.__bxChatAudioCtx || new Ctx();
+            if (ctx.state === 'suspended') ctx.resume();
+            const t = ctx.currentTime;
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'triangle';
+            o.frequency.value = 880;
+            g.gain.setValueAtTime(0.09, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
             o.connect(g);
-            g.connect(audioCtx.destination);
+            g.connect(ctx.destination);
             o.start(t);
-            o.stop(t + 0.055);
+            o.stop(t + 0.045);
         } catch (e) {}
     };
 
     const poll = async () => {
         if (!pollUrl) return;
+        if (window.__bxMessengerPolling) return;
+        window.__bxMessengerPolling = true;
         try {
             const activeChat = root?.getAttribute('data-active-chat') || '';
             const params = new URLSearchParams();
@@ -718,8 +794,13 @@
             const data = await res.json();
             const maxId = parseInt(data.max_id || '0', 10) || 0;
             if (data.sound && maxId > lastBeepMaxId) {
-                playNotifySound();
+                const now = Date.now();
+                if (now - lastBeepAt > 1200) {
+                    playNotifySound();
+                    lastBeepAt = now;
+                }
                 lastBeepMaxId = maxId;
+                sessionStorage.setItem(beepKey, String(lastBeepMaxId));
             }
             if (maxId > since) {
                 since = maxId;
@@ -769,11 +850,14 @@
                     ).join('') + '</ul>';
             });
         } catch (e) {}
+        finally {
+            window.__bxMessengerPolling = false;
+        }
     };
 
     if (pollUrl) {
         poll();
-        setInterval(poll, 5000);
+        window.__bxMessengerPollTimer = setInterval(poll, 5000);
     }
 })();
 </script>
