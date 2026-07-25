@@ -655,6 +655,29 @@ class ChatService
         return $chat->fresh(['members']);
     }
 
+    public function deleteGroup(Chat $chat, User $actor): void
+    {
+        if ($chat->type === 'direct') {
+            abort(422, 'Личный чат нельзя удалить');
+        }
+
+        if (!$chat->isOwner($actor->id) && !$actor->hasAccess('platform.systems.chats.create')) {
+            abort(403);
+        }
+
+        DB::transaction(function () use ($chat) {
+            $chat->loadMissing(['messages.attachment']);
+
+            foreach ($chat->messages as $message) {
+                foreach ($message->attachment as $file) {
+                    $file->delete();
+                }
+            }
+
+            $chat->delete();
+        });
+    }
+
     /**
      * @param  list<int>  $memberIds
      */

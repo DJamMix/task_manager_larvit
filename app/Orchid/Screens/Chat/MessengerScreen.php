@@ -8,9 +8,11 @@ use App\Orchid\Layouts\Chat\ChatEditLayout;
 use App\Orchid\Layouts\Chat\ChatMembersLayout;
 use App\Services\ChatService;
 use Illuminate\Http\Request;
+use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Layouts\Modal;
 use Orchid\Screen\Screen;
+use Orchid\Support\Color;
 use Orchid\Support\Facades\Layout;
 use Orchid\Support\Facades\Toast;
 
@@ -173,6 +175,12 @@ class MessengerScreen extends Screen
                 ->modal('membersModal')
                 ->method('saveMembers')
                 ->icon('bs.people');
+
+            $buttons[] = Button::make('Удалить чат')
+                ->icon('bs.trash')
+                ->method('removeChat')
+                ->confirm('Удалить групповой чат безвозвратно? Сообщения, файлы и история звонков будут удалены.')
+                ->type(Color::DANGER);
         }
 
         return $buttons;
@@ -320,5 +328,13 @@ class MessengerScreen extends Screen
         Toast::success('Чат обновлён');
 
         return redirect()->route('platform.systems.chats.view', $chat);
+    }
+
+    public function removeChat(Request $request, Chat $chat, ChatService $chats)
+    {
+        $chats->deleteGroup($chat, $request->user());
+        Toast::success('Чат удалён');
+
+        return redirect()->route('platform.systems.chats');
     }
 }
