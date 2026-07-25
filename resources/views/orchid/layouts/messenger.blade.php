@@ -3,6 +3,9 @@
      data-active-chat="{{ $active_chat_id ?? '' }}"
      data-send-url="{{ ($active_chat_id ?? null) ? url()->current() . '/sendMessage' : '' }}"
      data-messages-url="{{ $chats_messages_url ?? '' }}"
+     data-typing-url="{{ $chats_typing_url ?? '' }}"
+     data-chat-type="{{ $chat?->type ?? '' }}"
+     data-self-id="{{ auth()->id() }}"
      data-has-more="{{ !empty($messages_has_more) ? '1' : '0' }}"
      data-oldest-id="{{ $messages_oldest_id ?? '' }}"
      data-calls-enabled="{{ !empty($calls_enabled) ? '1' : '0' }}"
@@ -19,6 +22,8 @@
         $isMuted = (bool) ($chat_is_muted ?? false);
         $isPinned = (bool) ($chat_is_pinned ?? false);
         $canEditChat = (bool) ($can_edit_chat ?? false);
+        $presence = $presence ?? [];
+        $presenceOnline = static fn (?int $uid): bool => (bool) ($uid && !empty($presence[$uid] ?? $presence[(string) $uid] ?? false));
     @endphp
 
     <aside class="bx-messenger__sidebar">
@@ -37,16 +42,20 @@
 
         <div class="bx-messenger__list" id="bx-chat-list">
             @forelse($chatList as $item)
+                @php $peer = $item->type === 'direct' ? $item->otherMember() : null; @endphp
                 <a href="{{ route('platform.systems.chats.view', $item) }}"
                    class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}"
                    data-chat-id="{{ $item->id }}"
+                   data-peer-id="{{ $peer?->id ?? '' }}"
                    data-title="{{ mb_strtolower($item->displayTitle()) }}">
                     @if($item->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
-                            'avatarUser' => $item->otherMember(),
+                            'avatarUser' => $peer,
                             'avatarChat' => null,
                             'size' => 'md',
                             'shape' => 'round',
+                            'showOnline' => true,
+                            'isOnline' => $presenceOnline($peer?->id),
                         ])
                     @else
                         @include('orchid.layouts.partials.bx-avatar', [
@@ -100,12 +109,15 @@
                     <a href="{{ route('platform.systems.chats') }}" class="bx-back-chat" title="К списку чатов" aria-label="Назад">
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
                     </a>
+                    @php $headerPeer = $active->type === 'direct' ? $active->otherMember() : null; @endphp
                     @if($active->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
-                            'avatarUser' => $active->otherMember(),
+                            'avatarUser' => $headerPeer,
                             'avatarChat' => null,
                             'size' => 'lg',
                             'shape' => 'round',
+                            'showOnline' => true,
+                            'isOnline' => $presenceOnline($headerPeer?->id),
                         ])
                     @else
                         @include('orchid.layouts.partials.bx-avatar', [
@@ -124,15 +136,17 @@
                                     ? 'участника'
                                     : 'участников'
                             );
+                            $defaultSubtitle = $active->type === 'direct'
+                                ? ($presenceOnline($headerPeer?->id) ? 'в сети' : 'не в сети')
+                                : ($memberCount . ' ' . $memberWord);
                         @endphp
                         <button type="button"
                                 class="bx-chat-subtitle"
-                                id="bx-open-members">
-                            @if($active->type === 'direct')
-                                Личный чат
-                            @else
-                                {{ $memberCount }} {{ $memberWord }}
-                            @endif
+                                id="bx-open-members"
+                                data-default-subtitle="{{ $defaultSubtitle }}"
+                                data-member-count="{{ $memberCount }}"
+                                data-peer-id="{{ $headerPeer?->id ?? '' }}">
+                            {{ $defaultSubtitle }}
                         </button>
                     </div>
                 </div>
@@ -206,6 +220,8 @@
                     <div class="text-muted text-center py-5" id="bx-feed-empty">Начните переписку</div>
                 @endforelse
             </div>
+
+            <div id="bx-typing" class="bx-typing d-none" aria-live="polite"></div>
 
             @if($can_write ?? true)
             <div class="bx-composer" id="bx-composer"
@@ -362,20 +378,30 @@
                 </div>
                 <ul class="bx-members-modal__list">
                     @foreach($active->members->sortBy(fn ($u) => mb_strtolower($u->displayName())) as $member)
-                        <li class="bx-members-modal__item">
+                        <li class="bx-members-modal__item" data-user-id="{{ $member->id }}">
                             @include('orchid.layouts.partials.bx-avatar', [
                                 'avatarUser' => $member,
                                 'avatarChat' => null,
                                 'size' => 'md',
                                 'shape' => 'round',
+                                'showOnline' => true,
+                                'isOnline' => $presenceOnline($member->id),
                             ])
                             <div class="bx-members-modal__meta">
                                 <div class="bx-members-modal__name">{{ $member->displayName() }}</div>
-                                @if($member->pivot?->role === 'owner')
-                                    <div class="bx-members-modal__role">владелец</div>
-                                @elseif($member->position)
-                                    <div class="bx-members-modal__role">{{ $member->position }}</div>
-                                @endif
+                                <div class="bx-members-modal__status {{ $presenceOnline($member->id) ? 'is-online' : '' }}"
+                                     data-online-label="в сети"
+                                     data-offline-label="{{ $member->pivot?->role === 'owner' ? 'владелец' : ($member->position ?: 'не в сети') }}">
+                                    @if($presenceOnline($member->id))
+                                        в сети
+                                    @elseif($member->pivot?->role === 'owner')
+                                        владелец
+                                    @elseif($member->position)
+                                        {{ $member->position }}
+                                    @else
+                                        не в сети
+                                    @endif
+                                </div>
                             </div>
                         </li>
                     @endforeach
@@ -1698,6 +1724,102 @@
         }
     });
 
+    /* Presence + typing */
+    const typingEl = document.getElementById('bx-typing');
+    const subtitleBtn = document.getElementById('bx-open-members');
+    const typingUrl = root?.getAttribute('data-typing-url') || '';
+    const chatType = root?.getAttribute('data-chat-type') || '';
+    const csrfToken = root?.getAttribute('data-csrf') || '';
+    let typingPulseAt = 0;
+    let lastTypingKey = '';
+
+    const isUserOnline = (presence, userId) => {
+        if (!userId || !presence) return false;
+        return !!(presence[userId] || presence[String(userId)]);
+    };
+
+    const applyPresence = (presence) => {
+        document.querySelectorAll('.bx-avatar-wrap[data-user-id]').forEach((wrap) => {
+            const uid = wrap.getAttribute('data-user-id');
+            wrap.classList.toggle('is-online', isUserOnline(presence, uid));
+        });
+
+        document.querySelectorAll('.bx-members-modal__item[data-user-id]').forEach((item) => {
+            const uid = item.getAttribute('data-user-id');
+            const online = isUserOnline(presence, uid);
+            const status = item.querySelector('.bx-members-modal__status');
+            const wrap = item.querySelector('.bx-avatar-wrap');
+            wrap?.classList.toggle('is-online', online);
+            if (!status) return;
+            status.classList.toggle('is-online', online);
+            status.textContent = online
+                ? (status.getAttribute('data-online-label') || 'в сети')
+                : (status.getAttribute('data-offline-label') || 'не в сети');
+        });
+
+        if (subtitleBtn && chatType === 'direct' && !subtitleBtn.classList.contains('is-typing')) {
+            const peerId = subtitleBtn.getAttribute('data-peer-id');
+            const text = isUserOnline(presence, peerId) ? 'в сети' : 'не в сети';
+            subtitleBtn.setAttribute('data-default-subtitle', text);
+            subtitleBtn.textContent = text;
+        }
+    };
+
+    const formatTypingLabel = (list) => {
+        const names = (list || []).map((t) => String(t.name || '').trim()).filter(Boolean);
+        if (!names.length) return '';
+        if (chatType === 'direct') return 'печатает…';
+        if (names.length === 1) return names[0] + ' печатает…';
+        if (names.length === 2) return names[0] + ' и ' + names[1] + ' печатают…';
+        return names[0] + ' и ещё ' + (names.length - 1) + ' печатают…';
+    };
+
+    const applyTyping = (list) => {
+        const label = formatTypingLabel(list);
+        const key = (list || []).map((t) => t.user_id).join(',');
+        if (typingEl) {
+            if (!label) {
+                typingEl.classList.add('d-none');
+                typingEl.textContent = '';
+            } else {
+                typingEl.classList.remove('d-none');
+                typingEl.innerHTML = '<span class="bx-typing__dots" aria-hidden="true"><span></span><span></span><span></span></span><span>' + escapeHtml(label) + '</span>';
+            }
+        }
+        if (subtitleBtn) {
+            if (label) {
+                subtitleBtn.classList.add('is-typing');
+                subtitleBtn.textContent = label;
+            } else {
+                subtitleBtn.classList.remove('is-typing');
+                subtitleBtn.textContent = subtitleBtn.getAttribute('data-default-subtitle') || subtitleBtn.textContent;
+            }
+        }
+        lastTypingKey = key;
+    };
+
+    const sendTyping = () => {
+        if (!typingUrl || !csrfToken) return;
+        const now = Date.now();
+        if (now - typingPulseAt < 2200) return;
+        typingPulseAt = now;
+        fetch(typingUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+                'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: '{}',
+        }).catch(() => {});
+    };
+
+    input?.addEventListener('input', () => {
+        if ((input.value || '').trim() !== '') sendTyping();
+    });
+
     /* Live poll */
     const pollUrl = root?.getAttribute('data-poll-url');
     const storageKey = 'bx_chat_poll_since';
@@ -1822,6 +1944,8 @@
             if (typeof window.bxHandleCallsPoll === 'function') {
                 window.bxHandleCallsPoll(data.calls || []);
             }
+            if (data.presence) applyPresence(data.presence);
+            applyTyping(data.typing || []);
             if (maxId > since) {
                 since = maxId;
                 localStorage.setItem(storageKey, String(since));

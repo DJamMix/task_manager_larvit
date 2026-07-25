@@ -359,6 +359,17 @@ Route::get('chats-poll', function (\Illuminate\Http\Request $request, \App\Servi
     );
 })->name('platform.systems.chats.poll');
 
+Route::post('chats/{chat}/typing', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $chats->markTyping($chat, $request->user());
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.chats.typing');
+
 Route::get('chats-search', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
     abort_unless($chats->canAccessMessenger($request->user()), 403);
 

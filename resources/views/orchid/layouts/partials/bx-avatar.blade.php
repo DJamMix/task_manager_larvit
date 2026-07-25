@@ -6,6 +6,9 @@
     /** @var \App\Models\Chat|null $avatarChat */
     $avatarUser = $avatarUser ?? null;
     $avatarChat = $avatarChat ?? null;
+    $showOnline = (bool) ($showOnline ?? false);
+    $isOnline = (bool) ($isOnline ?? false);
+    $onlineUserId = $avatarUser?->id;
 
     if ($avatarChat) {
         $title = $avatarChat->displayTitle();
@@ -25,6 +28,10 @@
         }
     }
 @endphp
+@if($showOnline && $onlineUserId)
+<span class="bx-avatar-wrap {{ $isOnline ? 'is-online' : '' }}"
+      data-user-id="{{ $onlineUserId }}">
+@endif
 <span class="bx-avatar bx-avatar--{{ $size }} bx-avatar--{{ $shape }}"
       style="--bx-avatar-bg: {{ $color }}"
       title="{{ $title }}">
@@ -38,3 +45,7 @@
              onerror="this.remove()">
     @endif
 </span>
+@if($showOnline && $onlineUserId)
+    <span class="bx-online-dot" title="В сети" aria-hidden="true"></span>
+</span>
+@endif

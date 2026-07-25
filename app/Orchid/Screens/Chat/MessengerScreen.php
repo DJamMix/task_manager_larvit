@@ -81,6 +81,16 @@ class MessengerScreen extends Screen
 
         $composerTasks = $chats->attachableTasksFor($user, null, 60);
 
+        $chats->touchPresence($user);
+        $presenceMemberIds = $list
+            ->flatMap(fn (Chat $c) => $c->members->pluck('id'))
+            ->push($user->id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $presence = $chats->presenceMap($presenceMemberIds);
+
         $isMuted = false;
         $isPinned = false;
         $canWrite = true;
@@ -118,8 +128,12 @@ class MessengerScreen extends Screen
             'composer_tasks_search_url' => route('platform.systems.chats.tasks'),
             'chat_is_muted' => $isMuted,
             'chat_is_pinned' => $isPinned,
+            'presence' => $presence,
             'chats_poll_url' => route('platform.systems.chats.poll'),
             'chats_search_url' => route('platform.systems.chats.search'),
+            'chats_typing_url' => $resolved
+                ? route('platform.systems.chats.typing', $resolved)
+                : null,
             'chats_messages_url' => $resolved
                 ? route('platform.systems.chats.messages', $resolved)
                 : null,

@@ -162,6 +162,13 @@ class CallService
             return $call;
         });
 
+        $label = $video ? 'видеозвонок' : 'звонок';
+        $this->chats->postSystemMessage(
+            $chat,
+            $actor,
+            "{$actor->displayName()} начал(а) {$label}"
+        );
+
         return $this->connectionPayload($call->fresh(['chat', 'participants']), $actor);
     }
 
@@ -259,6 +266,10 @@ class CallService
                 'status' => ChatCallParticipant::STATUS_LEFT,
                 'left_at' => now(),
             ]);
+
+        if ($call->chat) {
+            $this->chats->postSystemMessage($call->chat, $actor, 'Звонок завершён');
+        }
     }
 
     /**

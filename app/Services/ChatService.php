@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\RoleCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Orchid\Support\Color;
 
@@ -255,10 +256,15 @@ class ChatService
 
     public function pollState(User $user, ?int $sinceMessageId = null, ?int $activeChatId = null): array
     {
+        $this->touchPresence($user);
+
+        $active = null;
         if ($activeChatId) {
-            $active = Chat::query()->find($activeChatId);
+            $active = Chat::query()->with('members')->find($activeChatId);
             if ($active && $active->isMember($user->id)) {
                 $this->markRead($active, $user);
+            } else {
+                $active = null;
             }
         }
 
@@ -282,21 +288,148 @@ class ChatService
                 ->exists();
         }
 
+        $memberIds = $chats
+            ->flatMap(fn (Chat $chat) => $chat->members->pluck('id'))
+            ->push($user->id)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
         return [
             'unread_total' => (int) $chats->sum('unread_count'),
             'sound' => $sound,
             'max_id' => $maxId,
-            'chats' => $chats->map(fn (Chat $chat) => [
-                'id' => (int) $chat->id,
-                'unread' => (int) ($chat->unread_count ?? 0),
-                'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
-                'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? '', 48),
-                'muted' => (bool) $chat->is_muted,
-            ])->values()->all(),
+            'chats' => $chats->map(function (Chat $chat) use ($user) {
+                $peerId = $chat->type === 'direct'
+                    ? $chat->otherMember($user->id)?->id
+                    : null;
+
+                return [
+                    'id' => (int) $chat->id,
+                    'unread' => (int) ($chat->unread_count ?? 0),
+                    'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
+                    'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? '', 48),
+                    'muted' => (bool) $chat->is_muted,
+                    'peer_id' => $peerId ? (int) $peerId : null,
+                ];
+            })->values()->all(),
             'messages' => $this->messagesPayload($user, $activeChatId, $sinceMessageId),
             'receipts' => $this->receiptsPayload($user, $activeChatId),
             'calls' => app(CallService::class)->openCallsPayload($user),
+            'presence' => $this->presenceMap($memberIds),
+            'typing' => $active ? $this->typingPayload($active, $user) : [],
         ];
+    }
+
+    /** Отметить пользователя онлайн (heartbeat при опросе чатов). */
+    public function touchPresence(User $user): void
+    {
+        Cache::put($this->presenceCacheKey($user->id), now()->timestamp, now()->addSeconds(60));
+    }
+
+    /**
+     * @param  list<int>|Collection  $userIds
+     * @return array<int, true> map user_id => true
+     */
+    public function presenceMap(iterable $userIds): array
+    {
+        $ids = collect($userIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->filter()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return [];
+        }
+
+        $online = [];
+        $threshold = now()->timestamp - 45;
+
+        foreach ($ids as $id) {
+            $cached = Cache::get($this->presenceCacheKey($id));
+            if ($cached && (int) $cached >= $threshold) {
+                $online[$id] = true;
+            }
+        }
+
+        $remaining = $ids->reject(fn (int $id) => isset($online[$id]));
+        if ($remaining->isNotEmpty()) {
+            try {
+                DB::table('sessions')
+                    ->whereIn('user_id', $remaining->all())
+                    ->where('last_activity', '>=', $threshold)
+                    ->distinct()
+                    ->pluck('user_id')
+                    ->each(function ($id) use (&$online) {
+                        $online[(int) $id] = true;
+                    });
+            } catch (\Throwable) {
+                // session driver без таблицы sessions — достаточно cache heartbeat
+            }
+        }
+
+        return $online;
+    }
+
+    public function markTyping(Chat $chat, User $actor): void
+    {
+        if (!$chat->isMember($actor->id)) {
+            abort(403);
+        }
+
+        $this->assertCanWriteInChat($chat, $actor);
+        $this->touchPresence($actor);
+
+        Cache::put($this->typingCacheKey($chat->id, $actor->id), [
+            'user_id' => (int) $actor->id,
+            'name' => $actor->displayName(),
+        ], now()->addSeconds(5));
+    }
+
+    public function clearTyping(Chat $chat, User $actor): void
+    {
+        Cache::forget($this->typingCacheKey($chat->id, $actor->id));
+    }
+
+    /**
+     * @return list<array{user_id: int, name: string}>
+     */
+    public function typingPayload(Chat $chat, User $viewer): array
+    {
+        $chat->loadMissing('members');
+        $out = [];
+
+        foreach ($chat->members as $member) {
+            if ((int) $member->id === (int) $viewer->id) {
+                continue;
+            }
+            $data = Cache::get($this->typingCacheKey($chat->id, $member->id));
+            if (is_array($data) && !empty($data['name'])) {
+                $out[] = [
+                    'user_id' => (int) ($data['user_id'] ?? $member->id),
+                    'name' => (string) $data['name'],
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    public function postSystemMessage(Chat $chat, User $actor, string $text): void
+    {
+        $this->postSystem($chat, $actor, $text);
+    }
+
+    private function presenceCacheKey(int $userId): string
+    {
+        return "chat:presence:{$userId}";
+    }
+
+    private function typingCacheKey(int $chatId, int $userId): string
+    {
+        return "chat:{$chatId}:typing:{$userId}";
     }
 
     /**
@@ -795,6 +928,7 @@ class ChatService
         }
 
         $this->assertCanWriteInChat($chat, $actor);
+        $this->clearTyping($chat, $actor);
 
         $rawText = $request->input('message.text');
         $quill = $this->comments->normalizeQuill($rawText);
