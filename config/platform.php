@@ -132,7 +132,9 @@ return [
             '/css/task-workspace.css',
             '/css/act-composer.css',
         ],
-        'scripts'     => [],
+        'scripts'     => [
+            '/js/chat-notify.js',
+        ],
     ],
 
     /*

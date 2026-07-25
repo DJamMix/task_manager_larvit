@@ -133,15 +133,57 @@ Route::get('task/attachment/download/{attachment}', function (Attachment $attach
     }
 
     $mime = (string) ($attachment->mime ?: mime_content_type($path) ?: 'application/octet-stream');
+    $ext = strtolower((string) ($attachment->extension
+        ?: pathinfo((string) $attachment->original_name, PATHINFO_EXTENSION)));
+    $isVoiceGroup = ($attachment->group ?? '') === 'voice';
+
+    if ($isVoiceGroup && ($ext === '' || $mime === 'application/octet-stream' || $mime === 'video/webm')) {
+        $head = (string) @file_get_contents($path, false, null, 0, 16);
+        if (str_starts_with($head, 'RIFF')) {
+            $mime = 'audio/wav';
+            $ext = 'wav';
+        } elseif (str_starts_with($head, 'OggS')) {
+            $mime = 'audio/ogg';
+            $ext = 'ogg';
+        } elseif (strlen($head) >= 4 && $head[0] === "\x1A" && $head[1] === "\x45") {
+            $mime = 'audio/webm';
+            $ext = 'webm';
+        }
+    }
+
+    $isVoice = $isVoiceGroup
+        || in_array($ext, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true)
+        || str_starts_with($mime, 'audio/')
+        || (
+            in_array($mime, ['video/webm', 'video/mp4', 'application/octet-stream'], true)
+            && in_array($ext, ['webm', 'ogg', 'm4a', 'mp4', 'wav'], true)
+        );
+
+    // Голосовые часто приходят как video/webm или octet-stream — без нормализации <audio> молчит
+    if ($isVoice) {
+        $mime = match (true) {
+            str_contains($mime, 'wav') || $ext === 'wav' => 'audio/wav',
+            str_contains($mime, 'mpeg') || $ext === 'mp3' => 'audio/mpeg',
+            str_contains($mime, 'ogg') || in_array($ext, ['ogg', 'oga', 'opus'], true) => 'audio/ogg',
+            str_contains($mime, 'mp4') || in_array($ext, ['m4a', 'mp4', 'aac'], true) => 'audio/mp4',
+            str_contains($mime, 'webm') || $ext === 'webm' => 'audio/webm',
+            default => (str_starts_with($mime, 'audio/') ? $mime : 'audio/wav'),
+        };
+    }
+
     $inline = request()->boolean('inline')
+        || $isVoice
         || str_starts_with($mime, 'audio/')
         || str_starts_with($mime, 'image/')
-        || $mime === 'video/mp4';
+        || $mime === 'video/mp4'
+        || $mime === 'video/webm';
 
     if ($inline) {
         return response()->file($path, [
             'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="' . addslashes((string) $attachment->original_name) . '"',
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'private, max-age=3600',
         ]);
     }
 

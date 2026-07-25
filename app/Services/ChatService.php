@@ -272,12 +272,13 @@ class ChatService
 
         $sound = false;
         if ($sinceMessageId && $sinceMessageId > 0) {
+            // Звук для любых новых чужих сообщений (кроме замьюченных чатов).
+            // Активный чат тоже учитываем — клиент сам решит, играть ли при открытой вкладке.
             $sound = ChatMessage::query()
                 ->where('user_id', '!=', $user->id)
                 ->where('id', '>', $sinceMessageId)
                 ->whereIn('chat_id', $chatIds)
                 ->when($mutedIds !== [], fn ($q) => $q->whereNotIn('chat_id', $mutedIds))
-                ->when($activeChatId, fn ($q) => $q->where('chat_id', '!=', $activeChatId))
                 ->exists();
         }
 
@@ -595,8 +596,8 @@ class ChatService
                 if (!$okMime && !in_array($ext, $allowedExt, true)) {
                     abort(422, 'Голосовое сообщение должно быть аудиофайлом');
                 }
-                // ~3 мин при типичном bitrate webm/opus — жёсткий потолок размера
-                if ($uploaded->getSize() > 8 * 1024 * 1024) {
+                // WAV до ~3 мин / 16kHz ≈ 6 МБ; webm меньше
+                if ($uploaded->getSize() > 12 * 1024 * 1024) {
                     abort(422, 'Голосовое сообщение слишком большое (макс. 3 минуты)');
                 }
                 if ($voiceDuration > 180) {
@@ -606,6 +607,38 @@ class ChatService
                 $file = new \Orchid\Attachment\File($uploaded, 'public');
                 $attachment = $file->load();
                 $attachment->group = 'voice';
+                // Нормализуем mime/расширение — иначе на других браузерах файл «не звучит»
+                if ($ext === '' || $ext === 'bin' || $ext === 'tmp') {
+                    if (str_contains($mime, 'wav')) {
+                        $ext = 'wav';
+                    } elseif (str_contains($mime, 'mp4') || str_contains($mime, 'm4a') || str_contains($mime, 'aac')) {
+                        $ext = 'm4a';
+                    } elseif (str_contains($mime, 'ogg')) {
+                        $ext = 'ogg';
+                    } elseif (str_contains($mime, 'webm')) {
+                        $ext = 'webm';
+                    } elseif (str_contains($mime, 'mpeg') || str_contains($mime, 'mp3')) {
+                        $ext = 'mp3';
+                    } else {
+                        $ext = 'wav';
+                    }
+                }
+                if ($mime === '' || $mime === 'application/octet-stream') {
+                    $mime = match ($ext) {
+                        'wav' => 'audio/wav',
+                        'm4a', 'mp4' => 'audio/mp4',
+                        'ogg', 'oga', 'opus' => 'audio/ogg',
+                        'webm' => 'audio/webm',
+                        'mp3' => 'audio/mpeg',
+                        'aac' => 'audio/aac',
+                        default => 'audio/wav',
+                    };
+                }
+                $attachment->mime = $mime;
+                $attachment->extension = $ext;
+                if (empty($attachment->original_name) || !str_contains((string) $attachment->original_name, '.')) {
+                    $attachment->original_name = 'voice.' . $ext;
+                }
                 $attachment->save();
                 $attachmentIds->push($attachment->id);
                 $isVoice = true;

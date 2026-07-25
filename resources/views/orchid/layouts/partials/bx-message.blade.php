@@ -21,6 +21,9 @@
     }
 
     $isVoiceAttachment = function ($file): bool {
+        if (($file->group ?? '') === 'voice') {
+            return true;
+        }
         $mime = strtolower((string) ($file->mime ?? ''));
         if (str_starts_with($mime, 'audio/') || $mime === 'video/mp4') {
             return true;
