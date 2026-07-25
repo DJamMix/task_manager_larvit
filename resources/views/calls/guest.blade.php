@@ -122,7 +122,7 @@
         }
         .stage-body { flex: 1 1 auto; min-height: 0; position: relative; display: flex; flex-direction: column; }
         .focus { display: none; flex: 1 1 auto; min-height: 0; padding: .65rem; }
-        .stage.has-screen .focus { display: block; }
+        .stage.has-screen .focus { display: none; }
         .pip-layer { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
         .grid {
             flex: 1 1 auto; min-height: 0; overflow: auto;
@@ -130,7 +130,7 @@
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             align-content: center;
         }
-        .stage.has-screen .grid { display: none; }
+        .stage.has-screen .grid { display: grid; }
         .strip-wrap {
             border-top: 1px solid var(--line);
             background: rgba(2,6,23,.55);
@@ -162,7 +162,13 @@
             border-color: #22c55e;
             box-shadow: 0 0 0 3px rgba(34,197,94,.25);
         }
-        .tile.is-screen { width: 100%; height: 100%; min-height: 220px; aspect-ratio: auto; }
+        .tile.is-screen { aspect-ratio: 16/10; min-height: 160px; }
+        .tile .fs {
+            position: absolute; top: .5rem; right: .5rem; z-index: 5;
+            border: 0; width: 34px; height: 34px; border-radius: 10px;
+            background: rgba(15,23,42,.72); color: #e2e8f0; cursor: pointer;
+        }
+        .tile .fs[hidden] { display: none !important; }
         .tile.is-pip {
             position: absolute; width: min(220px, 42vw); aspect-ratio: 16/10; min-height: 0;
             pointer-events: auto; cursor: grab; z-index: 7;
@@ -396,6 +402,6 @@ window.BX_GUEST_CALL = {
     defaultVideo: @json((bool) $video),
 };
 </script>
-<script src="{{ asset('js/call-guest.js') }}?v=20260725n"></script>
+<script src="{{ asset('js/call-guest.js') }}?v=20260725o"></script>
 </body>
 </html>

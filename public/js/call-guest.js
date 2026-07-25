@@ -210,9 +210,9 @@
         const screens = allTiles().filter((t) => t.classList.contains('is-screen'));
         const hasScreen = screens.length > 0;
         stage.classList.toggle('has-screen', hasScreen);
+        if (stripWrap) stripWrap.hidden = true;
 
         if (!hasScreen) {
-            if (stripWrap) stripWrap.hidden = true;
             allTiles().forEach((t) => {
                 t.classList.remove('is-pip');
                 t.style.left = t.style.top = t.style.right = t.style.bottom = '';
@@ -221,17 +221,14 @@
             return;
         }
 
-        if (stripWrap) {
-            stripWrap.hidden = false;
-            stripWrap.classList.toggle('is-collapsed', !!stripHidden);
-            if (stripLabel) stripLabel.textContent = stripHidden ? 'Показать участников' : 'Скрыть участников';
-        }
-
         const sharers = new Set(screens.map((s) => s.getAttribute('data-user')));
-        screens.forEach((s) => focusEl.appendChild(s));
-
         allTiles().forEach((t) => {
-            if (t.classList.contains('is-screen')) return;
+            if (t.classList.contains('is-screen')) {
+                t.classList.remove('is-pip');
+                t.style.left = t.style.top = t.style.right = t.style.bottom = '';
+                grid.appendChild(t);
+                return;
+            }
             const uid = t.getAttribute('data-user');
             if (sharers.has(uid) && t.classList.contains('has-video')) {
                 t.classList.add('is-pip');
@@ -246,7 +243,7 @@
             } else {
                 t.classList.remove('is-pip');
                 t.style.left = t.style.top = t.style.right = t.style.bottom = '';
-                stripEl.appendChild(t);
+                grid.appendChild(t);
             }
         });
     };
@@ -276,18 +273,28 @@
                 '<video playsinline autoplay muted></video>',
                 '<audio autoplay></audio>',
                 '<div class="shade"></div>',
+                '<button type="button" class="fs" title="На весь экран" hidden>⛶</button>',
                 '<div class="footer">',
                 '  <div class="nm"></div>',
                 '  <label class="vol" title="Громкость у вас"><span>♪</span><input type="range" min="0" max="100" step="5" value="100"><span class="val">100%</span></label>',
                 '</div>',
             ].join('');
-            (screen ? focusEl : grid).appendChild(el);
+            grid.appendChild(el);
             el.querySelector('.vol input')?.addEventListener('input', (ev) => {
                 const pct = parseInt(ev.target.value, 10) || 0;
                 setVol(id, pct);
                 applyVol(el, id);
                 const screenTile = findTile(tileKey(id, true));
                 if (screenTile && screenTile !== el) applyVol(screenTile, id);
+            });
+            el.querySelector('.fs')?.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                const video = el.querySelector('video') || el;
+                try {
+                    if (document.fullscreenElement) document.exitFullscreen();
+                    else if (video.requestFullscreen) video.requestFullscreen();
+                    else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
+                } catch (e) {}
             });
         }
 
@@ -301,6 +308,8 @@
         }
         const vol = el.querySelector('.vol');
         if (vol) vol.hidden = !!isLocal;
+        const fs = el.querySelector('.fs');
+        if (fs) fs.hidden = !screen;
         applyVol(el, id);
         refreshLayout();
         return el;

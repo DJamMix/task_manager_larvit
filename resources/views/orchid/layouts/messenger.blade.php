@@ -2099,5 +2099,5 @@
 })();
 </script>
 @if(!empty($calls_enabled))
-<script src="{{ asset('js/chat-calls.js') }}?v=20260725m"></script>
+<script src="{{ asset('js/chat-calls.js') }}?v=20260725o"></script>
 @endif

@@ -2555,16 +2555,17 @@ body.bx-lightbox-open { overflow: hidden; }
     min-height: 0;
     padding: 0.65rem;
 }
-.bx-call-stage.has-screen .bx-call-focus {
+.bx-call-stage.screen-expanded .bx-call-focus {
     display: block;
+}
+.bx-call-stage.screen-expanded .bx-call-stage__grid {
+    display: none;
 }
 .bx-call-focus .bx-call-tile.is-screen {
     width: 100%;
     height: 100%;
     min-height: 220px;
     aspect-ratio: auto;
-    grid-column: auto;
-    order: 0;
 }
 .bx-call-pip-layer {
     position: absolute;
@@ -2616,8 +2617,7 @@ body.bx-lightbox-open { overflow: hidden; }
     min-height: 96px;
     aspect-ratio: 16 / 10;
 }
-.bx-call-stage.has-screen .bx-call-stage__grid:empty { display: none; }
-.bx-call-stage:not(.has-screen) .bx-call-stage__grid {
+.bx-call-stage__grid {
     flex: 1 1 auto;
     min-height: 0;
     display: grid;
@@ -2628,17 +2628,7 @@ body.bx-lightbox-open { overflow: hidden; }
     align-content: center;
 }
 .bx-call-stage.has-screen .bx-call-stage__grid {
-    display: none;
-}
-.bx-call-stage__grid {
-    flex: 1 1 auto;
-    min-height: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 0.75rem;
-    padding: 0.85rem;
-    overflow: auto;
-    align-content: center;
 }
 .bx-call-tile {
     position: relative;
@@ -2761,15 +2751,29 @@ body.bx-lightbox-open { overflow: hidden; }
     text-align: right;
 }
 .bx-call-tile.is-screen {
-    grid-column: 1 / -1;
-    aspect-ratio: 16 / 9;
-    min-height: 240px;
-    order: -1;
-}
-.bx-call-stage.has-screen .bx-call-tile.is-screen {
-    grid-column: auto;
+    aspect-ratio: 16 / 10;
+    min-height: 160px;
     order: 0;
+    grid-column: auto;
 }
+.bx-call-tile__fs {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 5;
+    border: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #e2e8f0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.bx-call-tile__fs[hidden] { display: none !important; }
+.bx-call-tile__fs:hover { background: rgba(30, 41, 59, 0.95); }
 .bx-call-tile__screen-ico {
     width: 88px !important;
     height: 88px !important;

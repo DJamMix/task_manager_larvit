@@ -69,8 +69,66 @@
     let joinableCallId = null;
     let livekitReady = null;
     let disconnecting = false;
+    let ringTimer = null;
+    let ringCtx = null;
     const metaById = {};
     const decoder = new TextDecoder();
+
+    const stopCallRingtone = () => {
+        if (ringTimer) {
+            clearInterval(ringTimer);
+            ringTimer = null;
+        }
+        try {
+            if (ringCtx) {
+                ringCtx.close();
+                ringCtx = null;
+            }
+        } catch (e) {}
+    };
+
+    /** Мелодия входящего личного звонка (не для групп) */
+    const startCallRingtone = () => {
+        stopCallRingtone();
+        if (!window.__bxChatSoundUnlocked && !window.__bxChatAudioCtx) {
+            // попробуем всё равно после unlock в notify
+        }
+        const playBurst = () => {
+            try {
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return;
+                const base = window.__bxChatAudioCtx = window.__bxChatAudioCtx || new Ctx();
+                if (base.state === 'suspended') base.resume();
+                const ctx = base;
+                const volScale = (typeof window.__bxChatNotifyVolume === 'number'
+                    ? window.__bxChatNotifyVolume
+                    : 75) / 100;
+                if (volScale <= 0) return;
+                const t0 = ctx.currentTime;
+                // два гудка «тррр — тррр» как телефон
+                const beep = (start, freq) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, t0 + start);
+                    g.gain.setValueAtTime(0.0001, t0 + start);
+                    g.gain.exponentialRampToValueAtTime(0.22 * volScale, t0 + start + 0.03);
+                    g.gain.setValueAtTime(0.22 * volScale, t0 + start + 0.35);
+                    g.gain.exponentialRampToValueAtTime(0.0001, t0 + start + 0.45);
+                    o.connect(g);
+                    g.connect(ctx.destination);
+                    o.start(t0 + start);
+                    o.stop(t0 + start + 0.48);
+                };
+                beep(0, 440);
+                beep(0.08, 480);
+                beep(0.55, 440);
+                beep(0.63, 480);
+            } catch (e) {}
+        };
+        playBurst();
+        ringTimer = setInterval(playBurst, 2200);
+    };
 
     const postJson = async (url, body) => {
         const res = await fetch(url, {
@@ -207,11 +265,12 @@
         if (!stage) return;
         const screens = allTiles().filter((t) => t.classList.contains('is-screen'));
         const hasScreen = screens.length > 0;
+        // Демка в общей сетке (не на всю ширину). PIP — вебка шарящего.
         stage.classList.toggle('has-screen', hasScreen);
+        stage.classList.remove('screen-expanded');
+        if (stripWrap) stripWrap.hidden = true;
 
         if (!hasScreen) {
-            if (stripWrap) stripWrap.hidden = true;
-            stage.classList.remove('strip-collapsed');
             allTiles().forEach((t) => {
                 t.classList.remove('is-pip');
                 t.style.left = '';
@@ -223,17 +282,15 @@
             return;
         }
 
-        if (stripWrap) {
-            stripWrap.hidden = false;
-            stripWrap.classList.toggle('is-collapsed', !!stripHidden);
-            if (stripLabel) stripLabel.textContent = stripHidden ? 'Показать участников' : 'Скрыть участников';
-        }
-
         const sharerIds = new Set(screens.map((s) => s.getAttribute('data-user')));
-        screens.forEach((s) => focusEl?.appendChild(s));
-
+        // экраны и остальные — в сетке; вебка шарящего — перетаскиваемый PIP
         allTiles().forEach((t) => {
-            if (t.classList.contains('is-screen')) return;
+            if (t.classList.contains('is-screen')) {
+                t.classList.remove('is-pip');
+                t.style.left = t.style.top = t.style.right = t.style.bottom = '';
+                grid?.appendChild(t);
+                return;
+            }
             const uid = t.getAttribute('data-user');
             if (sharerIds.has(uid) && t.classList.contains('has-video')) {
                 t.classList.add('is-pip');
@@ -247,13 +304,31 @@
                 makeDraggable(t);
             } else {
                 t.classList.remove('is-pip');
-                t.style.left = '';
-                t.style.top = '';
-                t.style.right = '';
-                t.style.bottom = '';
-                stripEl?.appendChild(t);
+                t.style.left = t.style.top = t.style.right = t.style.bottom = '';
+                grid?.appendChild(t);
             }
         });
+    };
+
+    const toggleScreenFullscreen = async (tile) => {
+        if (!tile) return;
+        const target = tile.querySelector('.bx-call-tile__video') || tile;
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen();
+                return;
+            }
+            if (target.requestFullscreen) await target.requestFullscreen();
+            else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+        } catch (e) {
+            // fallback: CSS-разворот внутри сцены
+            stage?.classList.toggle('screen-expanded');
+            if (stage?.classList.contains('screen-expanded')) {
+                focusEl?.appendChild(tile);
+            } else {
+                refreshLayout();
+            }
+        }
     };
 
     const parseMeta = (participant) => {
@@ -344,6 +419,9 @@
                 '<video class="bx-call-tile__video" playsinline autoplay muted></video>',
                 '<audio class="bx-call-tile__audio" autoplay></audio>',
                 '<div class="bx-call-tile__shade"></div>',
+                '<button type="button" class="bx-call-tile__fs" title="На весь экран" hidden aria-label="На весь экран">',
+                '  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>',
+                '</button>',
                 '<div class="bx-call-tile__footer">',
                 '  <div class="bx-call-tile__name"></div>',
                 '  <label class="bx-call-tile__vol" title="Громкость у вас">',
@@ -354,7 +432,7 @@
                 '</div>',
                 '<div class="bx-call-tile__pulse" aria-hidden="true"></div>',
             ].join('');
-            (isScreen ? focusEl : grid)?.appendChild(el);
+            grid?.appendChild(el);
 
             const range = el.querySelector('.bx-call-tile__vol-range');
             range?.addEventListener('input', () => {
@@ -364,11 +442,17 @@
                 const screenTile = findTile(tileKey(id, true));
                 if (screenTile && screenTile !== el) applyAudioVolume(screenTile, id);
             });
+            el.querySelector('.bx-call-tile__fs')?.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                toggleScreenFullscreen(el);
+            });
         }
 
         const isLocal = id === String(room?.localParticipant?.identity);
         const nameEl = el.querySelector('.bx-call-tile__name');
         const volWrap = el.querySelector('.bx-call-tile__vol');
+        const fsBtn = el.querySelector('.bx-call-tile__fs');
+        if (fsBtn) fsBtn.hidden = !isScreen;
         if (nameEl) {
             nameEl.textContent = isScreen
                 ? ((isLocal ? 'Ваш экран' : (info.name || id) + ' · экран'))
@@ -525,8 +609,9 @@
         clearInterval(timerIv);
         if (stage) {
             stage.hidden = true;
-            stage.classList.remove('has-screen', 'strip-collapsed');
+            stage.classList.remove('has-screen', 'strip-collapsed', 'screen-expanded');
         }
+        stopCallRingtone();
         if (grid) grid.innerHTML = '';
         if (focusEl) focusEl.innerHTML = '';
         if (pipLayer) pipLayer.innerHTML = '';
@@ -568,6 +653,7 @@
     };
 
     const hangup = async () => {
+        stopCallRingtone();
         const id = callId;
         const gen = roomGen;
         await disconnectRoom();
@@ -578,6 +664,7 @@
     };
 
     const endForAll = async () => {
+        stopCallRingtone();
         const id = callId;
         const gen = roomGen;
         // Сначала сигнал участникам в LiveKit, потом API, потом свой выход
@@ -710,6 +797,7 @@
         document.body.classList.add('bx-call-open');
         if (incoming) incoming.hidden = true;
         if (activeBar) activeBar.hidden = true;
+        stopCallRingtone();
         if (devicesPanel) devicesPanel.hidden = true;
         if (grid) grid.innerHTML = '';
         if (focusEl) focusEl.innerHTML = '';
@@ -986,13 +1074,21 @@
             alert('Камера недоступна. Разрешите доступ в браузере.');
         }
     });
-    document.getElementById('bx-incoming-accept')?.addEventListener('click', () => joinById(ringingCallId));
-    document.getElementById('bx-incoming-decline')?.addEventListener('click', () => declineIncoming());
+    document.getElementById('bx-incoming-accept')?.addEventListener('click', () => {
+        stopCallRingtone();
+        joinById(ringingCallId);
+    });
+    document.getElementById('bx-incoming-decline')?.addEventListener('click', () => {
+        stopCallRingtone();
+        declineIncoming();
+    });
     document.getElementById('bx-active-call-join')?.addEventListener('click', () => joinById(joinableCallId));
     stripToggle?.addEventListener('click', () => {
         stripHidden = !stripHidden;
         refreshLayout();
     });
+
+    const joinBtn = document.getElementById('bx-active-call-join');
 
     window.bxHandleCallsPoll = function (calls) {
         if (!Array.isArray(calls)) return;
@@ -1000,7 +1096,6 @@
         if (callId) {
             const still = calls.find((c) => Number(c.id) === Number(callId));
             if (!still) {
-                // звонок завершили для всех (или он пропал) — выходим у всех
                 forceCallEnded();
             }
             return;
@@ -1019,32 +1114,59 @@
                 }
                 setIncomingAvatar(invite);
                 if (incoming) incoming.hidden = false;
-                if (typeof window.bxPlayChatNotify === 'function') window.bxPlayChatNotify();
+                startCallRingtone();
             }
         } else {
             ringingCallId = null;
             if (incoming) incoming.hidden = true;
+            stopCallRingtone();
         }
 
-        // Группа и личный: баннер «Присоединиться» только в открытом чате
+        // Группа / личный: баннер в открытом чате, в т.ч. после F5 (статус joined)
         const inChat = calls.find((c) =>
             String(c.chat_id) === activeChatId
-            && c.my_status !== 'joined'
             && c.my_status !== 'declined'
-            && !c.is_mine
         );
         if (inChat) {
             joinableCallId = inChat.id;
+            const reconnect = inChat.my_status === 'joined' || inChat.is_mine;
             if (activeBarText) {
                 const kind = inChat.chat_type === 'direct' ? 'Личный звонок' : 'Групповой звонок';
                 activeBarText.textContent = kind
                     + (inChat.video ? ' · видео' : '')
-                    + ' · ' + (inChat.participants || 0) + ' в эфире';
+                    + ' · ' + (inChat.participants || 0) + ' в эфире'
+                    + (reconnect ? ' · можно переподключиться' : '');
+            }
+            if (joinBtn) {
+                joinBtn.textContent = reconnect ? 'Переподключиться' : 'Присоединиться';
             }
             if (activeBar) activeBar.hidden = false;
         } else {
             joinableCallId = null;
             if (activeBar) activeBar.hidden = true;
+            if (joinBtn) joinBtn.textContent = 'Присоединиться';
         }
     };
+
+    // При перезагрузке/закрытии вкладки — выходим из комнаты в БД, чтобы не «висеть»
+    const leaveOnUnload = () => {
+        if (!callId) return;
+        const url = callUrl(callId, 'leave');
+        try {
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                },
+                credentials: 'same-origin',
+                body: '{}',
+                keepalive: true,
+            });
+        } catch (e) {}
+    };
+    window.addEventListener('pagehide', leaveOnUnload);
+    window.addEventListener('beforeunload', leaveOnUnload);
 })();
