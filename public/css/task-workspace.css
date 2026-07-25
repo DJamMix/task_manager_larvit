@@ -1615,7 +1615,99 @@
     margin-bottom: 0.35rem;
 }
 
-.bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; }
+.bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.4rem; align-items: flex-start; }
+
+.bx-msg__image {
+    display: block;
+    max-width: min(260px, 72vw);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #0f172a0a;
+    line-height: 0;
+    cursor: zoom-in;
+}
+.bx-msg__image img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 320px;
+    object-fit: cover;
+}
+.bx-msg--mine .bx-msg__image {
+    border-color: rgba(34, 197, 94, 0.25);
+}
+
+.bx-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+.bx-lightbox[hidden] { display: none !important; }
+.bx-lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: rgba(15, 23, 42, 0.82);
+    cursor: zoom-out;
+}
+.bx-lightbox__panel {
+    position: relative;
+    z-index: 1;
+    max-width: min(960px, 96vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+}
+.bx-lightbox__img {
+    max-width: 100%;
+    max-height: calc(92vh - 2.5rem);
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    background: #0b1220;
+}
+.bx-lightbox__close {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.35rem;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 999px;
+    background: #fff;
+    color: #0f172a;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+.bx-lightbox__open {
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    text-decoration: underline;
+}
+body.bx-lightbox-open { overflow: hidden; }
+
+.bx-voice.is-error {
+    outline: 1px solid #f87171;
+    outline-offset: 2px;
+}
+.bx-voice.is-error::after {
+    content: 'не воспроизводится';
+    display: block;
+    font-size: 0.68rem;
+    color: #b91c1c;
+    margin-top: 0.2rem;
+}
 
 .bx-msg__reply-btn {
     border: 0;

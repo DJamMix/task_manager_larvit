@@ -125,9 +125,29 @@
         @if($otherFiles->isNotEmpty())
             <div class="bx-msg__files">
                 @foreach($otherFiles as $file)
-                    <a href="{{ route('platform.task.attachment.download', $file) }}" class="badge text-bg-light border text-decoration-none">
-                        {{ $file->original_name }}
-                    </a>
+                    @php
+                        $fileMime = strtolower((string) ($file->mime ?? ''));
+                        $fileExt = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
+                        $isImage = str_starts_with($fileMime, 'image/')
+                            || in_array($fileExt, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+                        $fileUrl = route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]);
+                        $downloadUrl = route('platform.task.attachment.download', $file);
+                    @endphp
+                    @if($isImage)
+                        <a href="{{ $fileUrl }}"
+                           class="bx-msg__image"
+                           data-bx-lightbox="{{ $fileUrl }}"
+                           title="{{ $file->original_name }}">
+                            <img src="{{ $fileUrl }}"
+                                 alt="{{ $file->original_name }}"
+                                 loading="lazy"
+                                 decoding="async">
+                        </a>
+                    @else
+                        <a href="{{ $downloadUrl }}" class="badge text-bg-light border text-decoration-none">
+                            {{ $file->original_name }}
+                        </a>
+                    @endif
                 @endforeach
             </div>
         @endif

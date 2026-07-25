@@ -586,63 +586,73 @@ class ChatService
 
         if ($request->hasFile('message_voice')) {
             $uploaded = $request->file('message_voice');
-            if ($uploaded && $uploaded->isValid()) {
-                $mime = strtolower((string) $uploaded->getMimeType());
-                $ext = strtolower((string) $uploaded->getClientOriginalExtension());
-                $allowedExt = ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'mp4', 'wav', 'aac', 'opus'];
-                $okMime = str_starts_with($mime, 'audio/')
-                    || $mime === 'video/mp4'
-                    || $mime === 'application/octet-stream';
-                if (!$okMime && !in_array($ext, $allowedExt, true)) {
-                    abort(422, 'Голосовое сообщение должно быть аудиофайлом');
+            if (!$uploaded || !$uploaded->isValid()) {
+                $code = $uploaded?->getError();
+                if (in_array($code, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                    abort(422, 'Голосовое слишком большое для сервера (увеличьте upload_max_filesize в PHP до 16M).');
                 }
-                // WAV до ~3 мин / 16kHz ≈ 6 МБ; webm меньше
-                if ($uploaded->getSize() > 12 * 1024 * 1024) {
-                    abort(422, 'Голосовое сообщение слишком большое (макс. 3 минуты)');
-                }
-                if ($voiceDuration > 180) {
-                    abort(422, 'Голосовое сообщение не длиннее 3 минут');
-                }
-
-                $file = new \Orchid\Attachment\File($uploaded, 'public');
-                $attachment = $file->load();
-                $attachment->group = 'voice';
-                // Нормализуем mime/расширение — иначе на других браузерах файл «не звучит»
-                if ($ext === '' || $ext === 'bin' || $ext === 'tmp') {
-                    if (str_contains($mime, 'wav')) {
-                        $ext = 'wav';
-                    } elseif (str_contains($mime, 'mp4') || str_contains($mime, 'm4a') || str_contains($mime, 'aac')) {
-                        $ext = 'm4a';
-                    } elseif (str_contains($mime, 'ogg')) {
-                        $ext = 'ogg';
-                    } elseif (str_contains($mime, 'webm')) {
-                        $ext = 'webm';
-                    } elseif (str_contains($mime, 'mpeg') || str_contains($mime, 'mp3')) {
-                        $ext = 'mp3';
-                    } else {
-                        $ext = 'wav';
-                    }
-                }
-                if ($mime === '' || $mime === 'application/octet-stream') {
-                    $mime = match ($ext) {
-                        'wav' => 'audio/wav',
-                        'm4a', 'mp4' => 'audio/mp4',
-                        'ogg', 'oga', 'opus' => 'audio/ogg',
-                        'webm' => 'audio/webm',
-                        'mp3' => 'audio/mpeg',
-                        'aac' => 'audio/aac',
-                        default => 'audio/wav',
-                    };
-                }
-                $attachment->mime = $mime;
-                $attachment->extension = $ext;
-                if (empty($attachment->original_name) || !str_contains((string) $attachment->original_name, '.')) {
-                    $attachment->original_name = 'voice.' . $ext;
-                }
-                $attachment->save();
-                $attachmentIds->push($attachment->id);
-                $isVoice = true;
+                abort(422, 'Не удалось загрузить голосовое. Проверьте микрофон и попробуйте ещё раз.');
             }
+
+            $mime = strtolower((string) $uploaded->getMimeType());
+            $ext = strtolower((string) $uploaded->getClientOriginalExtension());
+            $allowedExt = ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'mp4', 'wav', 'aac', 'opus'];
+            $okMime = str_starts_with($mime, 'audio/')
+                || $mime === 'video/mp4'
+                || $mime === 'video/webm'
+                || $mime === 'application/octet-stream';
+            if (!$okMime && !in_array($ext, $allowedExt, true)) {
+                abort(422, 'Голосовое сообщение должно быть аудиофайлом');
+            }
+            // WAV 16 kHz / 3 мин ≈ 6 МБ
+            if ($uploaded->getSize() > 12 * 1024 * 1024) {
+                abort(422, 'Голосовое сообщение слишком большое (макс. 3 минуты)');
+            }
+            if ($voiceDuration > 180) {
+                abort(422, 'Голосовое сообщение не длиннее 3 минут');
+            }
+
+            $file = new \Orchid\Attachment\File($uploaded, 'public');
+            $attachment = $file->load();
+            $attachment->group = 'voice';
+            // Нормализуем mime/расширение — иначе на других браузерах файл «не звучит»
+            if ($ext === '' || $ext === 'bin' || $ext === 'tmp') {
+                if (str_contains($mime, 'wav')) {
+                    $ext = 'wav';
+                } elseif (str_contains($mime, 'mp4') || str_contains($mime, 'm4a') || str_contains($mime, 'aac')) {
+                    $ext = 'm4a';
+                } elseif (str_contains($mime, 'ogg')) {
+                    $ext = 'ogg';
+                } elseif (str_contains($mime, 'webm')) {
+                    $ext = 'webm';
+                } elseif (str_contains($mime, 'mpeg') || str_contains($mime, 'mp3')) {
+                    $ext = 'mp3';
+                } else {
+                    $ext = 'wav';
+                }
+            }
+            if ($mime === '' || $mime === 'application/octet-stream' || $mime === 'video/webm') {
+                $mime = match ($ext) {
+                    'wav' => 'audio/wav',
+                    'm4a', 'mp4' => 'audio/mp4',
+                    'ogg', 'oga', 'opus' => 'audio/ogg',
+                    'webm' => 'audio/webm',
+                    'mp3' => 'audio/mpeg',
+                    'aac' => 'audio/aac',
+                    default => 'audio/wav',
+                };
+            }
+            $attachment->mime = $mime;
+            $attachment->extension = $ext;
+            if (empty($attachment->original_name) || !str_contains((string) $attachment->original_name, '.')) {
+                $attachment->original_name = 'voice.' . $ext;
+            }
+            $attachment->save();
+            $attachmentIds->push($attachment->id);
+            $isVoice = true;
+        } elseif ((int) $request->input('message.voice_duration', 0) > 0) {
+            // Клиент думал, что отправил голос, но PHP отбросил файл (часто из‑за upload_max_filesize)
+            abort(422, 'Голосовое не дошло до сервера. Частая причина — лимит PHP upload_max_filesize (нужно ≥ 8–16M).');
         }
 
         if ($request->hasFile('message_files')) {
