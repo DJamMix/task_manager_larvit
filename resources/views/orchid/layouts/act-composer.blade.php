@@ -74,34 +74,35 @@
             </label>
 
             <label class="act-field">
-                <span>Заказчик</span>
+                <span>Заказчик (полное наименование)</span>
                 <input type="text"
                        name="act[customer]"
                        class="form-control"
                        form="post-form"
                        value="{{ $header['customer'] ?? '' }}"
                        required
-                       placeholder="ООО «…»">
+                       placeholder="ООО «Название» / ИП ФИО">
             </label>
 
             <label class="act-field">
-                <span>Исполнитель</span>
+                <span>Исполнитель (полное наименование / ФИО)</span>
                 <input type="text"
                        name="act[executor]"
                        class="form-control"
                        form="post-form"
                        value="{{ $header['executor'] ?? '' }}"
-                       required>
+                       required
+                       placeholder="ФИО / ИП / самозанятый">
             </label>
 
             <label class="act-field act-field--wide">
-                <span>Комментарий к акту</span>
+                <span>Основание (договор) или примечание</span>
                 <input type="text"
                        name="act[info]"
                        class="form-control"
                        form="post-form"
                        value="{{ $header['info'] ?? '' }}"
-                       placeholder="Необязательно">
+                       placeholder="Напр.: договора № 12 от 01.02.2026">
             </label>
         </div>
     </div>

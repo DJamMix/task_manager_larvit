@@ -201,37 +201,49 @@ class ActEditScreen extends Screen
     public function downloadWord(Act $act)
     {
         try {
-            $act->load(['tasks']);
+            $act->load(['tasks', 'project']);
 
             $tasksData = [];
             $totalHours = 0.0;
 
             foreach ($act->tasks as $task) {
-                $hours = (float) ($task->pivot->hours ?? 0);
+                $hours = round((float) ($task->pivot->hours ?? 0), 2);
                 $totalHours += $hours;
                 $tasksData[] = [
-                    'name' => (string) ($task->name ?? 'Задача'),
-                    'description' => '',
+                    'name' => (string) ($task->name ?? 'Услуга'),
                     'hours' => $hours,
-                    'amount' => 0,
                 ];
+            }
+            $totalHours = round($totalHours, 2);
+
+            $info = trim((string) ($act->info ?? ''));
+            // Если в комментарии похоже на реквизиты договора — вынесем в contract_ref
+            $contractRef = '';
+            if ($info !== '' && preg_match('/договор/iu', $info)) {
+                $contractRef = $info;
+                $info = '';
             }
 
             $data = [
                 'act' => [
                     'number' => (string) $act->number,
                     'date' => $act->date,
+                    'date_long' => \App\Support\ActDocumentFormatter::dateLong($act->date),
+                    'city' => 'г. ________',
                     'customer' => (string) $act->customer,
                     'executor' => (string) $act->executor,
-                    'customer_director' => '',
-                    'executor_fullname' => (string) $act->executor,
+                    'info' => $info,
+                    'contract_ref' => $contractRef,
+                    'hours_text' => \App\Support\ActDocumentFormatter::hoursWithWords($totalHours),
+                    'project' => $act->project?->name,
                 ],
                 'tasks' => $tasksData,
                 'total_hours' => $totalHours,
             ];
 
-            return WordForLaravel::load('word.act', $data)
-                ->download($act->number . '.docx');
+            $fileName = 'Akt_' . preg_replace('/[^\w\-]+/u', '_', (string) $act->number) . '.docx';
+
+            return WordForLaravel::load('word.act', $data)->download($fileName);
         } catch (\Throwable $e) {
             Log::error('Act download failed', ['error' => $e->getMessage(), 'act_id' => $act->id]);
             Toast::error('Ошибка генерации документа: ' . $e->getMessage());

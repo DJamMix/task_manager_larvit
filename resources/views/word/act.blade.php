@@ -1,311 +1,245 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Акт приема-передачи оказанных услуг № {{ $act['number'] }}</title>
+    <title>Акт оказанных услуг № {{ $act['number'] }}</title>
     <style>
         body {
-            font-family: 'Times New Roman', serif;
+            font-family: "Times New Roman", Times, serif;
             font-size: 12pt;
-            line-height: 1.5;
-            color: #000000;
-            margin: 2.5cm;
-            padding: 0;
+            line-height: 1.35;
+            color: #000;
+            margin: 2cm;
         }
-        
-        .document-wrapper {
-            max-width: 100%;
-            margin: 0 auto;
+        p { margin: 0 0 8pt 0; text-align: justify; }
+        .meta {
+            width: 100%;
+            margin-bottom: 18pt;
         }
-        
-        .document-header {
+        .meta td { vertical-align: top; font-size: 12pt; }
+        .meta-left { width: 50%; text-align: left; }
+        .meta-right { width: 50%; text-align: right; }
+        .title {
             text-align: center;
-            margin-bottom: 25pt;
-            padding-bottom: 15pt;
-            border-bottom: 1pt solid #000000;
-        }
-        
-        .document-title {
             font-size: 14pt;
             font-weight: bold;
-            margin: 0 0 10pt 0;
             text-transform: uppercase;
-            letter-spacing: 1pt;
+            margin: 0 0 6pt 0;
         }
-        
-        .document-number {
+        .subtitle {
+            text-align: center;
             font-size: 12pt;
             font-weight: bold;
-            margin: 5pt 0;
+            margin: 0 0 16pt 0;
         }
-        
-        .document-content {
-            margin-bottom: 20pt;
+        .preamble { margin-bottom: 12pt; }
+        .clause-title {
+            font-weight: bold;
+            margin: 12pt 0 8pt 0;
         }
-        
-        .contract-parties {
-            text-align: justify;
-            margin-bottom: 25pt;
-            line-height: 1.6;
-        }
-        
-        .services-table-wrapper {
-            margin: 25pt 0 30pt 0;
-        }
-        
-        .services-table {
+        table.services {
             width: 100%;
             border-collapse: collapse;
-            font-size: 11pt;
             table-layout: fixed;
-        }
-        
-        .services-table th {
-            border: 1pt solid #000000;
-            padding: 8pt;
-            background-color: #f2f2f2;
-            font-weight: bold;
-            text-align: center;
-            vertical-align: middle;
-        }
-        
-        .services-table td {
-            border: 1pt solid #000000;
-            padding: 8pt;
-            vertical-align: top;
-        }
-        
-        .col-number {
-            width: 8%;
-            text-align: center;
-            font-weight: bold;
-        }
-        
-        .col-service {
-            width: 72%;
-            text-align: left;
-        }
-        
-        .col-hours {
-            width: 20%;
-            text-align: center;
-        }
-        
-        .task-title {
-            font-weight: bold;
-            margin-bottom: 3pt;
-            display: block;
-        }
-        
-        .task-description {
-            font-size: 10pt;
-            color: #333333;
-            margin: 0;
-            line-height: 1.4;
-        }
-        
-        .total-summary {
-            text-align: right;
-            margin: 20pt 0 30pt 0;
-            font-size: 12pt;
-            font-weight: bold;
-        }
-        
-        .document-date {
-            text-align: center;
-            margin-top: 6pt;
+            margin: 8pt 0 10pt 0;
             font-size: 11pt;
         }
-        
-        .conditions-section {
-            margin-bottom: 40pt;
-            line-height: 1.6;
+        table.services th,
+        table.services td {
+            border: 1pt solid #000;
+            padding: 5pt 6pt;
+            vertical-align: top;
         }
-        
-        .conditions-list {
-            list-style-type: none;
+        table.services th {
+            text-align: center;
+            font-weight: bold;
+            background: #f3f3f3;
+        }
+        .c-num { width: 8%; text-align: center; }
+        .c-name { width: 62%; text-align: left; }
+        .c-unit { width: 12%; text-align: center; }
+        .c-qty { width: 18%; text-align: center; }
+        .total-line {
+            margin: 8pt 0 4pt 0;
+            font-weight: bold;
+        }
+        .total-words {
+            margin: 0 0 12pt 0;
+            font-style: italic;
+        }
+        .clauses p { margin-bottom: 6pt; }
+        .sign-table {
+            width: 100%;
+            margin-top: 28pt;
+            border-collapse: collapse;
+        }
+        .sign-table td {
+            width: 48%;
+            vertical-align: top;
             padding: 0;
-            margin: 0;
-            counter-reset: conditions;
         }
-        
-        .condition-item {
+        .sign-spacer { width: 4%; }
+        .sign-head {
+            font-weight: bold;
             margin-bottom: 8pt;
-            position: relative;
-            padding-left: 25pt;
-            text-align: justify;
-        }
-        
-        .condition-item:before {
-            content: counter(conditions) ".";
-            counter-increment: conditions;
-            position: absolute;
-            left: 0;
-            font-weight: bold;
-            width: 20pt;
-            text-align: right;
-        }
-        
-        .signatures-section {
-            margin-top: 60pt;
-        }
-        
-        .signatures-container {
-            width: 100%;
-            margin-top: 40pt;
-        }
-        
-        .signature-block {
-            width: 45%;
-            display: inline-block;
-            vertical-align: top;
-            min-height: 120pt;
-        }
-        
-        .signature-title {
-            font-weight: bold;
-            margin-bottom: 10pt;
-            display: block;
-        }
-        
-        .signature-company {
-            margin-bottom: 50pt;
-            min-height: 20pt;
-        }
-        
-        .signature-line {
-            border-bottom: 1pt solid #000000;
-            width: 100%;
-            margin-top: 40pt;
-        }
-        
-        .signature-name {
-            text-align: center;
-            font-size: 11pt;
-            margin-top: 5pt;
-        }
-        
-        .text-center {
             text-align: center;
         }
-        
-        .text-right {
-            text-align: right;
+        .sign-party {
+            min-height: 28pt;
+            margin-bottom: 18pt;
+            text-align: center;
         }
+        .sign-line {
+            border-bottom: 1pt solid #000;
+            height: 18pt;
+            margin-top: 28pt;
+        }
+        .sign-caption {
+            text-align: center;
+            font-size: 10pt;
+            margin-top: 3pt;
+        }
+        .mp {
+            margin-top: 10pt;
+            text-align: center;
+            font-size: 10pt;
+        }
+        .center { text-align: center; }
     </style>
 </head>
 <body>
-    <div class="document-wrapper">
-        <header class="document-header">
-            <h1 class="document-title">Акт приема-передачи оказанных услуг</h1>
-            <div class="document-number">№ {{ $act['number'] }}</div>
-            @if(!empty($act['date']))
-                <div class="document-date">
-                    от {{ \Illuminate\Support\Carbon::parse($act['date'])->format('d.m.Y') }}
-                </div>
-            @endif
-        </header>
-        
-        <main class="document-content">
-            <section class="contract-parties">
-                Общество с ограниченной ответственностью «{{ $act['customer'] }}», именуемое в дальнейшем «Заказчик», и {{ $act['executor'] }}, являющийся плательщиком налога на профессиональный доход, именуемый в дальнейшем «Исполнитель», составили настоящий акт приема-передачи оказанных услуг к договору возмездного оказания услуг о нижеследующем:
-            </section>
-            
-            <section class="services-table-wrapper">
-                <table class="services-table">
-                    <thead>
-                        <tr>
-                            <th class="col-number">№</th>
-                            <th class="col-service">Вид услуги</th>
-                            <th class="col-hours">Часы</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @php
-                            $totalHours = 0;
-                        @endphp
-                        
-                        @if(isset($tasks) && count($tasks) > 0)
-                            @foreach($tasks as $index => $task)
-                                @php
-                                    if (!$task) continue;
-                                    
-                                    $taskName = is_array($task)
-                                        ? ($task['name'] ?? 'Задача без названия')
-                                        : ($task->name ?? 'Задача без названия');
-                                    $taskDescription = is_array($task)
-                                        ? ($task['description'] ?? '')
-                                        : ($task->description ?? '');
-                                    $taskHours = is_array($task)
-                                        ? ($task['hours'] ?? 0)
-                                        : ($task->pivot->hours ?? $task->estimation_hours ?? 0);
-                                    
-                                    if (!is_numeric($taskHours)) {
-                                        $taskHours = 0;
-                                    }
-                                    
-                                    $taskHours = (float) $taskHours;
-                                    $totalHours += $taskHours;
-                                @endphp
-                                
-                                <tr>
-                                    <td class="col-number">{{ $index + 1 }}</td>
-                                    <td class="col-service">
-                                        @if($taskName)
-                                            <span class="task-title">{{ $taskName }}</span>
-                                        @endif
-                                        @if($taskDescription)
-                                            <div class="task-description">{{ $taskDescription }}</div>
-                                        @endif
-                                    </td>
-                                    <td class="col-hours">{{ number_format($taskHours, 2, ',', ' ') }}</td>
-                                </tr>
-                            @endforeach
-                        @else
-                            <tr>
-                                <td colspan="3" class="text-center">Нет задач в акте</td>
-                            </tr>
-                        @endif
-                    </tbody>
-                </table>
-            </section>
-            
-            <section class="total-summary">
-                Итого:
-                <span class="total-hours">
-                    {{ number_format($totalHours, 2, ',', ' ') }} ч.
-                </span>
-            </section>
-            
-            <section class="conditions-section">
-                <ol class="conditions-list">
-                    <li class="condition-item">
-                        Стоимость предоставленных услуг составляет указанную сумму. Стороны не имеют каких-либо претензий друг к другу.
-                    </li>
-                    <li class="condition-item">
-                        Настоящий акт составлен на русском языке в двух экземплярах равной юридической силы.
-                    </li>
-                </ol>
-            </section>
-        </main>
-        
-        <footer class="signatures-section">
-            <div class="signatures-container">
-                <div class="signature-block">
-                    <span class="signature-title">Генеральный директор</span>
-                    <div class="signature-company">ООО «{{ $act['customer'] }}»</div>
-                    <div class="signature-line"></div>
-                    <div class="signature-name">{{ $act['customer_director'] ?? '____________________' }}</div>
-                </div>
-                
-                <div class="signature-block" style="float: right;">
-                    <span class="signature-title">Исполнитель</span>
-                    <div class="signature-company">{{ $act['executor'] }}</div>
-                    <div class="signature-line"></div>
-                    <div class="signature-name">{{ $act['executor_fullname'] ?? '____________________' }}</div>
-                </div>
-            </div>
-        </footer>
-    </div>
+@php
+    $customer = \App\Support\ActDocumentFormatter::partyName((string) ($act['customer'] ?? ''));
+    $executor = \App\Support\ActDocumentFormatter::partyName((string) ($act['executor'] ?? ''));
+    $dateLong = $act['date_long'] ?? \App\Support\ActDocumentFormatter::dateLong($act['date'] ?? null);
+    $city = trim((string) ($act['city'] ?? 'г. ________'));
+    $contractRef = trim((string) ($act['contract_ref'] ?? ''));
+    $info = trim((string) ($act['info'] ?? ''));
+    $totalHours = (float) ($total_hours ?? 0);
+    $hoursText = $act['hours_text'] ?? \App\Support\ActDocumentFormatter::hoursWithWords($totalHours);
+    $hoursUnit = \App\Support\ActDocumentFormatter::hoursUnit($totalHours);
+@endphp
+
+<table class="meta">
+    <tr>
+        <td class="meta-left">{{ $city }}</td>
+        <td class="meta-right">{{ $dateLong }}</td>
+    </tr>
+</table>
+
+<p class="title">Акт</p>
+<p class="subtitle">
+    оказанных услуг № {{ $act['number'] }}
+</p>
+
+<p class="preamble">
+    {{ $customer }}, именуемый(ое) в дальнейшем «Заказчик», с одной стороны, и
+    {{ $executor }}, именуемый(ая) в дальнейшем «Исполнитель», с другой стороны,
+    вместе именуемые «Стороны», а по отдельности — «Сторона»,
+    составили настоящий Акт о нижеследующем:
+</p>
+
+@if($contractRef !== '')
+    <p>
+        Настоящий Акт составлен во исполнение {{ $contractRef }}.
+    </p>
+@elseif($info !== '')
+    <p>
+        Основание / примечание: {{ $info }}.
+    </p>
+@else
+    <p>
+        Настоящий Акт составлен во исполнение договора возмездного оказания услуг,
+        заключённого между Сторонами (далее — Договор).
+    </p>
+@endif
+
+<p class="clause-title">1. Исполнитель оказал, а Заказчик принял следующие услуги:</p>
+
+<table class="services">
+    <thead>
+    <tr>
+        <th class="c-num">№ п/п</th>
+        <th class="c-name">Наименование услуги (работы)</th>
+        <th class="c-unit">Ед. изм.</th>
+        <th class="c-qty">Количество</th>
+    </tr>
+    </thead>
+    <tbody>
+    @forelse(($tasks ?? []) as $index => $task)
+        @php
+            $name = is_array($task) ? ($task['name'] ?? 'Услуга') : ($task->name ?? 'Услуга');
+            $hours = (float) (is_array($task)
+                ? ($task['hours'] ?? 0)
+                : ($task->pivot->hours ?? 0));
+        @endphp
+        <tr>
+            <td class="c-num">{{ $index + 1 }}</td>
+            <td class="c-name">{{ $name }}</td>
+            <td class="c-unit">час</td>
+            <td class="c-qty">{{ \App\Support\ActDocumentFormatter::hoursNumeric($hours) }}</td>
+        </tr>
+    @empty
+        <tr>
+            <td class="center" colspan="4">Услуги не указаны</td>
+        </tr>
+    @endforelse
+    <tr>
+        <td class="c-name" colspan="3" style="text-align:right;font-weight:bold;">Итого:</td>
+        <td class="c-qty" style="font-weight:bold;">
+            {{ \App\Support\ActDocumentFormatter::hoursNumeric($totalHours) }}
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<p class="total-line">
+    Всего оказано услуг: {{ $hoursText }} {{ $hoursUnit }}.
+</p>
+
+<div class="clauses">
+    <p class="clause-title">2. Качество и объём услуг</p>
+    <p>
+        Услуги оказаны Исполнителем в полном объёме, в согласованные сроки и надлежащего качества.
+        Заказчик претензий по объёму, качеству и срокам оказания услуг не имеет.
+    </p>
+
+    <p class="clause-title">3. Расчёты</p>
+    <p>
+        Стоимость оказанных услуг определяется в соответствии с условиями Договора.
+        Настоящий Акт является основанием для проведения взаимных расчётов между Сторонами
+        в части принятых по настоящему Акту услуг.
+    </p>
+
+    <p class="clause-title">4. Заключительные положения</p>
+    <p>
+        Настоящий Акт составлен на русском языке в двух экземплярах, имеющих одинаковую юридическую силу,
+        по одному экземпляру для каждой из Сторон.
+    </p>
+    <p>
+        Во всём остальном, что не урегулировано настоящим Актом, Стороны руководствуются
+        условиями Договора и законодательством Российской Федерации.
+    </p>
+</div>
+
+<table class="sign-table">
+    <tr>
+        <td>
+            <div class="sign-head">Заказчик</div>
+            <div class="sign-party">{{ $customer }}</div>
+            <div class="sign-line"></div>
+            <div class="sign-caption">подпись / Ф. И. О.</div>
+            <div class="mp">М.П.</div>
+        </td>
+        <td class="sign-spacer"></td>
+        <td>
+            <div class="sign-head">Исполнитель</div>
+            <div class="sign-party">{{ $executor }}</div>
+            <div class="sign-line"></div>
+            <div class="sign-caption">подпись / Ф. И. О.</div>
+            <div class="mp">М.П. (при наличии)</div>
+        </td>
+    </tr>
+</table>
 </body>
 </html>
