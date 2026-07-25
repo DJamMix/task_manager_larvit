@@ -299,6 +299,87 @@ class ChatService
     }
 
     /**
+     * Поиск по чатам (название/собеседник) и сообщениям (plain_text).
+     *
+     * @return array{chats: list<array>, messages: list<array>}
+     */
+    public function search(User $user, string $query, int $limit = 25): array
+    {
+        $q = trim($query);
+        if (mb_strlen($q) < 2) {
+            return ['chats' => [], 'messages' => []];
+        }
+
+        $chats = $this->chatsFor($user);
+        $chatIds = $chats->pluck('id')->filter()->values();
+        $needle = mb_strtolower($q);
+
+        $matchedChats = $chats
+            ->filter(function (Chat $chat) use ($needle, $user) {
+                $title = mb_strtolower($chat->displayTitle($user->id));
+                if (str_contains($title, $needle)) {
+                    return true;
+                }
+                if ($chat->type === 'group' && str_contains(mb_strtolower((string) $chat->description), $needle)) {
+                    return true;
+                }
+                foreach ($chat->members as $member) {
+                    if (str_contains(mb_strtolower($member->displayName()), $needle)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            })
+            ->take($limit)
+            ->map(fn (Chat $chat) => [
+                'id' => (int) $chat->id,
+                'title' => $chat->displayTitle($user->id),
+                'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? 'Нет сообщений', 64),
+                'type' => $chat->type,
+                'url' => route('platform.systems.chats.view', $chat),
+                'unread' => (int) ($chat->unread_count ?? 0),
+            ])
+            ->values()
+            ->all();
+
+        $like = '%' . addcslashes($q, '%_\\') . '%';
+        $messages = ChatMessage::query()
+            ->whereIn('chat_id', $chatIds)
+            ->where('is_system', false)
+            ->whereNotNull('plain_text')
+            ->where('plain_text', 'like', $like)
+            ->with(['user', 'chat.members'])
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(function (ChatMessage $message) use ($user) {
+                $chat = $message->chat;
+                if (!$chat) {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $message->id,
+                    'chat_id' => (int) $message->chat_id,
+                    'chat_title' => $chat->displayTitle($user->id),
+                    'author' => $message->user?->displayName() ?? 'Участник',
+                    'preview' => \Illuminate\Support\Str::limit((string) $message->plain_text, 90),
+                    'at' => $message->created_at?->format('d.m H:i') ?? '',
+                    'url' => route('platform.systems.chats.view', $chat) . '?msg=' . $message->id,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        return [
+            'chats' => $matchedChats,
+            'messages' => $messages,
+        ];
+    }
+
+    /**
      * Новые сообщения активного чата для live-ленты.
      *
      * @return list<array{id: int, html: string, preview: string}>

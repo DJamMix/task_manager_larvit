@@ -9,8 +9,8 @@
 
     const VOL_KEY = 'bx_chat_notify_volume';
     const getVol = () => {
-        const v = parseInt(localStorage.getItem(VOL_KEY) || '70', 10);
-        return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 70;
+        const v = parseInt(localStorage.getItem(VOL_KEY) || '75', 10);
+        return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 75;
     };
     window.__bxChatNotifyVolume = getVol();
 
@@ -59,6 +59,7 @@
         document.addEventListener(ev, unlock, { once: true, passive: true });
     });
 
+    /** Отличительный «дзынь» — арпеджио + низкий удар, не путается с системными звуками */
     window.bxPlayChatNotify = function bxPlayChatNotify() {
         if (!window.__bxChatSoundUnlocked) return;
         const volScale = (typeof window.__bxChatNotifyVolume === 'number'
@@ -71,26 +72,33 @@
             const ctx = window.__bxChatAudioCtx = window.__bxChatAudioCtx || new Ctx();
             if (ctx.state === 'suspended') ctx.resume();
             const t = ctx.currentTime;
-            const beep = (freq, start, dur, vol) => {
+
+            const tone = (type, freq, start, dur, vol) => {
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
-                o.type = 'sine';
-                o.frequency.value = freq;
+                o.type = type;
+                o.frequency.setValueAtTime(freq, t + start);
                 const peak = Math.max(0.0001, vol * volScale);
                 g.gain.setValueAtTime(0.0001, t + start);
-                g.gain.exponentialRampToValueAtTime(peak, t + start + 0.015);
+                g.gain.exponentialRampToValueAtTime(peak, t + start + 0.012);
                 g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
                 o.connect(g);
                 g.connect(ctx.destination);
                 o.start(t + start);
-                o.stop(t + start + dur + 0.02);
+                o.stop(t + start + dur + 0.03);
             };
-            beep(1100, 0, 0.12, 0.65);
-            beep(1450, 0.14, 0.14, 0.6);
+
+            // Низкий «тук»
+            tone('triangle', 220, 0, 0.08, 0.55);
+            // Яркое арпеджио вверх
+            tone('sine', 880, 0.06, 0.1, 0.72);
+            tone('sine', 1175, 0.14, 0.1, 0.68);
+            tone('sine', 1568, 0.23, 0.14, 0.75);
+            // Короткий хвост
+            tone('triangle', 2093, 0.36, 0.16, 0.45);
         } catch (e) {}
     };
 
-    // Компактный регулятор громкости на всех страницах (если нет мессенджера)
     const mountVolControl = () => {
         if (document.getElementById('bx-global-notify-vol')) return;
         if (hasMessenger()) return;

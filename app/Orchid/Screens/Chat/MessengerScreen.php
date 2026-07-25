@@ -117,6 +117,7 @@ class MessengerScreen extends Screen
             'chat_is_muted' => $isMuted,
             'chat_is_pinned' => $isPinned,
             'chats_poll_url' => route('platform.systems.chats.poll'),
+            'chats_search_url' => route('platform.systems.chats.search'),
         ];
     }
 

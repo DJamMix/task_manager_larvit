@@ -359,6 +359,14 @@ Route::get('chats-poll', function (\Illuminate\Http\Request $request, \App\Servi
     );
 })->name('platform.systems.chats.poll');
 
+Route::get('chats-search', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    return response()->json(
+        $chats->search($request->user(), $request->string('q')->toString())
+    );
+})->name('platform.systems.chats.search');
+
 Route::get('chats-tasks', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
     abort_unless($chats->canAccessMessenger($request->user()), 403);
 

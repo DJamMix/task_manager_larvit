@@ -19,11 +19,21 @@
             <strong>Чаты</strong>
             <span class="badge text-bg-light border">{{ $chatList->count() }}</span>
         </div>
+        <div class="bx-messenger__search">
+            <input type="search"
+                   id="bx-chat-search"
+                   class="bx-messenger__search-input"
+                   placeholder="Поиск по чатам и сообщениям…"
+                   autocomplete="off"
+                   data-search-url="{{ $chats_search_url ?? route('platform.systems.chats.search') }}">
+        </div>
 
-        <div class="bx-messenger__list">
+        <div class="bx-messenger__list" id="bx-chat-list">
             @forelse($chatList as $item)
                 <a href="{{ route('platform.systems.chats.view', $item) }}"
-                   class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}">
+                   class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}"
+                   data-chat-id="{{ $item->id }}"
+                   data-title="{{ mb_strtolower($item->displayTitle()) }}">
                     @if($item->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
                             'avatarUser' => $item->otherMember(),
@@ -62,6 +72,17 @@
             @empty
                 <div class="text-muted small p-3">Пока нет чатов. Напишите коллеге или создайте группу.</div>
             @endforelse
+        </div>
+        <div class="bx-search-panel d-none" id="bx-search-panel" hidden>
+            <div class="bx-search-panel__section" id="bx-search-chats-wrap">
+                <div class="bx-search-panel__title">Чаты</div>
+                <div id="bx-search-chats"></div>
+            </div>
+            <div class="bx-search-panel__section" id="bx-search-msgs-wrap">
+                <div class="bx-search-panel__title">Сообщения</div>
+                <div id="bx-search-msgs"></div>
+            </div>
+            <div class="bx-search-panel__empty d-none" id="bx-search-empty">Ничего не найдено</div>
         </div>
     </aside>
 
@@ -108,8 +129,8 @@
                 <div class="bx-messenger__header-actions">
                     <label class="bx-notify-vol" title="Громкость звука новых сообщений">
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
-                        <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="70">
-                        <span id="bx-notify-volume-label">70%</span>
+                        <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="75">
+                        <span id="bx-notify-volume-label">75%</span>
                     </label>
                     <button type="submit"
                             class="bx-mute-btn {{ $isPinned ? 'is-active' : '' }}"
@@ -243,6 +264,9 @@
                             <span class="bx-voice-record__meter-fill" id="bx-voice-meter"></span>
                         </span>
                     </div>
+                    <label class="bx-voice-record__mic">
+                        <select id="bx-voice-mic" class="bx-mic-select" title="Микрофон"></select>
+                    </label>
                     <div class="bx-voice-record__actions">
                         <button type="button" class="bx-voice-record__btn" id="bx-voice-cancel">Отмена</button>
                         <button type="button" class="bx-voice-record__btn bx-voice-record__btn--send" id="bx-voice-stop">Отправить</button>
@@ -260,8 +284,8 @@
                 <p class="text-muted mb-0">Напишите коллеге лично или создайте групповой чат (если есть право).</p>
                 <label class="bx-notify-vol bx-notify-vol--empty" title="Громкость звука новых сообщений">
                     Громкость уведомлений
-                    <input type="range" id="bx-notify-volume-empty" min="0" max="100" step="5" value="70">
-                    <span id="bx-notify-volume-empty-label">70%</span>
+                    <input type="range" id="bx-notify-volume-empty" min="0" max="100" step="5" value="75">
+                    <span id="bx-notify-volume-empty-label">75%</span>
                 </label>
             </div>
         @endif
@@ -271,13 +295,19 @@
         <div class="bx-mic-gate__card" role="dialog" aria-modal="true" aria-labelledby="bx-mic-gate-title">
             <h3 id="bx-mic-gate-title" class="bx-mic-gate__title">Нужен микрофон</h3>
             <p class="bx-mic-gate__text" id="bx-mic-gate-text">
-                Разрешите доступ к микрофону, затем <strong>скажите несколько слов</strong> —
-                полоска ниже должна двигаться. Без этого голосовое уйдёт «пустым».
+                Разрешите доступ, выберите нужный микрофон и <strong>скажите несколько слов</strong> —
+                полоска должна двигаться. Иначе голосовое уйдёт без звука.
             </p>
+            <label class="bx-mic-gate__device">
+                Микрофон
+                <select id="bx-mic-gate-device" class="bx-mic-select form-select form-select-sm">
+                    <option value="">По умолчанию</option>
+                </select>
+            </label>
             <div class="bx-mic-gate__meter"><span id="bx-mic-gate-meter"></span></div>
             <p class="bx-mic-gate__hint" id="bx-mic-gate-hint"></p>
             <div class="bx-mic-gate__actions">
-                <button type="button" class="btn btn-primary" id="bx-mic-gate-retry">Разрешить микрофон</button>
+                <button type="button" class="btn btn-primary" id="bx-mic-gate-retry">Разрешить / проверить</button>
                 <button type="button" class="btn btn-link" id="bx-mic-gate-close">Закрыть</button>
             </div>
         </div>
@@ -1045,10 +1075,11 @@
         sendMessageAjax();
     });
 
-    /* Voice: PCM → WAV + проверка тишины + запрос микрофона */
+    /* Voice: PCM → WAV + проверка тишины + выбор микрофона */
     const VOICE_MAX_SEC = 180;
     const VOICE_TARGET_RATE = 16000;
     const VOICE_SILENCE_PEAK = 0.018;
+    const MIC_DEVICE_KEY = 'bx_chat_mic_device';
     const voiceBtn = document.getElementById('bx-tool-voice');
     const voiceBar = document.getElementById('bx-voice-bar');
     const voiceTimer = document.getElementById('bx-voice-timer');
@@ -1056,6 +1087,85 @@
     const micGate = document.getElementById('bx-mic-gate');
     const micGateMeter = document.getElementById('bx-mic-gate-meter');
     const micGateHint = document.getElementById('bx-mic-gate-hint');
+    const micGateSelect = document.getElementById('bx-mic-gate-device');
+    const voiceMicSelect = document.getElementById('bx-voice-mic');
+
+    const getSavedMicId = () => localStorage.getItem(MIC_DEVICE_KEY) || '';
+    const saveMicId = (id) => {
+        if (id) localStorage.setItem(MIC_DEVICE_KEY, id);
+        else localStorage.removeItem(MIC_DEVICE_KEY);
+        [micGateSelect, voiceMicSelect].forEach((sel) => {
+            if (sel && [...sel.options].some((o) => o.value === id)) sel.value = id;
+        });
+    };
+    const audioConstraints = (deviceId = getSavedMicId()) => {
+        const audio = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: 1,
+        };
+        if (deviceId) audio.deviceId = { exact: deviceId };
+        return { audio };
+    };
+    const openMicStream = async () => {
+        const preferred = getSavedMicId();
+        try {
+            return await navigator.mediaDevices.getUserMedia(audioConstraints(preferred));
+        } catch (e) {
+            if (preferred) {
+                // Устройство пропало — берём дефолтный
+                saveMicId('');
+                return navigator.mediaDevices.getUserMedia(audioConstraints(''));
+            }
+            throw e;
+        }
+    };
+    const refreshMicDeviceList = async () => {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const mics = devices.filter((d) => d.kind === 'audioinput');
+            const saved = getSavedMicId();
+            [micGateSelect, voiceMicSelect].forEach((sel) => {
+                if (!sel) return;
+                const prev = sel.value || saved;
+                sel.innerHTML = '';
+                const opt0 = document.createElement('option');
+                opt0.value = '';
+                opt0.textContent = 'По умолчанию';
+                sel.appendChild(opt0);
+                mics.forEach((d, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.textContent = d.label || ('Микрофон ' + (i + 1));
+                    sel.appendChild(opt);
+                });
+                if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+            });
+        } catch (e) {}
+    };
+    [micGateSelect, voiceMicSelect].forEach((sel) => {
+        sel?.addEventListener('change', async () => {
+            saveMicId(sel.value);
+            // Если идёт проверка в gate — переподключить выбранный микрофон
+            if (micGate && !micGate.hidden) {
+                stopMicGateListen();
+                try {
+                    const stream = await openMicStream();
+                    await listenMicLevels(stream);
+                    await refreshMicDeviceList();
+                    if (micGateHint) micGateHint.textContent = 'Выбран другой микрофон. Скажите пару слов…';
+                } catch (e) {
+                    if (micGateHint) micGateHint.textContent = micHelpText(e);
+                }
+            }
+            // Если идёт запись — перезапуск на новом устройстве сложно; подсказка
+            if (voiceRecording) {
+                alert('Смена микрофона применится со следующей записи. Завершите текущую или отмените.');
+            }
+        });
+    });
     let mediaStream = null;
     let voiceAudioCtx = null;
     let voiceProcessor = null;
@@ -1295,17 +1405,11 @@
     const requestMicUntilHeard = async () => {
         openMicGate('');
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    channelCount: 1,
-                },
-            });
+            const stream = await openMicStream();
             await listenMicLevels(stream);
+            await refreshMicDeviceList();
             if (micGateHint) {
-                micGateHint.textContent = 'Говорите сейчас… Когда полоска зелёная — нажмите микрофон в чате для записи.';
+                micGateHint.textContent = 'Говорите сейчас… Когда полоска зелёная — можно записывать. При необходимости смените микрофон выше.';
             }
         } catch (e) {
             if (micGateHint) micGateHint.textContent = micHelpText(e);
@@ -1324,14 +1428,8 @@
         }
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    channelCount: 1,
-                },
-            });
+            const stream = await openMicStream();
+            await refreshMicDeviceList();
             closeMicGate();
             await startVoiceCapture(stream);
         } catch (e) {
@@ -1409,8 +1507,8 @@
 
     const NOTIFY_VOL_KEY = 'bx_chat_notify_volume';
     const getNotifyVolume = () => {
-        const v = parseInt(localStorage.getItem(NOTIFY_VOL_KEY) || '70', 10);
-        return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 70;
+        const v = parseInt(localStorage.getItem(NOTIFY_VOL_KEY) || '75', 10);
+        return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 75;
     };
     const setNotifyVolume = (v) => {
         const n = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
@@ -1557,6 +1655,128 @@
         poll();
         window.__bxMessengerPollTimer = setInterval(poll, 2000);
     }
+
+    /* Поиск по чатам и сообщениям */
+    const searchInput = document.getElementById('bx-chat-search');
+    const searchPanel = document.getElementById('bx-search-panel');
+    const chatListEl = document.getElementById('bx-chat-list');
+    const searchChatsEl = document.getElementById('bx-search-chats');
+    const searchMsgsEl = document.getElementById('bx-search-msgs');
+    const searchEmptyEl = document.getElementById('bx-search-empty');
+    const searchChatsWrap = document.getElementById('bx-search-chats-wrap');
+    const searchMsgsWrap = document.getElementById('bx-search-msgs-wrap');
+    let searchTimer = null;
+    let searchSeq = 0;
+
+    const escapeHtmlSearch = (s) => String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const showSearchMode = (on) => {
+        if (!searchPanel || !chatListEl) return;
+        if (on) {
+            chatListEl.classList.add('d-none');
+            searchPanel.classList.remove('d-none');
+            searchPanel.hidden = false;
+        } else {
+            chatListEl.classList.remove('d-none');
+            searchPanel.classList.add('d-none');
+            searchPanel.hidden = true;
+            document.querySelectorAll('.bx-chat-item').forEach((el) => el.classList.remove('d-none'));
+        }
+    };
+
+    const filterLocalChats = (q) => {
+        const needle = q.toLowerCase();
+        document.querySelectorAll('#bx-chat-list .bx-chat-item').forEach((el) => {
+            const title = (el.getAttribute('data-title') || '').toLowerCase();
+            el.classList.toggle('d-none', needle.length >= 1 && !title.includes(needle));
+        });
+    };
+
+    const renderSearchResults = (data) => {
+        const chats = data.chats || [];
+        const msgs = data.messages || [];
+        if (searchChatsEl) {
+            searchChatsEl.innerHTML = chats.map((c) =>
+                '<a class="bx-search-hit" href="' + escapeHtmlSearch(c.url) + '">'
+                + '<div class="bx-search-hit__title">' + escapeHtmlSearch(c.title) + '</div>'
+                + '<div class="bx-search-hit__preview">' + escapeHtmlSearch(c.preview) + '</div>'
+                + '</a>'
+            ).join('');
+        }
+        if (searchMsgsEl) {
+            searchMsgsEl.innerHTML = msgs.map((m) =>
+                '<a class="bx-search-hit bx-search-hit--msg" href="' + escapeHtmlSearch(m.url) + '">'
+                + '<div class="bx-search-hit__meta">' + escapeHtmlSearch(m.chat_title)
+                + ' · ' + escapeHtmlSearch(m.author)
+                + ' · ' + escapeHtmlSearch(m.at) + '</div>'
+                + '<div class="bx-search-hit__preview">' + escapeHtmlSearch(m.preview) + '</div>'
+                + '</a>'
+            ).join('');
+        }
+        if (searchChatsWrap) searchChatsWrap.classList.toggle('d-none', !chats.length);
+        if (searchMsgsWrap) searchMsgsWrap.classList.toggle('d-none', !msgs.length);
+        if (searchEmptyEl) searchEmptyEl.classList.toggle('d-none', chats.length + msgs.length > 0);
+    };
+
+    const runSearch = async (q) => {
+        const url = searchInput?.getAttribute('data-search-url');
+        if (!url || q.length < 2) {
+            if (searchChatsEl) searchChatsEl.innerHTML = '';
+            if (searchMsgsEl) searchMsgsEl.innerHTML = '';
+            // локальный фильтр списка чатов
+            if (q.length >= 1) {
+                showSearchMode(false);
+                chatListEl?.classList.remove('d-none');
+                filterLocalChats(q);
+            } else {
+                showSearchMode(false);
+                filterLocalChats('');
+            }
+            return;
+        }
+        showSearchMode(true);
+        const seq = ++searchSeq;
+        try {
+            const res = await fetch(url + '?q=' + encodeURIComponent(q), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok || seq !== searchSeq) return;
+            const data = await res.json();
+            if (seq !== searchSeq) return;
+            renderSearchResults(data);
+        } catch (e) {}
+    };
+
+    searchInput?.addEventListener('input', () => {
+        const q = (searchInput.value || '').trim();
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => runSearch(q), 220);
+    });
+    searchInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            searchInput.value = '';
+            runSearch('');
+            searchInput.blur();
+        }
+    });
+
+    /* Переход к сообщению из поиска ?msg= */
+    const focusMessageFromQuery = () => {
+        const params = new URLSearchParams(window.location.search || '');
+        const msgId = params.get('msg');
+        if (!msgId) return;
+        const el = document.getElementById('chat-msg-' + msgId);
+        if (!el) return;
+        el.classList.add('bx-msg--highlight');
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setTimeout(() => el.classList.remove('bx-msg--highlight'), 2600);
+        params.delete('msg');
+        const next = window.location.pathname + (params.toString() ? ('?' + params) : '') + window.location.hash;
+        window.history.replaceState({}, '', next);
+    };
+    setTimeout(focusMessageFromQuery, 120);
 
     /* Превью картинок — открытие на весь экран */
     const lightbox = document.getElementById('bx-lightbox');
