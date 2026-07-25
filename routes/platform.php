@@ -458,6 +458,33 @@ Route::post('chats/calls/{call}/end', function (
     return response()->json(['ok' => true]);
 })->name('platform.systems.chats.calls.end');
 
+Route::post('chats/calls/{call}/guest-link', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\ChatCall $call,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    try {
+        return response()->json($calls->enableGuestLink($call, $request->user()));
+    } catch (\Throwable $e) {
+        return response()->json(['message' => $e->getMessage()], 422);
+    }
+})->name('platform.systems.chats.calls.guest');
+
+Route::delete('chats/calls/{call}/guest-link', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\ChatCall $call,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $calls->revokeGuestLink($call, $request->user());
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.chats.calls.guest.revoke');
+
 Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
     ->name('platform.systems.chats.view')
     ->breadcrumbs(function (Trail $trail, $chat) {

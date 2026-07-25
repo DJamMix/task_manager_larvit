@@ -425,23 +425,62 @@
         </div>
     </div>
     <div class="bx-call-stage__grid" id="bx-call-grid"></div>
+
     <div id="bx-call-devices-panel" class="bx-call-devices" hidden>
+        <div class="bx-call-devices__head">
+            <strong>Устройства</strong>
+            <button type="button" class="bx-call-devices__close" id="bx-call-devices-close" title="Закрыть" aria-label="Закрыть">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
         <label class="bx-call-devices__row">
-            <span>Микрофон</span>
+            <span class="bx-call-devices__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            </span>
+            <span class="bx-call-devices__label">Микрофон</span>
             <select id="bx-call-mic-select"></select>
         </label>
         <label class="bx-call-devices__row">
-            <span>Камера</span>
+            <span class="bx-call-devices__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            </span>
+            <span class="bx-call-devices__label">Камера</span>
             <select id="bx-call-cam-select"></select>
         </label>
+        <div class="bx-call-devices__guest" id="bx-call-guest-box" hidden>
+            <div class="bx-call-devices__guest-title">Гостевая ссылка</div>
+            <p class="bx-call-devices__guest-hint">Гости войдут без аккаунта и смогут говорить.</p>
+            <div class="bx-call-devices__guest-row">
+                <input type="text" id="bx-call-guest-url" readonly placeholder="Ссылка ещё не создана">
+                <button type="button" class="bx-call-devices__btn" id="bx-call-guest-copy" title="Копировать">Копировать</button>
+            </div>
+            <div class="bx-call-devices__guest-actions">
+                <button type="button" class="bx-call-devices__btn bx-call-devices__btn--accent" id="bx-call-guest-create">Создать / обновить</button>
+                <button type="button" class="bx-call-devices__btn bx-call-devices__btn--mute" id="bx-call-guest-revoke">Отключить</button>
+            </div>
+        </div>
     </div>
+
     <div class="bx-call-stage__bar">
-        <button type="button" class="bx-call-ctrl" id="bx-call-mic" title="Микрофон">Микрофон</button>
-        <button type="button" class="bx-call-ctrl" id="bx-call-cam" title="Камера">Камера</button>
-        <button type="button" class="bx-call-ctrl" id="bx-call-screen" title="Демонстрация экрана">Экран</button>
-        <button type="button" class="bx-call-ctrl" id="bx-call-devices" title="Устройства">Устройства</button>
-        <button type="button" class="bx-call-ctrl bx-call-ctrl--danger" id="bx-call-hang" title="Выйти из звонка">Выйти</button>
-        <button type="button" class="bx-call-ctrl bx-call-ctrl--end-all" id="bx-call-end-all" title="Завершить для всех" hidden>Завершить для всех</button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-mic" title="Микрофон">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+        </button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-cam" title="Камера">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        </button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-screen" title="Демонстрация экрана">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-devices" title="Устройства и гости">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </button>
+        <button type="button" class="bx-call-ctrl bx-call-ctrl--danger" id="bx-call-hang" title="Выйти">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10.68 13.31a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0124 20.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 01.12 4.18 2 2 0 012.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 9.91"/><path d="M23 1L1 23"/></svg>
+        </button>
+        <button type="button" class="bx-call-ctrl bx-call-ctrl--end-all" id="bx-call-end-all" title="Завершить для всех" hidden>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18.36 18.36A9 9 0 015.64 5.64M6.34 17.66A8 8 0 0012 20a8 8 0 008-8"/><path d="M1 1l22 22"/></svg>
+            <span class="bx-call-ctrl__txt">Всем</span>
+        </button>
     </div>
 </div>
 
@@ -2037,5 +2076,5 @@
 })();
 </script>
 @if(!empty($calls_enabled))
-<script src="{{ asset('js/chat-calls.js') }}?v=20260725j"></script>
+<script src="{{ asset('js/chat-calls.js') }}?v=20260725k"></script>
 @endif

@@ -36,14 +36,23 @@
     const screenBtn = document.getElementById('bx-call-screen');
     const devicesBtn = document.getElementById('bx-call-devices');
     const devicesPanel = document.getElementById('bx-call-devices-panel');
+    const devicesClose = document.getElementById('bx-call-devices-close');
     const micSelect = document.getElementById('bx-call-mic-select');
     const camSelect = document.getElementById('bx-call-cam-select');
+    const guestBox = document.getElementById('bx-call-guest-box');
+    const guestUrlInput = document.getElementById('bx-call-guest-url');
+    const guestCreateBtn = document.getElementById('bx-call-guest-create');
+    const guestCopyBtn = document.getElementById('bx-call-guest-copy');
+    const guestRevokeBtn = document.getElementById('bx-call-guest-revoke');
 
     let LK = null;
     let room = null;
     let roomGen = 0;
     let callId = null;
     let isStarter = false;
+    let canEnd = false;
+    let canManageGuests = false;
+    let guestUrl = '';
     let micOn = true;
     let camOn = false;
     let screenOn = false;
@@ -73,6 +82,22 @@
     };
 
     const callUrl = (id, action) => joinTpl.replace('__ID__', String(id)).replace('/join', '/' + action);
+
+    const guestLinkUrl = (id) => joinTpl.replace('__ID__', String(id)).replace('/join', '/guest-link');
+
+    const syncGuestUi = () => {
+        if (!guestBox) return;
+        guestBox.hidden = !canManageGuests;
+        if (guestUrlInput) guestUrlInput.value = guestUrl || '';
+    };
+
+    const applyCallFlags = (payload) => {
+        canEnd = !!(payload.can_end || payload.is_starter);
+        canManageGuests = !!payload.can_manage_guests;
+        guestUrl = payload.guest_url || '';
+        if (endAllBtn) endAllBtn.hidden = !canEnd;
+        syncGuestUi();
+    };
 
     const getSaved = (key) => {
         try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
@@ -387,9 +412,13 @@
         document.body.classList.remove('bx-call-open');
         callId = null;
         isStarter = false;
+        canEnd = false;
+        canManageGuests = false;
+        guestUrl = '';
         room = null;
         screenOn = false;
         if (endAllBtn) endAllBtn.hidden = true;
+        syncGuestUi();
         micBtn?.classList.remove('is-off');
         camBtn?.classList.remove('is-off');
         screenBtn?.classList.remove('is-on');
@@ -527,16 +556,19 @@
         const gen = ++roomGen;
         callId = payload.call_id;
         isStarter = !!payload.is_starter;
+        applyCallFlags(payload);
         camOn = !!payload.video;
         micOn = true;
         screenOn = false;
         screenBtn?.classList.remove('is-on');
-        if (titleEl) titleEl.textContent = payload.video ? 'Видеозвонок' : 'Аудиозвонок';
+        if (titleEl) {
+            const kind = payload.chat_type === 'direct' ? 'Личный' : 'Групповой';
+            titleEl.textContent = (payload.video ? kind + ' видеозвонок' : kind + ' звонок');
+        }
         if (stage) stage.hidden = false;
         document.body.classList.add('bx-call-open');
         if (incoming) incoming.hidden = true;
         if (activeBar) activeBar.hidden = true;
-        if (endAllBtn) endAllBtn.hidden = !isStarter;
         if (devicesPanel) devicesPanel.hidden = true;
         if (grid) grid.innerHTML = '';
         startTimer();
@@ -708,7 +740,59 @@
         if (!devicesPanel) return;
         const open = devicesPanel.hidden;
         devicesPanel.hidden = !open;
-        if (open) await refreshDevices();
+        if (open) {
+            syncGuestUi();
+            await refreshDevices();
+        }
+    });
+    devicesClose?.addEventListener('click', () => {
+        if (devicesPanel) devicesPanel.hidden = true;
+    });
+    guestCreateBtn?.addEventListener('click', async () => {
+        if (!callId || !canManageGuests) return;
+        try {
+            const data = await postJson(guestLinkUrl(callId), {});
+            guestUrl = data.guest_url || '';
+            syncGuestUi();
+            if (guestUrl && navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(guestUrl);
+                guestCreateBtn.textContent = 'Ссылка скопирована';
+                setTimeout(() => { guestCreateBtn.textContent = 'Создать / обновить'; }, 1600);
+            }
+        } catch (e) {
+            alert(e.message || 'Не удалось создать ссылку');
+        }
+    });
+    guestCopyBtn?.addEventListener('click', async () => {
+        if (!guestUrl) {
+            guestCreateBtn?.click();
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(guestUrl);
+            guestCopyBtn.textContent = 'Готово';
+            setTimeout(() => { guestCopyBtn.textContent = 'Копировать'; }, 1200);
+        } catch (e) {
+            guestUrlInput?.select();
+        }
+    });
+    guestRevokeBtn?.addEventListener('click', async () => {
+        if (!callId || !canManageGuests) return;
+        try {
+            await fetch(guestLinkUrl(callId), {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                },
+                credentials: 'same-origin',
+            });
+            guestUrl = '';
+            syncGuestUi();
+        } catch (e) {
+            alert('Не удалось отключить ссылку');
+        }
     });
     micSelect?.addEventListener('change', () => switchMic(micSelect.value));
     camSelect?.addEventListener('change', () => switchCam(camSelect.value));
@@ -756,7 +840,7 @@
             return;
         }
 
-        const invite = calls.find((c) => !c.is_mine && c.my_status === 'invited');
+        const invite = calls.find((c) => c.ring === true);
         if (invite) {
             if (ringingCallId !== invite.id) {
                 ringingCallId = invite.id;
@@ -776,11 +860,19 @@
             if (incoming) incoming.hidden = true;
         }
 
-        const inChat = calls.find((c) => String(c.chat_id) === activeChatId && c.my_status !== 'joined');
-        if (inChat && inChat.my_status !== 'declined') {
+        // Группа и личный: баннер «Присоединиться» только в открытом чате
+        const inChat = calls.find((c) =>
+            String(c.chat_id) === activeChatId
+            && c.my_status !== 'joined'
+            && c.my_status !== 'declined'
+            && !c.is_mine
+        );
+        if (inChat) {
             joinableCallId = inChat.id;
             if (activeBarText) {
-                activeBarText.textContent = (inChat.video ? 'Видеозвонок' : 'Звонок')
+                const kind = inChat.chat_type === 'direct' ? 'Личный звонок' : 'Групповой звонок';
+                activeBarText.textContent = kind
+                    + (inChat.video ? ' · видео' : '')
                     + ' · ' + (inChat.participants || 0) + ' в эфире';
             }
             if (activeBar) activeBar.hidden = false;

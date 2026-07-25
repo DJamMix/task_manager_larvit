@@ -19,6 +19,7 @@ class ChatCall extends Model
         'status',
         'video_enabled',
         'e2ee_key',
+        'guest_token',
         'started_at',
         'ended_at',
     ];

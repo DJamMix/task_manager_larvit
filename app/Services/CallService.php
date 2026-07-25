@@ -31,6 +31,31 @@ class CallService
             ->first();
     }
 
+    public function canEnd(ChatCall $call, User $actor): bool
+    {
+        if ((int) $call->started_by === (int) $actor->id) {
+            return true;
+        }
+
+        $call->loadMissing('chat');
+
+        return $call->chat
+            && $call->chat->type === 'group'
+            && $call->chat->isOwner($actor->id);
+    }
+
+    public function canManageGuests(ChatCall $call, User $actor): bool
+    {
+        $call->loadMissing('chat');
+        if (!$call->chat || $call->chat->type !== 'group' || !$call->isOpen()) {
+            return false;
+        }
+
+        return (int) $call->started_by === (int) $actor->id
+            || $call->chat->isOwner($actor->id)
+            || $this->chats->canCreate($actor);
+    }
+
     /**
      * Активные/входящие звонки для пользователя (для poll / баннера).
      *
@@ -54,12 +79,20 @@ class CallService
         return $calls->map(function (ChatCall $call) use ($user) {
             $chat = $call->chat;
             $mine = $call->participants->firstWhere('user_id', $user->id);
-
             $starter = $call->starter;
+            $chatType = $chat?->type ?? 'group';
+            $myStatus = $mine?->status ?? ChatCallParticipant::STATUS_INVITED;
+            $isMine = (int) $call->started_by === (int) $user->id;
+
+            // Личный: входящий звонок (ring). Группа: только «присоединиться», без звонка всем.
+            $ring = $chatType === 'direct'
+                && !$isMine
+                && $myStatus === ChatCallParticipant::STATUS_INVITED;
 
             return [
                 'id' => (int) $call->id,
                 'chat_id' => (int) $call->chat_id,
+                'chat_type' => $chatType,
                 'chat_title' => $chat?->displayTitle($user->id) ?? 'Чат',
                 'status' => $call->status,
                 'video' => (bool) $call->video_enabled,
@@ -68,8 +101,14 @@ class CallService
                 'starter_avatar' => $starter?->avatarUrl() ?: '',
                 'starter_initials' => $starter?->avatarInitials() ?? '?',
                 'starter_color' => $starter?->avatarColor() ?? '#64748b',
-                'is_mine' => (int) $call->started_by === (int) $user->id,
-                'my_status' => $mine?->status ?? ChatCallParticipant::STATUS_INVITED,
+                'is_mine' => $isMine,
+                'my_status' => $myStatus,
+                'ring' => $ring,
+                'can_end' => $this->canEnd($call, $user),
+                'can_manage_guests' => $this->canManageGuests($call, $user),
+                'guest_url' => ($call->guest_token && $this->canManageGuests($call, $user))
+                    ? route('calls.guest', $call->guest_token)
+                    : null,
                 'participants' => $call->participants
                     ->where('status', ChatCallParticipant::STATUS_JOINED)
                     ->count(),
@@ -94,12 +133,15 @@ class CallService
             return $this->join($existing, $actor);
         }
 
-        $call = DB::transaction(function () use ($chat, $actor, $video) {
+        $isDirect = $chat->type === 'direct';
+
+        $call = DB::transaction(function () use ($chat, $actor, $video, $isDirect) {
             $call = ChatCall::query()->create([
                 'chat_id' => $chat->id,
                 'started_by' => $actor->id,
                 'room_name' => 'chat-' . $chat->id . '-' . Str::lower(Str::random(10)),
-                'status' => ChatCall::STATUS_RINGING,
+                // Личный — ringing (входящий у собеседника). Группа — сразу active.
+                'status' => $isDirect ? ChatCall::STATUS_RINGING : ChatCall::STATUS_ACTIVE,
                 'video_enabled' => $video,
                 'e2ee_key' => Str::random(32),
                 'started_at' => now(),
@@ -119,9 +161,6 @@ class CallService
 
             return $call;
         });
-
-        $call->status = ChatCall::STATUS_ACTIVE;
-        $call->save();
 
         return $this->connectionPayload($call->fresh(['chat', 'participants']), $actor);
     }
@@ -189,16 +228,19 @@ class CallService
             $participant->left_at = now();
             $participant->save();
         }
+
+        // В личном: если отклонили — завершаем звонок
+        $call->loadMissing('chat');
+        if ($call->chat?->type === 'direct' && $call->isOpen()) {
+            $this->end($call, $actor, force: true);
+        }
     }
 
     public function end(ChatCall $call, User $actor, bool $force = false): void
     {
         $call->loadMissing('chat');
-        if (!$force) {
-            $isStarter = (int) $call->started_by === (int) $actor->id;
-            if (!$isStarter) {
-                abort(403, 'Завершить звонок для всех может только инициатор');
-            }
+        if (!$force && !$this->canEnd($call, $actor)) {
+            abort(403, 'Завершить звонок для всех может инициатор или владелец группы');
         }
 
         if ($call->status === ChatCall::STATUS_ENDED) {
@@ -207,6 +249,7 @@ class CallService
 
         $call->status = ChatCall::STATUS_ENDED;
         $call->ended_at = now();
+        $call->guest_token = null;
         $call->save();
 
         ChatCallParticipant::query()
@@ -216,6 +259,126 @@ class CallService
                 'status' => ChatCallParticipant::STATUS_LEFT,
                 'left_at' => now(),
             ]);
+    }
+
+    /**
+     * Создать / обновить гостевую ссылку (только групповые звонки).
+     *
+     * @return array{guest_url: string, guest_token: string}
+     */
+    public function enableGuestLink(ChatCall $call, User $actor): array
+    {
+        if (!$this->canManageGuests($call, $actor)) {
+            abort(403, 'Гостевую ссылку может создать владелец группы или инициатор звонка');
+        }
+        if (!$call->isOpen()) {
+            throw new RuntimeException('Звонок уже завершён');
+        }
+
+        if (!$call->guest_token) {
+            $call->guest_token = Str::lower(Str::random(40));
+            $call->save();
+        }
+
+        return [
+            'guest_token' => $call->guest_token,
+            'guest_url' => route('calls.guest', $call->guest_token),
+        ];
+    }
+
+    public function revokeGuestLink(ChatCall $call, User $actor): void
+    {
+        if (!$this->canManageGuests($call, $actor)) {
+            abort(403);
+        }
+        $call->guest_token = null;
+        $call->save();
+    }
+
+    public function findOpenByGuestToken(string $token): ?ChatCall
+    {
+        $token = trim($token);
+        if ($token === '') {
+            return null;
+        }
+
+        return ChatCall::query()
+            ->where('guest_token', $token)
+            ->whereIn('status', [ChatCall::STATUS_RINGING, ChatCall::STATUS_ACTIVE])
+            ->with('chat')
+            ->first();
+    }
+
+    /**
+     * Гость входит в комнату по ссылке (без аккаунта).
+     *
+     * @return array<string, mixed>
+     */
+    public function joinAsGuest(string $token, string $name, bool $video = false): array
+    {
+        if (!$this->isAvailable()) {
+            throw new RuntimeException('Звонки недоступны');
+        }
+
+        $call = $this->findOpenByGuestToken($token);
+        if (!$call) {
+            throw new RuntimeException('Ссылка недействительна или звонок завершён');
+        }
+
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? '');
+        if ($name === '' || mb_strlen($name) < 2) {
+            throw new RuntimeException('Укажите имя (минимум 2 символа)');
+        }
+        if (mb_strlen($name) > 60) {
+            $name = mb_substr($name, 0, 60);
+        }
+
+        $identity = 'guest-' . Str::lower(Str::random(12));
+        $initials = mb_strtoupper(mb_substr($name, 0, 2));
+        $colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#ec4899', '#22c55e', '#14b8a6', '#f97316'];
+        $color = $colors[crc32($identity) % count($colors)];
+
+        $tokenJwt = $this->livekit->createAccessToken([
+            'room' => $call->room_name,
+            'identity' => $identity,
+            'name' => $name,
+            'metadata' => [
+                'guest' => true,
+                'name' => $name,
+                'avatar' => '',
+                'initials' => $initials,
+                'color' => $color,
+            ],
+        ]);
+
+        if ($call->status === ChatCall::STATUS_RINGING) {
+            $call->status = ChatCall::STATUS_ACTIVE;
+            $call->save();
+        }
+
+        return [
+            'call_id' => (int) $call->id,
+            'chat_id' => (int) $call->chat_id,
+            'status' => $call->status,
+            'video' => $video,
+            'room' => $call->room_name,
+            'ws_url' => $this->livekit->wsUrl(),
+            'token' => $tokenJwt,
+            'is_starter' => false,
+            'is_guest' => true,
+            'can_end' => false,
+            'can_manage_guests' => false,
+            'guest_url' => null,
+            'chat_type' => $call->chat?->type ?? 'group',
+            'me' => [
+                'id' => $identity,
+                'name' => $name,
+                'avatar' => '',
+                'initials' => $initials,
+                'color' => $color,
+            ],
+            'roster' => [],
+        ];
     }
 
     /**
@@ -236,7 +399,7 @@ class CallService
             ],
         ]);
 
-        $call->loadMissing(['participants.user']);
+        $call->loadMissing(['chat', 'participants.user']);
 
         $roster = $call->participants
             ->where('status', ChatCallParticipant::STATUS_JOINED)
@@ -254,15 +417,23 @@ class CallService
             ->values()
             ->all();
 
+        $canGuests = $this->canManageGuests($call, $actor);
+
         return [
             'call_id' => (int) $call->id,
             'chat_id' => (int) $call->chat_id,
+            'chat_type' => $call->chat?->type ?? 'group',
             'status' => $call->status,
             'video' => (bool) $call->video_enabled,
             'room' => $call->room_name,
             'ws_url' => $this->livekit->wsUrl(),
             'token' => $token,
             'is_starter' => (int) $call->started_by === (int) $actor->id,
+            'can_end' => $this->canEnd($call, $actor),
+            'can_manage_guests' => $canGuests,
+            'guest_url' => ($canGuests && $call->guest_token)
+                ? route('calls.guest', $call->guest_token)
+                : null,
             'me' => [
                 'id' => (int) $actor->id,
                 'name' => $actor->name ?: $actor->displayName(),

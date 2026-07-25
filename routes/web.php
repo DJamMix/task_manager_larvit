@@ -6,6 +6,39 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/call/guest/{token}', function (string $token, \App\Services\CallService $calls) {
+    $call = $calls->findOpenByGuestToken($token);
+    if (!$call) {
+        return response()->view('calls.guest-expired', [], 404);
+    }
+
+    return view('calls.guest', [
+        'token' => $token,
+        'chat_title' => $call->chat?->title ?: 'Групповой звонок',
+        'video' => (bool) $call->video_enabled,
+        'join_url' => route('calls.guest.join', $token),
+    ]);
+})->middleware('web')->name('calls.guest');
+
+Route::post('/call/guest/{token}/join', function (
+    \Illuminate\Http\Request $request,
+    string $token,
+    \App\Services\CallService $calls
+) {
+    $request->validate([
+        'name' => ['required', 'string', 'min:2', 'max:60'],
+        'video' => ['sometimes', 'boolean'],
+    ]);
+
+    try {
+        return response()->json(
+            $calls->joinAsGuest($token, (string) $request->input('name'), $request->boolean('video'))
+        );
+    } catch (\Throwable $e) {
+        return response()->json(['message' => $e->getMessage()], 422);
+    }
+})->middleware('web')->name('calls.guest.join');
+
 Route::get('/test-task-search', function() {
     $userId = 6; // Используем ID из вашего индекса
     $query = 'проблему'; // Слово из ваших задач
