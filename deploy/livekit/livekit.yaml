@@ -1,0 +1,12 @@
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: true
+  # Если за NAT — укажите публичный IP сервера:
+  # node_ip: "YOUR.PUBLIC.IP"
+keys:
+  # api_key: api_secret (минимум 32 символа у secret)
+  devkey: secretsecretsecretsecretsecretsecret00
+logging:
+  level: info

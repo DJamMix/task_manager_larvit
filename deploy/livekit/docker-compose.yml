@@ -1,0 +1,22 @@
+# LiveKit на Debian (production / staging)
+# Запуск на сервере:
+#   cd /path/to/app/deploy/livekit && docker compose up -d
+#
+# В .env Laravel на Debian:
+#   LIVEKIT_URL=wss://livekit.ВАШ_ДОМЕН
+#   LIVEKIT_API_KEY=devkey   # смените на проде
+#   LIVEKIT_API_SECRET=...   # длинный секрет, тот же что в keys ниже
+#
+# Nginx (пример): проксируйте wss на 127.0.0.1:7880 — см. nginx-livekit.conf
+
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    ports:
+      - "127.0.0.1:7880:7880"   # только localhost — снаружи через nginx/wss
+      - "7881:7881"
+      - "7882:7882/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro

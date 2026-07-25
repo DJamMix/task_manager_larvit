@@ -182,7 +182,20 @@
         });
         room.on(LK.RoomEvent.Disconnected, () => stopCallUi());
 
-        await room.connect(payload.ws_url, payload.token);
+        if (!payload.ws_url) {
+            throw new Error('LiveKit URL пустой. Проверьте LIVEKIT_URL в .env');
+        }
+        try {
+            await room.connect(payload.ws_url, payload.token);
+        } catch (err) {
+            const hint = [
+                'Не удалось подключиться к сигналингу LiveKit (' + payload.ws_url + ').',
+                'Проверьте: 1) LiveKit запущен (порт 7880)',
+                '2) LIVEKIT_URL доступен из браузера (не localhost сервера, если вы на другом ПК)',
+                '3) На HTTPS нужен wss://, не ws://',
+            ].join('\n');
+            throw new Error((err && err.message ? err.message + '\n\n' : '') + hint);
+        }
         await room.localParticipant.setMicrophoneEnabled(true);
         await room.localParticipant.setCameraEnabled(!!payload.video);
 
