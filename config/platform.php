@@ -129,11 +129,11 @@ return [
         'stylesheets' => [
             '/css/footer.css',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260725b',
+            '/css/task-workspace.css?v=20260725c',
             '/css/act-composer.css',
         ],
         'scripts'     => [
-            '/js/chat-notify.js?v=20260725b',
+            '/js/chat-notify.js?v=20260725c',
         ],
     ],
 

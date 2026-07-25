@@ -106,6 +106,11 @@
                     </div>
                 </div>
                 <div class="bx-messenger__header-actions">
+                    <label class="bx-notify-vol" title="Громкость звука новых сообщений">
+                        <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
+                        <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="70">
+                        <span id="bx-notify-volume-label">70%</span>
+                    </label>
                     <button type="submit"
                             class="bx-mute-btn {{ $isPinned ? 'is-active' : '' }}"
                             formaction="{{ url()->current() }}/togglePin"
@@ -234,6 +239,9 @@
                         <span class="bx-voice-record__label">Запись</span>
                         <span class="bx-voice-record__timer" id="bx-voice-timer">0:00</span>
                         <span class="bx-voice-record__limit">/ 3:00</span>
+                        <span class="bx-voice-record__meter" title="Уровень микрофона" aria-hidden="true">
+                            <span class="bx-voice-record__meter-fill" id="bx-voice-meter"></span>
+                        </span>
                     </div>
                     <div class="bx-voice-record__actions">
                         <button type="button" class="bx-voice-record__btn" id="bx-voice-cancel">Отмена</button>
@@ -250,9 +258,30 @@
             <div class="bx-messenger__empty">
                 <h2 class="h4">Корпоративные чаты</h2>
                 <p class="text-muted mb-0">Напишите коллеге лично или создайте групповой чат (если есть право).</p>
+                <label class="bx-notify-vol bx-notify-vol--empty" title="Громкость звука новых сообщений">
+                    Громкость уведомлений
+                    <input type="range" id="bx-notify-volume-empty" min="0" max="100" step="5" value="70">
+                    <span id="bx-notify-volume-empty-label">70%</span>
+                </label>
             </div>
         @endif
     </section>
+
+    <div id="bx-mic-gate" class="bx-mic-gate" hidden>
+        <div class="bx-mic-gate__card" role="dialog" aria-modal="true" aria-labelledby="bx-mic-gate-title">
+            <h3 id="bx-mic-gate-title" class="bx-mic-gate__title">Нужен микрофон</h3>
+            <p class="bx-mic-gate__text" id="bx-mic-gate-text">
+                Разрешите доступ к микрофону, затем <strong>скажите несколько слов</strong> —
+                полоска ниже должна двигаться. Без этого голосовое уйдёт «пустым».
+            </p>
+            <div class="bx-mic-gate__meter"><span id="bx-mic-gate-meter"></span></div>
+            <p class="bx-mic-gate__hint" id="bx-mic-gate-hint"></p>
+            <div class="bx-mic-gate__actions">
+                <button type="button" class="btn btn-primary" id="bx-mic-gate-retry">Разрешить микрофон</button>
+                <button type="button" class="btn btn-link" id="bx-mic-gate-close">Закрыть</button>
+            </div>
+        </div>
+    </div>
 
     @if($active)
         <div class="bx-members-modal" id="bx-members-sheet" hidden>
@@ -733,7 +762,6 @@
             if (!buf || buf.byteLength < 64) throw new Error('empty');
             const head = new Uint8Array(buf.slice(0, 16));
             let type = (res.headers.get('Content-Type') || '').split(';')[0].trim();
-            // По сигнатуре файла — надёжнее, чем Content-Type
             if (head[0] === 0x52 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x46) {
                 type = 'audio/wav';
             } else if (head[0] === 0x4F && head[1] === 0x67 && head[2] === 0x67 && head[3] === 0x53) {
@@ -743,15 +771,79 @@
             } else if (!type || type === 'application/octet-stream' || type === 'text/html') {
                 type = 'audio/wav';
             }
+
+            // webm/ogg с Linux часто не играет в других браузерах — перекодируем в WAV на лету
+            if (type === 'audio/webm' || type === 'audio/ogg' || type === 'video/webm') {
+                const wav = await remuxArrayBufferToWav(buf);
+                if (wav) {
+                    audio.src = URL.createObjectURL(wav);
+                    wrap.setAttribute('data-blob-ready', '1');
+                    wrap.setAttribute('data-audio-type', 'audio/wav');
+                    return true;
+                }
+            }
+
             const playable = new Blob([buf], { type });
-            const objUrl = URL.createObjectURL(playable);
-            audio.src = objUrl;
+            audio.src = URL.createObjectURL(playable);
             wrap.setAttribute('data-blob-ready', '1');
             wrap.setAttribute('data-audio-type', type);
             return true;
         } catch (e) {
             return false;
         }
+    };
+
+    const remuxArrayBufferToWav = async (arrayBuffer) => {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        const ctx = new Ctx();
+        try {
+            const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+            const ch0 = decoded.getChannelData(0);
+            let mono = ch0;
+            if (decoded.numberOfChannels > 1) {
+                const ch1 = decoded.getChannelData(1);
+                mono = new Float32Array(ch0.length);
+                for (let i = 0; i < ch0.length; i++) mono[i] = (ch0[i] + ch1[i]) * 0.5;
+            }
+            const targetRate = 16000;
+            const ratio = decoded.sampleRate / targetRate;
+            const len = Math.max(1, Math.floor(mono.length / ratio));
+            const down = new Float32Array(len);
+            for (let i = 0; i < len; i++) down[i] = mono[Math.min(mono.length - 1, Math.floor(i * ratio))];
+            return encodeWavPcm(down, targetRate);
+        } catch (e) {
+            return null;
+        } finally {
+            await ctx.close().catch(() => {});
+        }
+    };
+
+    const encodeWavPcm = (samples, sampleRate) => {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeStr = (pos, str) => {
+            for (let i = 0; i < str.length; i++) view.setUint8(pos + i, str.charCodeAt(i));
+        };
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        let idx = 44;
+        for (let i = 0; i < samples.length; i++, idx += 2) {
+            const s = Math.max(-1, Math.min(1, samples[i]));
+            view.setInt16(idx, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        return new Blob([buffer], { type: 'audio/wav' });
     };
 
     const initVoicePlayers = (scope) => {
@@ -819,8 +911,16 @@
                 try {
                     await audio.play();
                 } catch (err) {
-                    // Часто webm с Chrome не играет на iPhone — подсказка
-                    alert('Браузер не может воспроизвести это голосовое. Попросите отправителя записать ещё раз (обновлённая версия пишет совместимый формат).');
+                    // Повтор: принудительный remux (если ещё webm)
+                    wrap.removeAttribute('data-blob-ready');
+                    const again = await ensureVoiceBlobSrc(wrap, audio, src);
+                    if (again) {
+                        try {
+                            await audio.play();
+                            return;
+                        } catch (e2) {}
+                    }
+                    alert('Браузер не может воспроизвести это голосовое. Попросите отправителя записать ещё раз (нужен формат WAV — после обновления чатов).');
                     wrap.classList.add('is-error');
                 }
             });
@@ -945,30 +1045,56 @@
         sendMessageAjax();
     });
 
-    /* Voice recording — MediaRecorder → WAV 16kHz (играет у всех браузеров) */
+    /* Voice: PCM → WAV + проверка тишины + запрос микрофона */
     const VOICE_MAX_SEC = 180;
     const VOICE_TARGET_RATE = 16000;
+    const VOICE_SILENCE_PEAK = 0.018;
     const voiceBtn = document.getElementById('bx-tool-voice');
     const voiceBar = document.getElementById('bx-voice-bar');
     const voiceTimer = document.getElementById('bx-voice-timer');
-    let mediaRecorder = null;
+    const voiceMeter = document.getElementById('bx-voice-meter');
+    const micGate = document.getElementById('bx-mic-gate');
+    const micGateMeter = document.getElementById('bx-mic-gate-meter');
+    const micGateHint = document.getElementById('bx-mic-gate-hint');
     let mediaStream = null;
-    let voiceChunks = [];
-    let voiceMime = '';
+    let voiceAudioCtx = null;
+    let voiceProcessor = null;
+    let voiceSource = null;
+    let voicePcmChunks = [];
+    let voiceSampleRate = 48000;
+    let voicePeak = 0;
     let voiceRecording = false;
     let voiceStartedAt = 0;
     let voiceTick = null;
     let voiceCancelled = false;
+    let micGateStream = null;
+    let micGateCtx = null;
+    let micGateRaf = 0;
+    let micGateHeard = false;
 
     const formatVoiceTime = (sec) => {
         const s = Math.max(0, Math.floor(sec));
         return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
     };
 
+    const setMeter = (el, peak) => {
+        if (!el) return;
+        const pct = Math.min(100, Math.round(peak * 220));
+        el.style.width = pct + '%';
+        el.classList.toggle('is-hot', pct > 8);
+    };
+
     const stopVoiceTracks = () => {
+        try { voiceProcessor?.disconnect(); } catch (e) {}
+        try { voiceSource?.disconnect(); } catch (e) {}
+        voiceProcessor = null;
+        voiceSource = null;
         mediaStream?.getTracks().forEach((t) => t.stop());
         mediaStream = null;
-        mediaRecorder = null;
+        if (voiceAudioCtx) {
+            voiceAudioCtx.close().catch(() => {});
+            voiceAudioCtx = null;
+        }
         voiceRecording = false;
     };
 
@@ -979,26 +1105,50 @@
         voiceBtn?.classList.remove('is-recording');
         composer?.classList.remove('is-voice-recording');
         if (voiceTimer) voiceTimer.textContent = '0:00';
+        setMeter(voiceMeter, 0);
     };
 
-    const showMicHelp = (err) => {
-        const name = err?.name || '';
-        let msg = 'Не удалось получить доступ к микрофону.';
-        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            msg = 'Микрофон работает только по HTTPS (или localhost).\nОткройте сайт как https://…';
-        } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-            msg = 'Микрофон заблокирован в браузере.\n\n'
-                + 'Как разрешить снова:\n'
-                + '• Chrome: замочек слева от адреса → «Микрофон» → Разрешить → обновить страницу\n'
-                + '• Firefox: иконка разрешения в адресной строке → Разрешить\n'
-                + '• Edge: значок замка → Разрешения сайта → Микрофон\n\n'
-                + 'После смены разрешения нажмите микрофон ещё раз.';
-        } else if (name === 'NotFoundError') {
-            msg = 'Микрофон не найден. Подключите устройство и повторите.';
-        } else if (name === 'NotReadableError') {
-            msg = 'Микрофон занят другой программой. Закройте её и попробуйте снова.';
+    const stopMicGateListen = () => {
+        cancelAnimationFrame(micGateRaf);
+        micGateStream?.getTracks().forEach((t) => t.stop());
+        micGateStream = null;
+        if (micGateCtx) {
+            micGateCtx.close().catch(() => {});
+            micGateCtx = null;
         }
-        alert(msg);
+        setMeter(micGateMeter, 0);
+    };
+
+    const closeMicGate = () => {
+        stopMicGateListen();
+        if (micGate) micGate.hidden = true;
+    };
+
+    const openMicGate = (msg) => {
+        if (micGateHint) micGateHint.textContent = msg || '';
+        if (micGate) micGate.hidden = false;
+    };
+
+    const micHelpText = (err) => {
+        const name = err?.name || '';
+        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            return 'Микрофон работает только по HTTPS. Откройте сайт как https://…';
+        }
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+            return 'Доступ заблокирован. Замочек в адресной строке → Микрофон → Разрешить, затем снова «Разрешить микрофон».';
+        }
+        if (name === 'NotFoundError') return 'Микрофон не найден. Подключите устройство.';
+        if (name === 'NotReadableError') return 'Микрофон занят другой программой.';
+        return 'Не удалось открыть микрофон. Нажмите «Разрешить микрофон» ещё раз.';
+    };
+
+    const mergePcm = (chunks) => {
+        let len = 0;
+        chunks.forEach((c) => { len += c.length; });
+        const out = new Float32Array(len);
+        let o = 0;
+        chunks.forEach((c) => { out.set(c, o); o += c.length; });
+        return out;
     };
 
     const downsampleBuffer = (buffer, fromRate, toRate) => {
@@ -1007,120 +1157,52 @@
         const newLen = Math.max(1, Math.floor(buffer.length / ratio));
         const result = new Float32Array(newLen);
         for (let i = 0; i < newLen; i++) {
-            const idx = Math.min(buffer.length - 1, Math.floor(i * ratio));
-            result[i] = buffer[idx];
+            result[i] = buffer[Math.min(buffer.length - 1, Math.floor(i * ratio))];
         }
         return result;
     };
 
-    const encodeWavFromFloat32 = (samples, sampleRate) => {
-        const buffer = new ArrayBuffer(44 + samples.length * 2);
-        const view = new DataView(buffer);
-        const writeStr = (pos, str) => {
-            for (let i = 0; i < str.length; i++) view.setUint8(pos + i, str.charCodeAt(i));
-        };
-        writeStr(0, 'RIFF');
-        view.setUint32(4, 36 + samples.length * 2, true);
-        writeStr(8, 'WAVE');
-        writeStr(12, 'fmt ');
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, sampleRate, true);
-        view.setUint32(28, sampleRate * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeStr(36, 'data');
-        view.setUint32(40, samples.length * 2, true);
-        let idx = 44;
-        for (let i = 0; i < samples.length; i++, idx += 2) {
-            const s = Math.max(-1, Math.min(1, samples[i]));
-            view.setInt16(idx, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    const peakOf = (samples) => {
+        let peak = 0;
+        for (let i = 0; i < samples.length; i++) {
+            const v = Math.abs(samples[i]);
+            if (v > peak) peak = v;
         }
-        return new Blob([buffer], { type: 'audio/wav' });
-    };
-
-    /** Любой записанный blob → WAV mono (слушают Chrome / Safari / Firefox / iPhone) */
-    const blobToUniversalWav = async (blob, targetRate = VOICE_TARGET_RATE) => {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return null;
-        const ctx = new Ctx();
-        try {
-            const raw = await blob.arrayBuffer();
-            const decoded = await ctx.decodeAudioData(raw.slice(0));
-            const channel = decoded.numberOfChannels > 1
-                ? (() => {
-                    const a = decoded.getChannelData(0);
-                    const b = decoded.getChannelData(1);
-                    const m = new Float32Array(a.length);
-                    for (let i = 0; i < a.length; i++) m[i] = (a[i] + b[i]) * 0.5;
-                    return m;
-                })()
-                : decoded.getChannelData(0);
-            const mono = downsampleBuffer(channel, decoded.sampleRate, targetRate);
-            return encodeWavFromFloat32(mono, targetRate);
-        } catch (e) {
-            return null;
-        } finally {
-            await ctx.close().catch(() => {});
-        }
-    };
-
-    const pickVoiceMime = () => {
-        if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
-        const candidates = [
-            'audio/webm;codecs=opus',
-            'audio/webm',
-            'audio/mp4',
-            'audio/ogg;codecs=opus',
-            'audio/ogg',
-        ];
-        return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+        return peak;
     };
 
     const finishVoiceRecording = async () => {
         const duration = Math.min(VOICE_MAX_SEC, Math.round((Date.now() - voiceStartedAt) / 1000));
-        const chunks = voiceChunks.slice();
-        const mime = voiceMime;
+        const chunks = voicePcmChunks.slice();
+        const rate = voiceSampleRate;
+        const peak = voicePeak;
         stopVoiceTracks();
         endVoiceUi();
         if (voiceCancelled || !chunks.length || duration < 1) return;
 
-        const rawType = (mime || chunks[0]?.type || 'audio/webm').split(';')[0];
-        const rawBlob = new Blob(chunks, { type: rawType });
-        if (rawBlob.size < 200) {
-            alert('Запись пустая. Проверьте микрофон и разрешения браузера.');
+        const pcm = mergePcm(chunks);
+        const livePeak = Math.max(peak, peakOf(pcm));
+        if (livePeak < VOICE_SILENCE_PEAK) {
+            openMicGate('Запись без звука (тишина). Разрешите микрофон, скажите пару слов и запишите снова.');
+            await requestMicUntilHeard();
             return;
         }
 
-        // PHP часто имеет upload_max_filesize=2M — WAV должен уложиться (~1.8 МБ запас)
+        let targetRate = VOICE_TARGET_RATE;
+        let mono = downsampleBuffer(pcm, rate, targetRate);
+        let blob = encodeWavPcm(mono, targetRate);
         const MAX_SAFE = 1800 * 1024;
-        let outBlob = await blobToUniversalWav(rawBlob, 16000);
-        if (outBlob && outBlob.size > MAX_SAFE) {
-            outBlob = await blobToUniversalWav(rawBlob, 8000);
+        if (blob.size > MAX_SAFE) {
+            targetRate = 8000;
+            mono = downsampleBuffer(pcm, rate, targetRate);
+            blob = encodeWavPcm(mono, targetRate);
         }
-        let fileName = 'voice.wav';
-        let fileType = 'audio/wav';
-        if (!outBlob || outBlob.size < 1000 || outBlob.size > MAX_SAFE) {
-            // Сжатый исходник (webm/m4a) — маленький, но Safari может не играть старые webm
-            outBlob = rawBlob;
-            if (rawType.includes('mp4') || rawType.includes('aac')) {
-                fileName = 'voice.m4a';
-                fileType = 'audio/mp4';
-            } else if (rawType.includes('ogg')) {
-                fileName = 'voice.ogg';
-                fileType = 'audio/ogg';
-            } else {
-                fileName = 'voice.webm';
-                fileType = 'audio/webm';
-            }
-            if (outBlob.size > MAX_SAFE) {
-                alert('Голосовое слишком большое для сервера. Запишите короче или попросите админа поднять upload_max_filesize в PHP до 16M.');
-                return;
-            }
+        if (blob.size > MAX_SAFE) {
+            alert('Голосовое слишком большое. Запишите короче (до ~1.5 мин) или поднимите upload_max_filesize в PHP до 16M.');
+            return;
         }
 
-        const file = new File([outBlob], fileName, { type: fileType });
+        const file = new File([blob], 'voice.wav', { type: 'audio/wav' });
         const fd = new FormData();
         fd.append('message_voice', file);
         fd.append('message[voice_duration]', String(duration));
@@ -1129,27 +1211,91 @@
         await sendMessageAjax(fd);
     };
 
-    const startVoice = async () => {
-        if (!navigator.mediaDevices?.getUserMedia) {
-            showMicHelp({ name: 'NotSupported' });
-            return;
+    const startVoiceCapture = async (stream) => {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) {
+            alert('Браузер не поддерживает запись голоса');
+            return false;
         }
-        if (typeof MediaRecorder === 'undefined') {
-            alert('Браузер не поддерживает запись голоса. Обновите Chrome / Firefox / Edge.');
-            return;
-        }
-        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-            showMicHelp({ name: 'Insecure' });
-            return;
-        }
+        mediaStream = stream;
+        voiceAudioCtx = new Ctx();
+        if (voiceAudioCtx.state === 'suspended') await voiceAudioCtx.resume();
+        voiceSampleRate = voiceAudioCtx.sampleRate || 48000;
+        voiceSource = voiceAudioCtx.createMediaStreamSource(mediaStream);
+        voiceProcessor = voiceAudioCtx.createScriptProcessor(4096, 1, 1);
+        voicePcmChunks = [];
+        voicePeak = 0;
+        voiceCancelled = false;
+        voiceStartedAt = Date.now();
+        voiceRecording = true;
+
+        voiceProcessor.onaudioprocess = (ev) => {
+            if (!voiceRecording) return;
+            const input = ev.inputBuffer.getChannelData(0);
+            const copy = new Float32Array(input.length);
+            copy.set(input);
+            voicePcmChunks.push(copy);
+            let peak = 0;
+            for (let i = 0; i < input.length; i++) {
+                const v = Math.abs(input[i]);
+                if (v > peak) peak = v;
+            }
+            if (peak > voicePeak) voicePeak = peak;
+            setMeter(voiceMeter, peak);
+        };
+        const mute = voiceAudioCtx.createGain();
+        mute.gain.value = 0;
+        voiceSource.connect(voiceProcessor);
+        voiceProcessor.connect(mute);
+        mute.connect(voiceAudioCtx.destination);
 
         voiceBar?.classList.remove('d-none');
         voiceBtn?.classList.add('is-recording');
         composer?.classList.add('is-voice-recording');
         if (voiceTimer) voiceTimer.textContent = '0:00';
 
+        voiceTick = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - voiceStartedAt) / 1000);
+            if (voiceTimer) voiceTimer.textContent = formatVoiceTime(elapsed);
+            if (elapsed >= VOICE_MAX_SEC) stopVoice(false);
+        }, 200);
+        return true;
+    };
+
+    const listenMicLevels = async (stream) => {
+        stopMicGateListen();
+        micGateStream = stream;
+        micGateHeard = false;
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        micGateCtx = new Ctx();
+        if (micGateCtx.state === 'suspended') await micGateCtx.resume();
+        const src = micGateCtx.createMediaStreamSource(stream);
+        const analyser = micGateCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        src.connect(analyser);
+        const data = new Uint8Array(analyser.fftSize);
+        const tick = () => {
+            analyser.getByteTimeDomainData(data);
+            let peak = 0;
+            for (let i = 0; i < data.length; i++) {
+                const v = Math.abs((data[i] - 128) / 128);
+                if (v > peak) peak = v;
+            }
+            setMeter(micGateMeter, peak);
+            if (peak > VOICE_SILENCE_PEAK) {
+                micGateHeard = true;
+                if (micGateHint) micGateHint.textContent = 'Микрофон слышно — можно записывать.';
+            }
+            micGateRaf = requestAnimationFrame(tick);
+        };
+        tick();
+    };
+
+    const requestMicUntilHeard = async () => {
+        openMicGate('');
         try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({
+            const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
@@ -1157,81 +1303,77 @@
                     channelCount: 1,
                 },
             });
-            voiceMime = pickVoiceMime();
-            mediaRecorder = voiceMime
-                ? new MediaRecorder(mediaStream, { mimeType: voiceMime })
-                : new MediaRecorder(mediaStream);
-            voiceMime = mediaRecorder.mimeType || voiceMime || 'audio/webm';
-            voiceChunks = [];
-            voiceCancelled = false;
-            voiceStartedAt = Date.now();
-            voiceRecording = true;
-            mediaRecorder.ondataavailable = (ev) => {
-                if (ev.data && ev.data.size > 0) voiceChunks.push(ev.data);
-            };
-            mediaRecorder.onstop = () => {
-                finishVoiceRecording();
-            };
-            try {
-                mediaRecorder.start(250);
-            } catch (e) {
-                mediaRecorder.start();
+            await listenMicLevels(stream);
+            if (micGateHint) {
+                micGateHint.textContent = 'Говорите сейчас… Когда полоска зелёная — нажмите микрофон в чате для записи.';
             }
-            voiceTick = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - voiceStartedAt) / 1000);
-                if (voiceTimer) voiceTimer.textContent = formatVoiceTime(elapsed);
-                if (elapsed >= VOICE_MAX_SEC) stopVoice(false);
-            }, 200);
         } catch (e) {
-            stopVoiceTracks();
-            endVoiceUi();
-            showMicHelp(e);
+            if (micGateHint) micGateHint.textContent = micHelpText(e);
+            openMicGate(micHelpText(e));
+        }
+    };
+
+    const startVoice = async () => {
+        if (!navigator.mediaDevices?.getUserMedia) {
+            openMicGate('Браузер не поддерживает микрофон.');
+            return;
+        }
+        if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            openMicGate(micHelpText({ name: 'Insecure' }));
+            return;
+        }
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    channelCount: 1,
+                },
+            });
+            closeMicGate();
+            await startVoiceCapture(stream);
+        } catch (e) {
+            openMicGate(micHelpText(e));
         }
     };
 
     const stopVoice = (cancel = false) => {
         voiceCancelled = cancel;
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        if (voiceRecording) {
             voiceRecording = false;
-            mediaRecorder.stop();
+            finishVoiceRecording();
         } else {
             stopVoiceTracks();
             endVoiceUi();
         }
     };
 
-    voiceBtn?.addEventListener('click', (e) => {
-        if (voiceBtn.dataset.longPress === '1') {
-            voiceBtn.dataset.longPress = '0';
-            e.preventDefault();
-            return;
-        }
-        if (voiceRecording || (mediaRecorder && mediaRecorder.state === 'recording')) {
+    voiceBtn?.addEventListener('click', () => {
+        if (voiceRecording) {
             stopVoice(false);
             return;
         }
         startVoice();
     });
-    // Долгое нажатие на микрофон — повторный запрос разрешения
-    let voicePressTimer = null;
-    voiceBtn?.addEventListener('pointerdown', () => {
-        voicePressTimer = setTimeout(async () => {
-            voiceBtn.dataset.longPress = '1';
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                stream.getTracks().forEach((t) => t.stop());
-                alert('Микрофон разрешён. Теперь можно записывать голосовые.');
-            } catch (e) {
-                showMicHelp(e);
-            }
-        }, 900);
-    });
-    const clearVoicePress = () => clearTimeout(voicePressTimer);
-    voiceBtn?.addEventListener('pointerup', clearVoicePress);
-    voiceBtn?.addEventListener('pointerleave', clearVoicePress);
-    voiceBtn?.addEventListener('pointercancel', clearVoicePress);
     document.getElementById('bx-voice-stop')?.addEventListener('click', () => stopVoice(false));
     document.getElementById('bx-voice-cancel')?.addEventListener('click', () => stopVoice(true));
+    document.getElementById('bx-mic-gate-close')?.addEventListener('click', () => closeMicGate());
+    document.getElementById('bx-mic-gate-retry')?.addEventListener('click', async () => {
+        // Бесконечно можно жать — браузер снова спросит, если не «запрещено навсегда»
+        stopMicGateListen();
+        await requestMicUntilHeard();
+        if (micGateHeard) {
+            // Автостарт записи после успешного теста
+            const stream = micGateStream;
+            micGateStream = null; // не стопать в close
+            cancelAnimationFrame(micGateRaf);
+            if (micGateCtx) { micGateCtx.close().catch(() => {}); micGateCtx = null; }
+            closeMicGate();
+            if (stream) await startVoiceCapture(stream);
+        }
+    });
 
     /* Live poll */
     const pollUrl = root?.getAttribute('data-poll-url');
@@ -1265,6 +1407,32 @@
         document.addEventListener(ev, unlockSound, { once: true, passive: true });
     });
 
+    const NOTIFY_VOL_KEY = 'bx_chat_notify_volume';
+    const getNotifyVolume = () => {
+        const v = parseInt(localStorage.getItem(NOTIFY_VOL_KEY) || '70', 10);
+        return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : 70;
+    };
+    const setNotifyVolume = (v) => {
+        const n = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
+        localStorage.setItem(NOTIFY_VOL_KEY, String(n));
+        document.querySelectorAll('#bx-notify-volume, #bx-notify-volume-empty').forEach((el) => {
+            el.value = String(n);
+        });
+        document.querySelectorAll('#bx-notify-volume-label, #bx-notify-volume-empty-label').forEach((el) => {
+            el.textContent = n + '%';
+        });
+        window.__bxChatNotifyVolume = n;
+        return n;
+    };
+    setNotifyVolume(getNotifyVolume());
+    document.querySelectorAll('#bx-notify-volume, #bx-notify-volume-empty').forEach((el) => {
+        el.addEventListener('input', () => {
+            unlockSound();
+            setNotifyVolume(el.value);
+            if (typeof window.bxPlayChatNotify === 'function') window.bxPlayChatNotify();
+        });
+    });
+
     const playNotifySound = () => {
         if (typeof window.bxPlayChatNotify === 'function') {
             window.bxPlayChatNotify();
@@ -1276,22 +1444,25 @@
             if (!Ctx) return;
             const ctx = window.__bxChatAudioCtx = window.__bxChatAudioCtx || new Ctx();
             if (ctx.state === 'suspended') ctx.resume();
+            const volScale = getNotifyVolume() / 100;
+            if (volScale <= 0) return;
             const t = ctx.currentTime;
             const beep = (freq, start, dur, vol) => {
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 o.type = 'sine';
                 o.frequency.value = freq;
+                const peak = Math.max(0.0001, vol * volScale);
                 g.gain.setValueAtTime(0.0001, t + start);
-                g.gain.exponentialRampToValueAtTime(vol, t + start + 0.01);
+                g.gain.exponentialRampToValueAtTime(peak, t + start + 0.01);
                 g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
                 o.connect(g);
                 g.connect(ctx.destination);
                 o.start(t + start);
                 o.stop(t + start + dur + 0.02);
             };
-            beep(1200, 0, 0.1, 0.55);
-            beep(1500, 0.12, 0.12, 0.5);
+            beep(1100, 0, 0.12, 0.65);
+            beep(1450, 0.14, 0.14, 0.6);
         } catch (e) {}
     };
 
