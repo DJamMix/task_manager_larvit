@@ -2,6 +2,7 @@
 
 namespace App\Orchid\Layouts\Comment;
 
+use App\Support\UploadLimits;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Group;
@@ -34,7 +35,7 @@ class DiscussionComposerLayout extends Rows
                     ->title('Файлы')
                     ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css')
                     ->storage('public')
-                    ->maxFileSize(50)
+                    ->maxFileSize(UploadLimits::maxMb(50))
                     ->maxFiles(5),
 
                 Select::make('comment.notify_user_ids.')

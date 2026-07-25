@@ -4,6 +4,7 @@ namespace App\Orchid\Layouts\Chat;
 
 use App\Models\Task;
 use App\Services\ChatService;
+use App\Support\UploadLimits;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Group;
@@ -59,7 +60,7 @@ class ChatComposerLayout extends Rows
                 ->title('Файлы')
                 ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css')
                 ->storage('public')
-                ->maxFileSize(50)
+                ->maxFileSize(UploadLimits::maxMb(50))
                 ->maxFiles(5),
 
             Button::make('Отправить')

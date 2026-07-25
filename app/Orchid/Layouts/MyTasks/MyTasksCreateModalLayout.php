@@ -7,6 +7,7 @@ use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\Project;
 use App\Models\TaskCategory;
 use App\Services\ProjectContext;
+use App\Support\UploadLimits;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\DateTimer;
 use Orchid\Screen\Fields\Group;
@@ -101,7 +102,7 @@ class MyTasksCreateModalLayout extends Rows
             ->title('Вложения')
             ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig')
             ->storage('public')
-            ->maxFileSize(50)
+            ->maxFileSize(UploadLimits::maxMb(50))
             ->maxFiles(8);
 
         return $fields;

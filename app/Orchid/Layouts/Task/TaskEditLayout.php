@@ -8,6 +8,7 @@ use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\Project;
 use App\Models\TaskCategory;
 use App\Models\User;
+use App\Support\UploadLimits;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\CheckBox;
 use Orchid\Screen\Fields\DateTimer;
@@ -140,8 +141,8 @@ class TaskEditLayout extends Rows
                 ->title('Прикрепленные файлы')
                 ->acceptedFiles('image/*,application/pdf,.psd')
                 ->storage('public')
-                ->maxFileSize(1024)
-                ->help('Допустимые форматы: JPG, PNG, PDF, PSD. Макс. размер: 1 ГБ'),
+                ->maxFileSize(UploadLimits::maxMb(50))
+                ->help('Допустимые форматы: JPG, PNG, PDF, PSD'),
         ];
     }
 }
