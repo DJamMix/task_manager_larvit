@@ -121,6 +121,10 @@ class MessengerScreen extends Screen
             'chats_messages_url' => $resolved
                 ? route('platform.systems.chats.messages', $resolved)
                 : null,
+            'calls_enabled' => app(\App\Services\CallService::class)->isAvailable(),
+            'calls_start_url' => $resolved
+                ? route('platform.systems.chats.calls.start', $resolved)
+                : null,
         ];
     }
 

@@ -390,6 +390,74 @@ Route::get('chats-tasks', function (\Illuminate\Http\Request $request, \App\Serv
     ]);
 })->name('platform.systems.chats.tasks');
 
+Route::post('chats/{chat}/calls', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    try {
+        return response()->json(
+            $calls->start($chat, $request->user(), $request->boolean('video', true))
+        );
+    } catch (\Throwable $e) {
+        return response()->json(['message' => $e->getMessage()], 422);
+    }
+})->name('platform.systems.chats.calls.start');
+
+Route::post('chats/calls/{call}/join', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\ChatCall $call,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    try {
+        return response()->json($calls->join($call, $request->user()));
+    } catch (\Throwable $e) {
+        return response()->json(['message' => $e->getMessage()], 422);
+    }
+})->name('platform.systems.chats.calls.join');
+
+Route::post('chats/calls/{call}/leave', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\ChatCall $call,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $calls->leave($call, $request->user());
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.chats.calls.leave');
+
+Route::post('chats/calls/{call}/decline', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\ChatCall $call,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $calls->decline($call, $request->user());
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.chats.calls.decline');
+
+Route::post('chats/calls/{call}/end', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\ChatCall $call,
+    \App\Services\ChatService $chats,
+    \App\Services\CallService $calls
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $calls->end($call, $request->user());
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.chats.calls.end');
+
 Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
     ->name('platform.systems.chats.view')
     ->breadcrumbs(function (Trail $trail, $chat) {

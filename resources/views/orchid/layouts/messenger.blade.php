@@ -4,7 +4,11 @@
      data-send-url="{{ ($active_chat_id ?? null) ? url()->current() . '/sendMessage' : '' }}"
      data-messages-url="{{ $chats_messages_url ?? '' }}"
      data-has-more="{{ !empty($messages_has_more) ? '1' : '0' }}"
-     data-oldest-id="{{ $messages_oldest_id ?? '' }}">
+     data-oldest-id="{{ $messages_oldest_id ?? '' }}"
+     data-calls-enabled="{{ !empty($calls_enabled) ? '1' : '0' }}"
+     data-calls-start-url="{{ $calls_start_url ?? '' }}"
+     data-call-join-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.calls.join', ['call' => 999999])) }}"
+     data-csrf="{{ csrf_token() }}">
     @php
         $chatList = $chats ?? collect();
         $active = $chat ?? null;
@@ -133,6 +137,24 @@
                     </div>
                 </div>
                 <div class="bx-messenger__header-actions">
+                    @if(!empty($calls_enabled) && !empty($calls_start_url))
+                        <button type="button"
+                                class="bx-mute-btn bx-call-btn"
+                                id="bx-call-audio"
+                                title="Аудиозвонок"
+                                data-video="0">
+                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+                            <span>Звонок</span>
+                        </button>
+                        <button type="button"
+                                class="bx-mute-btn bx-call-btn"
+                                id="bx-call-video"
+                                title="Видеозвонок"
+                                data-video="1">
+                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                            <span>Видео</span>
+                        </button>
+                    @endif
                     <label class="bx-notify-vol" title="Громкость звука новых сообщений">
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
                         <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="75">
@@ -159,6 +181,13 @@
                             <span>Звук</span>
                         @endif
                     </button>
+                </div>
+            </div>
+
+            <div id="bx-active-call-bar" class="bx-active-call-bar" hidden>
+                <div id="bx-active-call-text">Идёт звонок</div>
+                <div class="bx-active-call-bar__actions">
+                    <button type="button" class="btn btn-sm btn-success" id="bx-active-call-join">Присоединиться</button>
                 </div>
             </div>
 
@@ -362,6 +391,37 @@
         <button type="button" class="bx-lightbox__close" data-bx-lightbox-close aria-label="Закрыть">×</button>
         <img class="bx-lightbox__img" src="" alt="">
         <a class="bx-lightbox__open" href="#" target="_blank" rel="noopener">Открыть в новой вкладке</a>
+    </div>
+</div>
+
+<div id="bx-incoming-call" class="bx-incoming-call" hidden>
+    <div class="bx-incoming-call__card">
+        <div class="bx-incoming-call__title" id="bx-incoming-title">Входящий звонок</div>
+        <div class="bx-incoming-call__sub" id="bx-incoming-sub"></div>
+        <div class="bx-incoming-call__actions">
+            <button type="button" class="btn btn-success" id="bx-incoming-accept">Ответить</button>
+            <button type="button" class="btn btn-outline-danger" id="bx-incoming-decline">Отклонить</button>
+        </div>
+    </div>
+</div>
+
+<div id="bx-call-stage" class="bx-call-stage" hidden>
+    <div class="bx-call-stage__top">
+        <div>
+            <div class="bx-call-stage__title" id="bx-call-title">Звонок</div>
+            <div class="bx-call-stage__secure" title="Шифрование медиа DTLS-SRTP, канал WSS/TLS — как в Telegram/Bitrix WebRTC">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                Защищённый звонок · DTLS-SRTP
+            </div>
+        </div>
+        <div class="bx-call-stage__timer" id="bx-call-timer">00:00</div>
+    </div>
+    <div class="bx-call-stage__grid" id="bx-call-grid"></div>
+    <div class="bx-call-stage__bar">
+        <button type="button" class="bx-call-ctrl" id="bx-call-mic" title="Микрофон">Микрофон</button>
+        <button type="button" class="bx-call-ctrl" id="bx-call-cam" title="Камера">Камера</button>
+        <button type="button" class="bx-call-ctrl bx-call-ctrl--danger" id="bx-call-hang" title="Выйти из звонка">Выйти</button>
+        <button type="button" class="bx-call-ctrl bx-call-ctrl--end-all" id="bx-call-end-all" title="Завершить для всех" hidden>Завершить для всех</button>
     </div>
 </div>
 
@@ -1677,6 +1737,9 @@
                 lastBeepMaxId = maxId;
                 sessionStorage.setItem(beepKey, String(lastBeepMaxId));
             }
+            if (typeof window.bxHandleCallsPoll === 'function') {
+                window.bxHandleCallsPoll(data.calls || []);
+            }
             if (maxId > since) {
                 since = maxId;
                 localStorage.setItem(storageKey, String(since));
@@ -1953,3 +2016,6 @@
     });
 })();
 </script>
+@if(!empty($calls_enabled))
+<script src="{{ asset('js/chat-calls.js') }}?v=20260725h"></script>
+@endif

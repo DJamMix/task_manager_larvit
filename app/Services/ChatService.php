@@ -295,6 +295,7 @@ class ChatService
             ])->values()->all(),
             'messages' => $this->messagesPayload($user, $activeChatId, $sinceMessageId),
             'receipts' => $this->receiptsPayload($user, $activeChatId),
+            'calls' => app(CallService::class)->openCallsPayload($user),
         ];
     }
 
