@@ -76,23 +76,18 @@
         }
         
         .col-number {
-            width: 6%;
+            width: 8%;
             text-align: center;
             font-weight: bold;
         }
         
         .col-service {
-            width: 55%;
+            width: 72%;
             text-align: left;
         }
         
         .col-hours {
-            width: 18%;
-            text-align: center;
-        }
-        
-        .col-price {
-            width: 21%;
+            width: 20%;
             text-align: center;
         }
         
@@ -116,13 +111,10 @@
             font-weight: bold;
         }
         
-        .total-amount {
-            font-size: 13pt;
-            border-bottom: 2pt double #000000;
-            padding-bottom: 2pt;
-            margin-left: 10pt;
-            display: inline-block;
-            min-width: 120pt;
+        .document-date {
+            text-align: center;
+            margin-top: 6pt;
+            font-size: 11pt;
         }
         
         .conditions-section {
@@ -207,6 +199,11 @@
         <header class="document-header">
             <h1 class="document-title">Акт приема-передачи оказанных услуг</h1>
             <div class="document-number">№ {{ $act['number'] }}</div>
+            @if(!empty($act['date']))
+                <div class="document-date">
+                    от {{ \Illuminate\Support\Carbon::parse($act['date'])->format('d.m.Y') }}
+                </div>
+            @endif
         </header>
         
         <main class="document-content">
@@ -221,13 +218,11 @@
                             <th class="col-number">№</th>
                             <th class="col-service">Вид услуги</th>
                             <th class="col-hours">Часы</th>
-                            <th class="col-price">Общая стоимость, руб.</th>
                         </tr>
                     </thead>
                     <tbody>
                         @php
                             $totalHours = 0;
-                            $totalAmount = 0;
                         @endphp
                         
                         @if(isset($tasks) && count($tasks) > 0)
@@ -235,36 +230,22 @@
                                 @php
                                     if (!$task) continue;
                                     
-                                    $taskName = '';
-                                    $taskDescription = '';
-                                    $taskHours = 0;
-                                    $taskAmount = 0;
-                                    
-                                    if (is_array($task)) {
-                                        $taskName = $task['name'] ?? 'Задача без названия';
-                                        $taskDescription = $task['description'] ?? '';
-                                        $taskHours = $task['hours'] ?? $task['estimation_hours'] ?? 0;
-                                        $taskAmount = $task['amount'] ?? 0;
-                                    } else {
-                                        $taskName = $task->name ?? 'Задача без названия';
-                                        $taskDescription = $task->description ?? '';
-                                        $taskHours = $task->pivot->hours ?? $task->estimation_hours ?? 0;
-                                        $taskAmount = $task->amount ?? $task->pivot->amount ?? 0;
-                                    }
+                                    $taskName = is_array($task)
+                                        ? ($task['name'] ?? 'Задача без названия')
+                                        : ($task->name ?? 'Задача без названия');
+                                    $taskDescription = is_array($task)
+                                        ? ($task['description'] ?? '')
+                                        : ($task->description ?? '');
+                                    $taskHours = is_array($task)
+                                        ? ($task['hours'] ?? 0)
+                                        : ($task->pivot->hours ?? $task->estimation_hours ?? 0);
                                     
                                     if (!is_numeric($taskHours)) {
                                         $taskHours = 0;
                                     }
                                     
-                                    if (!is_numeric($taskAmount)) {
-                                        $taskAmount = 0;
-                                    }
-                                    
-                                    $taskHours = (float)$taskHours;
-                                    $taskAmount = (float)$taskAmount;
-                                    
+                                    $taskHours = (float) $taskHours;
                                     $totalHours += $taskHours;
-                                    $totalAmount += $taskAmount;
                                 @endphp
                                 
                                 <tr>
@@ -278,18 +259,11 @@
                                         @endif
                                     </td>
                                     <td class="col-hours">{{ number_format($taskHours, 2, ',', ' ') }}</td>
-                                    <td class="col-price">
-                                        @if($taskAmount > 0)
-                                            {{ number_format($taskAmount, 2, ',', ' ') }}
-                                        @else
-                                            -
-                                        @endif
-                                    </td>
                                 </tr>
                             @endforeach
                         @else
                             <tr>
-                                <td colspan="4" class="text-center">Нет задач в акте</td>
+                                <td colspan="3" class="text-center">Нет задач в акте</td>
                             </tr>
                         @endif
                     </tbody>
@@ -297,9 +271,9 @@
             </section>
             
             <section class="total-summary">
-                Итого: 
+                Итого:
                 <span class="total-hours">
-                    {{ number_format($totalHours, 2, ',', ' ') }} Часов.
+                    {{ number_format($totalHours, 2, ',', ' ') }} ч.
                 </span>
             </section>
             

@@ -4,408 +4,238 @@ namespace App\Orchid\Screens\Acts;
 
 use App\Models\Act;
 use App\Models\Project;
-use App\Orchid\Layouts\Act\ActEditLayout;
-use App\Services\ActCreationService;
+use App\Services\ActService;
+use App\Services\ProjectContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Screen;
-use Orchid\Support\Facades\Alert;
-use Orchid\Support\Facades\Toast;
 use Orchid\Support\Color;
+use Orchid\Support\Facades\Layout;
+use Orchid\Support\Facades\Toast;
 use WordForLaravel\Facades\WordForLaravel;
 
 class ActEditScreen extends Screen
 {
-    public $name = 'Создание акта';
-    public $description = 'Создание нового акта выполненных работ';
-    public $exists = false;
     public $act;
-    public $hasDuplicates = false;
-    
-    private ActCreationService $creationService;
 
-    public function __construct()
+    public $exists = false;
+
+    public function permission(): ?iterable
     {
-        $this->creationService = new ActCreationService();
+        return ['platform.systems.acts'];
     }
 
-    public function query(Act $act): array
+    public function query(Act $act, ActService $acts, ProjectContext $context, Request $request): iterable
     {
         $this->exists = $act->exists;
         $this->act = $act;
-        $step = request()->get('step', 'main_data');
-        
-        if ($this->exists) {
-            $act->load(['tasks' => function($query) {
-                $query->with([
-                    'project:id,name',
-                    'executor:id,name',
-                    'creator:id,name',
-                    'category:id,name'
-                ]);
-            }]);
-            
-            return [
-                'act' => $act,
-                'act_tasks' => $act->tasks,
-                'step' => 'main_data',
-            ];
-        }
-        
-        $query = ['act' => $act, 'step' => $step];
-        
-        if ($step === 'task_selection') {
-            $actData = $this->creationService->getSessionData();
-            
-            if (!$actData || !isset($actData['project_id'])) {
-                session()->forget('act_data');
-                $query['error'] = 'Данные акта утеряны или неполны';
-                return $query;
-            }
-            
-            $selectedIds = session()->get('selected_task_ids', []);
-            
-            $tasks = $this->creationService->getTasksForSelection(
-                $actData['project_id'],
-                $selectedIds,
-                null
-            );
-            
-            $this->checkForDuplicates($tasks);
-            
-            $query['tasks'] = $tasks;
-            $query['project'] = Project::find($actData['project_id']);
-            $query['act_data'] = $actData;
-            $query['has_duplicates'] = $this->hasDuplicates;
-        }
-        
-        return $query;
-    }
 
-    private function checkForDuplicates(array $tasks): void
-    {
-        foreach ($tasks as $task) {
-            if (!empty($task['used_in_acts'])) {
-                $this->hasDuplicates = true;
-                break;
-            }
+        if ($act->exists) {
+            $act->load(['tasks.executor', 'project.clients']);
+            $projectId = (int) ($act->project_id ?: $request->integer('project_id'));
+        } else {
+            $projectId = (int) ($request->integer('project_id')
+                ?: ($context->has() ? $context->id() : 0));
         }
-    }
 
-    public function commandBar(): array
-    {
-        $step = request()->get('step', 'main_data');
-        
-        if ($this->exists) {
-            return [
-                Link::make('Назад')
-                    ->icon('arrow-left')
-                    ->route('platform.systems.acts'),
-                    
-                Button::make('Сохранить')
-                    ->icon('check')
-                    ->method('save')
-                    ->type(Color::DARK),
-                    
-                Link::make('Скачать')
-                    ->icon('download')
-                    ->route('platform.systems.acts.download', $this->act)
-                    ->type(Color::DARK),
-                    
-                Button::make('Удалить')
-                    ->icon('trash')
-                    ->method('remove')
-                    ->type(Color::DARK)
-                    ->confirm('Вы уверены?'),
-            ];
-        }
-        
-        if ($step === 'task_selection') {
-            $buttons = [
-                Button::make('Назад')
-                    ->icon('arrow-left')
-                    ->method('previousStep'),
-            ];
-            
-            if ($this->hasDuplicates) {
-                $buttons[] = Button::make('Сгенерировать акт')
-                    ->icon('check')
-                    ->method('generateAct')
-                    ->type(Color::DARK)
-                    ->confirm('Обнаружены задачи, которые уже используются в других актах. Вы уверены, что хотите создать акт с этими задачами?');
-            } else {
-                $buttons[] = Button::make('Сгенерировать акт')
-                    ->icon('check')
-                    ->method('generateAct')
-                    ->type(Color::DARK);
-            }
-            
-            return $buttons;
-        }
-        
+        $projects = Project::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $project = $projectId > 0
+            ? Project::query()->with('clients')->find($projectId)
+            : null;
+
+        $tasks = $project
+            ? $acts->tasksForComposer((int) $project->id, $act->exists ? $act : null)
+            : [];
+
+        $header = [
+            'number' => old('act.number', $act->exists ? $act->number : $acts->suggestNumber($projectId ?: null)),
+            'date' => old('act.date', $act->exists && $act->date
+                ? $act->date->format('Y-m-d')
+                : now()->format('Y-m-d')),
+            'customer' => old('act.customer', $act->exists ? $act->customer : $acts->defaultCustomer($project)),
+            'executor' => old('act.executor', $act->exists ? $act->executor : $acts->defaultExecutor()),
+            'info' => old('act.info', $act->exists ? (string) $act->info : ''),
+            'project_id' => old('project_id', $projectId ?: ''),
+        ];
+
         return [
-            Link::make('Отмена')
-                ->icon('close')
-                ->route('platform.systems.acts'),
-                
-            Button::make('Далее')
-                ->icon('arrow-right')
-                ->method('nextStep')
-                ->type(Color::DARK),
+            'act' => $act,
+            'act_exists' => $act->exists,
+            'header' => $header,
+            'projects' => $projects,
+            'project' => $project,
+            'tasks' => $tasks,
+            'selected_count' => collect($tasks)->where('selected', true)->count(),
+            'selected_hours' => round((float) collect($tasks)->where('selected', true)->sum('hours'), 2),
         ];
     }
 
-    public function layout(): array
+    public function name(): ?string
     {
-        return [ActEditLayout::class];
+        return $this->exists
+            ? ('Акт ' . ($this->act->number ?? ''))
+            : 'Новый акт';
     }
 
-    public function nextStep(Request $request)
+    public function description(): ?string
     {
+        return 'Выберите задачи, скорректируйте часы и сохраните. Часы по умолчанию — факт (если есть), иначе оценка.';
+    }
+
+    public function commandBar(): iterable
+    {
+        $bar = [
+            Link::make('К списку')
+                ->icon('bs.arrow-left')
+                ->route('platform.systems.acts'),
+        ];
+
+        if ($this->exists) {
+            $bar[] = Link::make('Скачать Word')
+                ->icon('bs.download')
+                ->route('platform.systems.acts.download', $this->act)
+                ->target('_blank');
+
+            $bar[] = Button::make('Удалить')
+                ->icon('bs.trash')
+                ->method('remove')
+                ->confirm('Удалить акт безвозвратно?')
+                ->type(Color::DANGER);
+        }
+
+        $bar[] = Button::make($this->exists ? 'Сохранить' : 'Создать акт')
+            ->icon('bs.check-lg')
+            ->method('save')
+            ->type(Color::PRIMARY)
+            ->class('btn btn-primary');
+
+        return $bar;
+    }
+
+    public function layout(): iterable
+    {
+        return [
+            Layout::view('partials.project-context-banner'),
+            Layout::view('orchid.layouts.act-composer'),
+        ];
+    }
+
+    public function save(Request $request, Act $act, ActService $acts)
+    {
+        $actId = $act->exists ? $act->id : null;
+
+        $validated = $request->validate([
+            'act.number' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('acts', 'number')->ignore($actId),
+            ],
+            'act.date' => 'required|date',
+            'act.customer' => 'required|string|max:255',
+            'act.executor' => 'required|string|max:255',
+            'act.info' => 'nullable|string|max:5000',
+            'project_id' => 'required|exists:projects,id',
+            'lines' => 'nullable|array',
+        ], [
+            'act.number.required' => 'Укажите номер акта',
+            'act.number.unique' => 'Акт с таким номером уже существует',
+            'act.date.required' => 'Укажите дату',
+            'act.customer.required' => 'Укажите заказчика',
+            'act.executor.required' => 'Укажите исполнителя',
+            'project_id.required' => 'Выберите проект',
+        ]);
+
         try {
-            $validatedData = $this->creationService->validateMainData($request);
-            $this->creationService->saveMainDataToSession($validatedData);
-            
-            session()->forget('selected_task_ids');
-            
-            return redirect()->route('platform.systems.acts.create', ['step' => 'task_selection']);
-            
-        } catch (\Exception $e) {
-            Log::error('Ошибка перехода к выбору задач', [
-                'error' => $e->getMessage(),
-                'data' => $request->all(),
-            ]);
-            
-            Toast::error('Ошибка: ' . $e->getMessage());
-            return back()->withInput();
-        }
-    }
+            $parsed = $acts->parseLines($request->input('lines', []));
+            $saved = $acts->save(
+                $act->exists ? $act : null,
+                [
+                    'number' => $validated['act']['number'],
+                    'date' => $validated['act']['date'],
+                    'customer' => $validated['act']['customer'],
+                    'executor' => $validated['act']['executor'],
+                    'info' => $validated['act']['info'] ?? '',
+                    'project_id' => (int) $validated['project_id'],
+                ],
+                $parsed
+            );
 
-    public function previousStep()
-    {
-        $this->creationService->clearSessionData();
-        session()->forget('selected_task_ids');
-        return redirect()->route('platform.systems.acts.create', ['step' => 'main_data']);
-    }
-
-    public function selectAllTasks()
-    {
-        $actData = $this->creationService->getSessionData();
-        
-        if (!$actData || !isset($actData['project_id'])) {
-            Toast::warning('Данные акта утеряны. Начните заново.');
-            return redirect()->route('platform.systems.acts.create');
-        }
-        
-        $tasks = $this->creationService->getTasksForSelection($actData['project_id'], [], null);
-        
-        $selectedIds = [];
-        foreach ($tasks as $task) {
-            $selectedIds[] = $task['id'] ?? 0;
-        }
-        
-        session(['selected_task_ids' => $selectedIds]);
-        
-        Toast::info('Все задачи выбраны.');
-        return redirect()->route('platform.systems.acts.create', ['step' => 'task_selection']);
-    }
-
-    public function generateAct(Request $request)
-    {
-        try {
-            $actData = $this->creationService->getSessionData();
-            
-            if (!$actData) {
-                Toast::warning('Данные акта утеряны. Начните заново.');
-                return redirect()->route('platform.systems.acts.create');
-            }
-            
-            $tasks = $request->input('tasks', []);
-            
-            $selectedTasks = [];
-            $selectedTaskIds = [];
-            foreach ($tasks as $task) {
-                $isSelected = false;
-                
-                if (isset($task['selected'])) {
-                    $isSelected = ($task['selected'] === '1' || 
-                                  $task['selected'] === true || 
-                                  $task['selected'] === 'on' || 
-                                  $task['selected'] === 'true');
-                }
-
-                if ($isSelected) {
-                    $taskId = $task['id'] ?? null;
-                    $hours = $task['hours'] ?? 0;
-                    
-                    if ($taskId) {
-                        $selectedTasks[$taskId] = ['hours' => (float) $hours];
-                        $selectedTaskIds[] = $taskId;
-                    }
-                }
-            }
-            
-            if (empty($selectedTasks)) {
-                Toast::warning('Выберите хотя бы одну задачу');
-                return back()->withInput();
-            }
-            
-            $duplicates = $this->creationService->checkTaskDuplicates($selectedTaskIds, null);
-            
-            if (!empty($duplicates)) {
-                Log::info('Создание акта с дублирующимися задачами', [
-                    'act_data' => $actData,
-                    'duplicates' => $duplicates,
-                    'user_id' => auth()->id(),
-                ]);
-            }
-            
-            $totalHours = array_sum(array_column($selectedTasks, 'hours'));
-            
-            $processedTasks = [
-                'selectedTasks' => $selectedTasks,
-                'totalHours' => (float) $totalHours,
-                'totalTasks' => count($selectedTasks),
-            ];
-            
-            $act = $this->creationService->createAct($actData, $processedTasks);
-            
-            $this->creationService->clearSessionData();
-            session()->forget('selected_task_ids');
-            
-            if (!empty($duplicates)) {
-                Alert::success('Акт успешно создан. Внимание: некоторые задачи уже были использованы в других актах.');
+            $dupes = $acts->duplicateWarnings($parsed['taskIds'], (int) $saved->id);
+            if ($dupes !== []) {
+                $nums = collect($dupes)->pluck('number')->implode(', ');
+                Toast::warning('Акт сохранён. Часть задач уже есть в других актах: ' . $nums);
             } else {
-                Alert::success('Акт успешно создан.');
+                Toast::success($act->exists ? 'Акт обновлён' : 'Акт создан');
             }
-            
-            return redirect()->route('platform.systems.acts.edit', $act);
-            
-        } catch (\Exception $e) {
-            Log::error('Ошибка создания акта', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            
-            Toast::error('Ошибка создания акта: ' . $e->getMessage());
-            return redirect()->route('platform.systems.acts.create', ['step' => 'main_data']);
-        }
-    }
 
-    public function save(Act $act, Request $request)
-    {
-        try {
-            $request->validate([
-                'act.number' => 'required|string|unique:acts,number,' . $act->id,
-                'act.date' => 'required|date',
-                'act.customer' => 'required|string',
-                'act.executor' => 'required|string',
-            ], [
-                'act.number.required' => 'Поле "Номер акта" обязательно для заполнения.',
-                'act.number.unique' => 'Акт с таким номером уже существует.',
-                'act.number.string' => 'Поле "Номер акта" должно быть строкой.',
-                'act.date.required' => 'Поле "Дата акта" обязательно для заполнения.',
-                'act.date.date' => 'Поле "Дата акта" должно быть датой.',
-                'act.customer.required' => 'Поле "Заказчик" обязательно для заполнения.',
-                'act.customer.string' => 'Поле "Заказчик" должно быть строкой.',
-                'act.executor.required' => 'Поле "Исполнитель" обязательно для заполнения.',
-                'act.executor.string' => 'Поле "Исполнитель" должно быть строкой.',
-            ]);
-            
-            $act->fill($request->get('act'))->save();
-            Alert::success('Акт успешно обновлен.');
-            return redirect()->route('platform.systems.acts');
-            
-        } catch (\Exception $e) {
-            Log::error('Ошибка сохранения акта', [
-                'error' => $e->getMessage(),
-                'act_id' => $act->id,
-            ]);
-            
-            Toast::error('Ошибка сохранения: ' . $e->getMessage());
+            return redirect()->route('platform.systems.acts.edit', $saved);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('Act save failed', ['error' => $e->getMessage()]);
+            Toast::error('Не удалось сохранить акт: ' . $e->getMessage());
+
             return back()->withInput();
         }
     }
 
     public function remove(Act $act)
     {
-        try {
-            Log::info('Акт удален', [
-                'id' => $act->id,
-                'number' => $act->number,
-                'user_id' => auth()->id(),
-            ]);
-            
-            $act->tasks()->detach();
-            $act->delete();
-            
-            Alert::success('Акт успешно удален.');
-            return redirect()->route('platform.systems.acts');
-            
-        } catch (\Exception $e) {
-            Log::error('Ошибка удаления акта', [
-                'error' => $e->getMessage(),
-                'act_id' => $act->id,
-            ]);
-            
-            Toast::error('Ошибка удаления: ' . $e->getMessage());
-            return back();
-        }
+        abort_unless($act->exists, 404);
+
+        $act->tasks()->detach();
+        $act->delete();
+        Toast::info('Акт удалён');
+
+        return redirect()->route('platform.systems.acts');
     }
 
     public function downloadWord(Act $act)
     {
         try {
             $act->load(['tasks']);
-            
+
             $tasksData = [];
-            $totalHours = 0;
-            
+            $totalHours = 0.0;
+
             foreach ($act->tasks as $task) {
-                if (!$task) continue;
-                
-                $hours = $task->pivot->hours ?? $task->estimation_hours ?? 0;
-                
-                if (!is_numeric($hours)) {
-                    $hours = 0;
-                }
-                
-                $hours = (float) $hours;
+                $hours = (float) ($task->pivot->hours ?? 0);
                 $totalHours += $hours;
-                
                 $tasksData[] = [
-                    'name' => (string) ($task->name ?? 'Задача без названия'),
+                    'name' => (string) ($task->name ?? 'Задача'),
+                    'description' => '',
                     'hours' => $hours,
+                    'amount' => 0,
                 ];
             }
-            
+
             $data = [
                 'act' => [
                     'number' => (string) $act->number,
                     'date' => $act->date,
                     'customer' => (string) $act->customer,
                     'executor' => (string) $act->executor,
-                    'customer_director' => (string) ($act->customer_director ?? ''),
-                    'executor_fullname' => (string) ($act->executor_fullname ?? ''),
+                    'customer_director' => '',
+                    'executor_fullname' => (string) $act->executor,
                 ],
                 'tasks' => $tasksData,
                 'total_hours' => $totalHours,
             ];
-            
+
             return WordForLaravel::load('word.act', $data)
                 ->download($act->number . '.docx');
-                
-        } catch (\Exception $e) {
-            Log::error('Ошибка скачивания акта', [
-                'error' => $e->getMessage(),
-                'act_id' => $act->id,
-                'tasks' => $act->tasks->pluck('id', 'name'),
-                'trace' => $e->getTraceAsString(),
-            ]);
-            
+        } catch (\Throwable $e) {
+            Log::error('Act download failed', ['error' => $e->getMessage(), 'act_id' => $act->id]);
             Toast::error('Ошибка генерации документа: ' . $e->getMessage());
+
             return back();
         }
     }

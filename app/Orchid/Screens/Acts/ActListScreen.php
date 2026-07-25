@@ -13,14 +13,15 @@ class ActListScreen extends Screen
 {
     public function query(ProjectContext $context): iterable
     {
-        $query = Act::with(['tasks', 'project'])->latest();
+        $query = Act::with(['tasks', 'project'])->latest('date')->latest('id');
 
         if ($context->has()) {
             $query->where('project_id', $context->id());
         }
 
         return [
-            'acts' => $query->paginate(10),
+            'acts' => $query->paginate(15),
+            'has_project_context' => $context->has(),
         ];
     }
 
@@ -34,23 +35,27 @@ class ActListScreen extends Screen
     public function description(): ?string
     {
         return app(ProjectContext::class)->has()
-            ? 'Показаны акты активного проекта. При создании проект подставится сам.'
-            : null;
+            ? 'Акты выбранного проекта. При создании проект подставится автоматически.'
+            : 'Акты выполненных работ по проектам.';
     }
 
     public function permission(): ?iterable
     {
-        return [
-            'platform.systems.acts',
-        ];
+        return ['platform.systems.acts'];
     }
 
     public function commandBar(): iterable
     {
+        $context = app(ProjectContext::class);
+        $createUrl = $context->has()
+            ? route('platform.systems.acts.create', ['project_id' => $context->id()])
+            : route('platform.systems.acts.create');
+
         return [
-            Link::make('Создать новый акт')
-                ->icon('plus')
-                ->route('platform.systems.acts.create'),
+            Link::make('Составить акт')
+                ->icon('bs.file-earmark-plus')
+                ->href($createUrl)
+                ->class('btn btn-primary'),
         ];
     }
 
@@ -58,6 +63,7 @@ class ActListScreen extends Screen
     {
         return [
             Layout::view('partials.project-context-banner'),
+            Layout::view('orchid.layouts.act-list-intro'),
             ActListLayout::class,
         ];
     }
