@@ -632,6 +632,137 @@
         });
     };
 
+    const formatVoiceClock = (sec) => {
+        if (!isFinite(sec) || sec < 0) return '0:00';
+        const s = Math.floor(sec);
+        return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    };
+
+    const seededBars = (seed, count) => {
+        let h = 0;
+        for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+        const out = [];
+        for (let i = 0; i < count; i++) {
+            h = (h * 1103515245 + 12345) & 0x7fffffff;
+            const n = (h % 1000) / 1000;
+            // мягкая «речь»: средние выше, края ниже
+            const envelope = 0.35 + 0.65 * Math.sin((i / count) * Math.PI);
+            out.push(Math.max(0.12, Math.min(1, (0.25 + n * 0.75) * envelope)));
+        }
+        return out;
+    };
+
+    const renderVoiceBars = (barsEl, values) => {
+        barsEl.innerHTML = values.map((v) =>
+            `<span class="bx-voice__bar" style="height:${Math.round(12 + v * 88)}%"></span>`
+        ).join('');
+    };
+
+    const analyzeVoiceBars = async (url, count) => {
+        try {
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('fetch');
+            const buf = await res.arrayBuffer();
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) throw new Error('ctx');
+            const ctx = new Ctx();
+            const audioBuffer = await ctx.decodeAudioData(buf.slice(0));
+            const data = audioBuffer.getChannelData(0);
+            const block = Math.max(1, Math.floor(data.length / count));
+            const values = [];
+            for (let i = 0; i < count; i++) {
+                let sum = 0;
+                const start = i * block;
+                for (let j = start; j < start + block && j < data.length; j++) {
+                    sum += Math.abs(data[j]);
+                }
+                values.push(sum / block);
+            }
+            const max = Math.max(...values, 0.01);
+            await ctx.close().catch(() => {});
+            return values.map((v) => Math.max(0.1, v / max));
+        } catch (e) {
+            return seededBars(url, count);
+        }
+    };
+
+    const pauseOtherVoices = (except) => {
+        document.querySelectorAll('.bx-voice.is-playing').forEach((el) => {
+            if (el === except) return;
+            const a = el.querySelector('audio');
+            if (a) {
+                a.pause();
+                el.classList.remove('is-playing');
+            }
+        });
+    };
+
+    const initVoicePlayers = (scope) => {
+        const rootEl = scope || document;
+        rootEl.querySelectorAll('.bx-voice:not([data-ready])').forEach((wrap) => {
+            wrap.setAttribute('data-ready', '1');
+            const audio = wrap.querySelector('audio');
+            const barsEl = wrap.querySelector('.bx-voice__bars');
+            const timeEl = wrap.querySelector('.bx-voice__time');
+            const playBtn = wrap.querySelector('.bx-voice__play');
+            const wave = wrap.querySelector('.bx-voice__wave');
+            const src = wrap.getAttribute('data-src') || audio?.src || '';
+            if (!audio || !barsEl) return;
+
+            const BAR_COUNT = 40;
+            renderVoiceBars(barsEl, seededBars(src, BAR_COUNT));
+            analyzeVoiceBars(src, BAR_COUNT).then((vals) => renderVoiceBars(barsEl, vals));
+
+            const updateProgress = () => {
+                const dur = audio.duration || 0;
+                const cur = audio.currentTime || 0;
+                const ratio = dur > 0 ? cur / dur : 0;
+                const bars = barsEl.querySelectorAll('.bx-voice__bar');
+                const played = Math.round(ratio * bars.length);
+                bars.forEach((bar, i) => bar.classList.toggle('is-played', i < played));
+                if (timeEl) {
+                    timeEl.textContent = formatVoiceClock(wrap.classList.contains('is-playing') || cur > 0.05 ? cur : (dur || 0));
+                }
+                if (wave) wave.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+            };
+
+            audio.addEventListener('loadedmetadata', updateProgress);
+            audio.addEventListener('timeupdate', updateProgress);
+            audio.addEventListener('ended', () => {
+                wrap.classList.remove('is-playing');
+                audio.currentTime = 0;
+                updateProgress();
+            });
+            audio.addEventListener('pause', () => {
+                if (audio.ended) return;
+                wrap.classList.remove('is-playing');
+            });
+            audio.addEventListener('play', () => wrap.classList.add('is-playing'));
+
+            playBtn?.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (audio.paused) {
+                    pauseOtherVoices(wrap);
+                    audio.play().catch(() => {});
+                } else {
+                    audio.pause();
+                }
+            });
+
+            const seekFromEvent = (e) => {
+                const rect = wave.getBoundingClientRect();
+                const x = ('clientX' in e ? e.clientX : (e.touches?.[0]?.clientX || 0)) - rect.left;
+                const ratio = Math.max(0, Math.min(1, x / rect.width));
+                if (isFinite(audio.duration) && audio.duration > 0) {
+                    audio.currentTime = ratio * audio.duration;
+                    updateProgress();
+                }
+            };
+            wave?.addEventListener('click', seekFromEvent);
+        });
+    };
+
     const appendMessage = (payload) => {
         if (!feed || !payload?.html || !payload?.id) return false;
         if (document.getElementById('chat-msg-' + payload.id)) return false;
@@ -639,7 +770,10 @@
         const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
         feed.insertAdjacentHTML('beforeend', payload.html);
         const node = document.getElementById('chat-msg-' + payload.id);
-        if (node) highlightCodes(node);
+        if (node) {
+            highlightCodes(node);
+            initVoicePlayers(node);
+        }
         if (nearBottom) feed.scrollTop = feed.scrollHeight;
 
         const activeChat = root?.getAttribute('data-active-chat') || '';
@@ -650,6 +784,8 @@
         }
         return true;
     };
+
+    initVoicePlayers(document);
 
     const resetComposer = () => {
         if (input) {

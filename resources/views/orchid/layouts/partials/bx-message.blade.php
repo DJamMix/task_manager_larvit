@@ -75,10 +75,24 @@
         @if($voiceFiles->isNotEmpty())
             <div class="bx-msg__voices">
                 @foreach($voiceFiles as $file)
-                    <audio class="bx-voice-player"
-                           controls
-                           preload="metadata"
-                           src="{{ route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]) }}"></audio>
+                    <div class="bx-voice {{ $mine ? 'bx-voice--mine' : '' }}"
+                         data-src="{{ route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]) }}">
+                        <button type="button" class="bx-voice__play" aria-label="Воспроизвести">
+                            <svg class="bx-voice__icon bx-voice__icon--play" viewBox="0 0 24 24" aria-hidden="true">
+                                <path fill="currentColor" d="M8 5v14l11-7z"/>
+                            </svg>
+                            <svg class="bx-voice__icon bx-voice__icon--pause" viewBox="0 0 24 24" aria-hidden="true" hidden>
+                                <path fill="currentColor" d="M6 5h4v14H6zm8 0h4v14h-4z"/>
+                            </svg>
+                        </button>
+                        <div class="bx-voice__body">
+                            <div class="bx-voice__wave" tabindex="0" role="slider" aria-label="Прогресс" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                                <div class="bx-voice__bars"></div>
+                            </div>
+                            <span class="bx-voice__time">0:00</span>
+                        </div>
+                        <audio preload="metadata" src="{{ route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]) }}"></audio>
+                    </div>
                 @endforeach
             </div>
         @endif

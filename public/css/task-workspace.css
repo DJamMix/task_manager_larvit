@@ -1332,14 +1332,95 @@
 .bx-voice-bar__btn--send { color: #2563eb; }
 
 .bx-msg__voices {
-    margin-top: 0.35rem;
+    margin-top: 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
 }
-.bx-voice-player {
-    display: block;
-    width: min(280px, 100%);
+
+/* Telegram / VK style voice message */
+.bx-voice {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 200px;
+    max-width: 280px;
+    user-select: none;
+}
+.bx-voice__play {
+    flex-shrink: 0;
+    width: 36px;
     height: 36px;
-    margin-top: 0.2rem;
+    border: 0;
+    border-radius: 50%;
+    background: #3390ec;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .12s ease, transform .12s ease;
 }
+.bx-voice__play:hover { background: #2a7fd4; }
+.bx-voice__play:active { transform: scale(0.96); }
+.bx-voice--mine .bx-voice__play {
+    background: #4fae4e;
+}
+.bx-voice--mine .bx-voice__play:hover { background: #3f9a3e; }
+.bx-voice__icon { width: 16px; height: 16px; display: block; }
+.bx-voice__icon--play { margin-left: 2px; }
+.bx-voice.is-playing .bx-voice__icon--play { display: none; }
+.bx-voice.is-playing .bx-voice__icon--pause { display: block !important; }
+.bx-voice:not(.is-playing) .bx-voice__icon--pause { display: none !important; }
+
+.bx-voice__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.bx-voice__wave {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    outline: none;
+}
+.bx-voice__bars {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+    height: 100%;
+}
+.bx-voice__bar {
+    flex: 1 1 0;
+    min-width: 2px;
+    max-width: 3px;
+    height: 20%;
+    border-radius: 2px;
+    background: rgba(51, 144, 236, 0.35);
+    transition: background .08s linear;
+}
+.bx-voice--mine .bx-voice__bar {
+    background: rgba(79, 174, 78, 0.35);
+}
+.bx-voice__bar.is-played {
+    background: #3390ec;
+}
+.bx-voice--mine .bx-voice__bar.is-played {
+    background: #4fae4e;
+}
+.bx-voice__time {
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+    line-height: 1;
+}
+.bx-voice--mine .bx-voice__time { color: #5a8f5a; }
+.bx-voice audio { display: none; }
+
 
 .bx-chat-item__avatar--lg {
     width: 44px;
