@@ -1148,7 +1148,8 @@
         }
     };
 
-    // При перезагрузке/закрытии вкладки — выходим из комнаты в БД, чтобы не «висеть»
+    // При закрытии вкладки — выходим из комнаты в БД (без beforeunload:
+    // он в части браузеров показывает «точные ли хотите уйти / форма заполнена»).
     const leaveOnUnload = () => {
         if (!callId) return;
         const url = callUrl(callId, 'leave');
@@ -1168,5 +1169,4 @@
         } catch (e) {}
     };
     window.addEventListener('pagehide', leaveOnUnload);
-    window.addEventListener('beforeunload', leaveOnUnload);
 })();

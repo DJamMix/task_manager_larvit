@@ -305,7 +305,7 @@
             @if($can_write ?? true)
             <div class="bx-composer" id="bx-composer"
                  data-mentions='@json($mentionUsers)'>
-                <input type="hidden" name="message[parent_id]" id="chat-message-parent-id" form="post-form" value="">
+                <input type="hidden" id="chat-message-parent-id" value="">
 
                 <div id="bx-reply-banner" class="bx-composer__reply d-none">
                     <div>
@@ -317,12 +317,19 @@
                 </div>
 
                 <div class="bx-composer__box">
-                    <textarea name="message[text]"
-                              id="bx-composer-input"
+                    <textarea id="bx-composer-input"
                               class="bx-composer__input"
-                              form="post-form"
+                              name="bx_chat_draft"
                               rows="1"
-                              placeholder="Написать сообщение… @имя — упомянуть, Enter — отправить"></textarea>
+                              placeholder="Написать сообщение… @имя — упомянуть, Enter — отправить"
+                              autocomplete="off"
+                              autocorrect="off"
+                              autocapitalize="off"
+                              spellcheck="true"
+                              data-lpignore="true"
+                              data-1p-ignore="true"
+                              data-bwignore="true"
+                              data-form-type="other"></textarea>
 
                     <div id="bx-mention-menu" class="bx-mention-menu d-none" role="listbox"></div>
 
@@ -335,10 +342,8 @@
                             <label class="bx-composer__tool" title="Файлы (до 10)">
                                 <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
                                 <input type="file"
-                                       name="message_files[]"
                                        id="bx-composer-files"
                                        class="d-none"
-                                       form="post-form"
                                        multiple
                                        accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,.exe,.msi,audio/*,video/*">
                             </label>
@@ -361,7 +366,7 @@
                                            class="bx-composer__select"
                                            placeholder="Поиск: номер или название…"
                                            autocomplete="off">
-                                    <input type="hidden" name="message[task_id]" id="bx-task-id" form="post-form" value="">
+                                    <input type="hidden" id="bx-task-id" value="">
                                     <div id="bx-task-picked" class="bx-task-picked d-none"></div>
                                     <div id="bx-task-results" class="bx-task-results"
                                          data-search-url="{{ $composer_tasks_search_url ?? route('platform.systems.chats.tasks') }}"
@@ -689,6 +694,14 @@
     window.addEventListener('resize', lockMessengerHeight);
     window.addEventListener('orientationchange', () => setTimeout(lockMessengerHeight, 250));
     window.visualViewport?.addEventListener('resize', lockMessengerHeight);
+
+    // После POST Orchid (пин/мьют/создание чата) F5 иначе спрашивает про повтор формы
+    try {
+        if (window.history?.replaceState) {
+            window.history.replaceState(null, document.title, window.location.href);
+        }
+    } catch (e) {}
+
     const input = document.getElementById('bx-composer-input');
     const parentInput = document.getElementById('chat-message-parent-id');
     const replyBanner = document.getElementById('bx-reply-banner');
@@ -698,6 +711,18 @@
     const filesPreview = document.getElementById('bx-files-preview');
     const FILES_MAX = 10;
     let pendingFiles = [];
+
+    // Анти-автозаполнение браузера: кратко readonly при фокусе
+    if (input) {
+        input.setAttribute('readonly', 'readonly');
+        const unlockAutofill = () => {
+            input.removeAttribute('readonly');
+        };
+        input.addEventListener('focus', () => {
+            setTimeout(unlockAutofill, 30);
+        }, { passive: true });
+        input.addEventListener('pointerdown', unlockAutofill, { passive: true });
+    }
 
     const toast = (msg, type = 'info') => {
         if (typeof window.uiToast === 'function') window.uiToast(msg, type);
