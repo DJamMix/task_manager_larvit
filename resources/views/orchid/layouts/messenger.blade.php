@@ -2,6 +2,12 @@
     document.documentElement.classList.add('bx-messenger-page');
     if (document.body) document.body.classList.add('bx-messenger-page');
     else document.addEventListener('DOMContentLoaded', () => document.body.classList.add('bx-messenger-page'));
+    document.addEventListener('turbo:load', () => {
+        if (!document.querySelector('.bx-messenger')) {
+            document.documentElement.classList.remove('bx-messenger-page');
+            document.body?.classList.remove('bx-messenger-page', 'bx-messenger-mobile');
+        }
+    });
 </script>
 <div class="bx-messenger {{ ($active_chat_id ?? null) ? 'is-chat-open' : 'is-list-open' }}"
      data-poll-url="{{ $chats_poll_url ?? route('platform.systems.chats.poll') }}"
@@ -661,15 +667,20 @@
     const root = document.querySelector('.bx-messenger');
     const lockMessengerHeight = () => {
         if (!root) return;
-        const top = root.getBoundingClientRect().top;
-        const mobile = window.matchMedia('(max-width: 900px)').matches;
-        const bottomPad = mobile ? 0 : 0;
-        const available = Math.max(mobile ? 260 : 320, window.innerHeight - top - bottomPad);
-        root.style.height = available + 'px';
-        root.style.maxHeight = available + 'px';
         document.body.classList.add('bx-messenger-page');
         document.documentElement.classList.add('bx-messenger-page');
+        const mobile = window.matchMedia('(max-width: 1199.98px)').matches;
         document.body.classList.toggle('bx-messenger-mobile', mobile);
+        if (!mobile) {
+            // На десктопе высоту даёт flex-раскладка app-shell + messenger workspace
+            root.style.height = '';
+            root.style.maxHeight = '';
+            return;
+        }
+        const top = root.getBoundingClientRect().top;
+        const available = Math.max(260, window.innerHeight - top);
+        root.style.height = available + 'px';
+        root.style.maxHeight = available + 'px';
     };
     document.body.classList.add('bx-messenger-page');
     lockMessengerHeight();

@@ -1,0 +1,67 @@
+/**
+ * Orchid shell: независимое прокручивание левого меню и области контента.
+ * Десктоп (≥1200px). На мобиле оставляем стандартное поведение Orchid.
+ */
+@media (min-width: 1200px) {
+    html {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    body > .container-fluid {
+        height: 100%;
+        max-width: none;
+        padding-left: 0;
+        padding-right: 0;
+        overflow: hidden;
+    }
+
+    body > .container-fluid > .row {
+        height: 100%;
+        margin-left: 0;
+        margin-right: 0;
+        flex-wrap: nowrap;
+        align-items: stretch;
+    }
+
+    /* Левое меню — свой скролл */
+    body > .container-fluid > .row > .aside {
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: 100%;
+        overflow: hidden;
+        position: sticky;
+        top: 0;
+        align-self: stretch;
+    }
+
+    body > .container-fluid > .row > .aside > .aside-collapse {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Контент справа от меню — свой скролл */
+    body > .container-fluid > .row > .col-xxl,
+    body > .container-fluid > .row > .col-xl-9 {
+        height: 100%;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body > .container-fluid > .row > .col-xl-9.mx-auto {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+}

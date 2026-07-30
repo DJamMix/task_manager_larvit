@@ -128,8 +128,9 @@ return [
     'resource' => [
         'stylesheets' => [
             '/css/footer.css',
+            '/css/app-shell.css?v=20260730a',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260730j',
+            '/css/task-workspace.css?v=20260730k',
             '/css/act-composer.css',
         ],
         'scripts'     => [

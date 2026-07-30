@@ -34,6 +34,9 @@ class MessengerScreen extends Screen
 
     public function query(ChatService $chats, Request $request): iterable
     {
+        // Полноширинный workspace без footer/container-xl — мессенджер до меню и края экрана
+        config(['platform.workspace' => 'orchid.workspace.messenger']);
+
         $user = $request->user();
 
         if (!$chats->canAccessMessenger($user)) {
