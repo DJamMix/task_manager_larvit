@@ -1742,6 +1742,22 @@
         hideMentionMenu();
     };
 
+    const focusComposer = () => {
+        if (!input || input.disabled) return;
+        if (document.activeElement?.closest?.('.modal, .bx-chat-info, #bx-forward-sheet, #bx-chat-search')) return;
+        try {
+            input.focus({ preventScroll: true });
+        } catch (e) {
+            try { input.focus(); } catch (err) {}
+        }
+    };
+
+    // При открытии чата сразу можно печатать
+    if (root?.classList.contains('is-chat-open')) {
+        setTimeout(focusComposer, 50);
+        setTimeout(focusComposer, 300);
+    }
+
     let sending = false;
     const setSendingUi = (on) => {
         composer?.classList.toggle('is-sending', on);
@@ -1816,6 +1832,7 @@
         } finally {
             sending = false;
             setSendingUi(false);
+            focusComposer();
         }
     };
 
@@ -2461,6 +2478,8 @@
 
     const showDesktopNotify = (payload) => {
         if (!payload || !('Notification' in window) || Notification.permission !== 'granted') return;
+        // Если Web Push включён — системное уведомление уже придёт из service worker (иначе дубль).
+        if (localStorage.getItem('tml_push_enabled') === '1') return;
         const activeChat = String(root?.getAttribute('data-active-chat') || '');
         const notifyUrl = String(payload.url || '');
         const viewingSameChat = activeChat

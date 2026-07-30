@@ -173,7 +173,10 @@
                 } catch (e) {}
                 return existing;
             }
-            const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+            const registration = await navigator.serviceWorker.register('/sw.js', {
+                scope: '/',
+                updateViaCache: 'none',
+            });
             await Promise.race([
                 navigator.serviceWorker.ready,
                 new Promise((resolve) => setTimeout(resolve, 2000)),
@@ -254,16 +257,32 @@
             localStorage.removeItem(ENABLED_FLAG);
         };
 
-        const showTestNotification = (title, body) => {
+        const showTestNotification = async (title, body) => {
+            const textTitle = title || 'Уведомления включены';
+            const textBody = body || 'Так будут приходить сообщения из чатов.';
             try {
-                const n = new Notification(title || 'Уведомления включены', {
-                    body: body || 'Так будут приходить сообщения из чатов.',
+                const registration = await getRegistration();
+                // Edge надёжнее показывает уведомления через Service Worker, чем через new Notification()
+                if (registration?.showNotification) {
+                    await registration.showNotification(textTitle, {
+                        body: textBody,
+                        icon: '/favicon.ico',
+                        tag: 'tml-push-test',
+                    });
+                    return;
+                }
+            } catch (e) {}
+            try {
+                const n = new Notification(textTitle, {
+                    body: textBody,
                     icon: '/favicon.ico',
                     tag: 'tml-push-test',
                 });
                 setTimeout(() => n.close(), 6000);
             } catch (e) {}
         };
+
+        const isEdge = () => /Edg\//.test(navigator.userAgent);
 
         const refreshUi = async () => {
             paintQuickStatus();
@@ -344,8 +363,12 @@
                     }
 
                     await syncSubscription({ force: true });
-                    showTestNotification();
-                    alert('Push включены. Можно нажать «Проверить push». Свои сообщения себе не приходят.');
+                    await showTestNotification();
+                    if (isEdge()) {
+                        alert('Push включены в Edge. Если уведомления не видны: Параметры Windows → Система → Уведомления → Microsoft Edge = Вкл. Затем «Проверить push».');
+                    } else {
+                        alert('Push включены. Можно нажать «Проверить push». Свои сообщения себе не приходят.');
+                    }
                 } catch (error) {
                     console.warn('Web Push:', error);
                     alert(error?.message || 'Не удалось включить push-уведомления');
@@ -366,7 +389,7 @@
                     testButton.disabled = true;
                     try {
                         await syncSubscription({ force: false });
-                        showTestNotification('Локальная проверка', 'Браузерное разрешение работает.');
+                        await showTestNotification('Локальная проверка', 'Браузерное разрешение работает.');
                         const testUrl = messenger.getAttribute('data-push-test-url');
                         if (!testUrl) throw new Error('Маршрут проверки push не найден');
                         const res = await request(testUrl, { method: 'POST' });

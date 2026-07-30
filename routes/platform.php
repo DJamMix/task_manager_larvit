@@ -518,15 +518,25 @@ Route::post('web-push/subscribe', function (\Illuminate\Http\Request $request) {
     ]);
 
     try {
+        $ua = substr((string) $request->userAgent(), 0, 65535);
         \App\Models\PushSubscription::query()->updateOrCreate(
             ['endpoint' => $data['endpoint']],
             [
                 'user_id' => $request->user()->id,
                 'public_key' => $data['keys']['p256dh'],
                 'auth_token' => $data['keys']['auth'],
-                'user_agent' => substr((string) $request->userAgent(), 0, 65535),
+                'user_agent' => $ua,
             ]
         );
+
+        // Убираем старые подписки того же браузера — иначе одно сообщение = 2 push
+        if ($ua !== '') {
+            \App\Models\PushSubscription::query()
+                ->where('user_id', $request->user()->id)
+                ->where('endpoint', '!=', $data['endpoint'])
+                ->where('user_agent', $ua)
+                ->delete();
+        }
     } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::warning('WebPush subscribe failed: '.$e->getMessage());
 

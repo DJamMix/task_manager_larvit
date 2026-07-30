@@ -135,7 +135,7 @@ return [
         ],
         'scripts'     => [
             '/js/chat-notify.js?v=20260725h',
-            '/js/web-push.js?v=20260730h',
+            '/js/web-push.js?v=20260730i',
         ],
     ],
 

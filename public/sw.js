@@ -14,9 +14,8 @@ self.addEventListener('push', (event) => {
         payload = { body: event.data ? event.data.text() : '' };
     }
 
-    // Всегда показываем системное уведомление — и при открытой, и при закрытой вкладке.
-    // Дубли с poll-уведомлениями режутся по tag на стороне ОС.
-    event.waitUntil(self.registration.showNotification(payload.title || 'TaskManagerLarVit', {
+    const title = payload.title || 'TaskManagerLarVit';
+    const options = {
         body: payload.body || '',
         icon: payload.icon || '/favicon.ico',
         badge: payload.icon || '/favicon.ico',
@@ -24,7 +23,26 @@ self.addEventListener('push', (event) => {
         tag: payload.tag || 'tml-chat',
         renotify: true,
         requireInteraction: false,
-    }));
+    };
+
+    event.waitUntil((async () => {
+        // Не дублируем, если пользователь уже смотрит этот чат в активной вкладке
+        try {
+            const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+            const target = String(payload.url || '');
+            const chatMatch = target.match(/\/chats\/(\d+)/);
+            const chatId = chatMatch ? chatMatch[1] : '';
+            for (const client of windows) {
+                if (!client.focused) continue;
+                const href = String(client.url || '');
+                if (chatId && (href.includes('/chats/' + chatId) || href.endsWith('/' + chatId))) {
+                    return;
+                }
+            }
+        } catch (e) {}
+
+        await self.registration.showNotification(title, options);
+    })());
 });
 
 self.addEventListener('notificationclick', (event) => {
