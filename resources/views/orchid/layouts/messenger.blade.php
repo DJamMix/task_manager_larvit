@@ -11,6 +11,11 @@
      data-calls-enabled="{{ !empty($calls_enabled) ? '1' : '0' }}"
      data-calls-start-url="{{ $calls_start_url ?? '' }}"
      data-call-join-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.calls.join', ['call' => 999999])) }}"
+     data-forward-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.forward', $active_chat_id) : '' }}"
+     data-chats-picker-url="{{ $chats_picker_url ?? route('platform.systems.chats.picker') }}"
+     data-media-url="{{ $chats_media_url ?? '' }}"
+     data-vapid-key-url="{{ route('platform.web-push.vapid-key') }}"
+     data-push-subscribe-url="{{ route('platform.web-push.subscribe') }}"
      data-csrf="{{ csrf_token() }}">
     @php
         $chatList = $chats ?? collect();
@@ -151,6 +156,12 @@
                     </div>
                 </div>
                 <div class="bx-messenger__header-actions">
+                    <button type="button" class="bx-mute-btn" id="bx-open-media">
+                        <span>Медиа</span>
+                    </button>
+                    <button type="button" class="bx-mute-btn" id="bx-enable-push" hidden>
+                        <span>Включить push</span>
+                    </button>
                     @if(!empty($calls_enabled) && !empty($calls_start_url))
                         <button type="button"
                                 class="bx-mute-btn bx-call-btn"
@@ -223,6 +234,14 @@
 
             <div id="bx-typing" class="bx-typing d-none" aria-live="polite"></div>
 
+            <div class="bx-selection-bar" id="bx-selection-bar" hidden>
+                <span id="bx-selection-count">Выбрано: 0</span>
+                <div>
+                    <button type="button" class="btn btn-sm btn-primary" id="bx-forward-selected">Переслать (0)</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="bx-selection-cancel">Отмена</button>
+                </div>
+            </div>
+
             @if($can_write ?? true)
             <div class="bx-composer" id="bx-composer"
                  data-mentions='@json($mentionUsers)'>
@@ -253,7 +272,7 @@
                                 <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
                             </button>
 
-                            <label class="bx-composer__tool" title="Файл">
+                            <label class="bx-composer__tool" title="Файлы (до 10)">
                                 <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
                                 <input type="file"
                                        name="message_files[]"
@@ -261,7 +280,7 @@
                                        class="d-none"
                                        form="post-form"
                                        multiple
-                                       accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,audio/*">
+                                       accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,audio/*,video/*">
                             </label>
 
                             <button type="button" class="bx-composer__tool" id="bx-tool-voice" title="Голосовое (до 3 мин). Удерживайте — проверить микрофон">
@@ -298,6 +317,7 @@
                         </div>
 
                         <div class="bx-composer__right">
+                            <div class="bx-composer__files-preview d-none" id="bx-files-preview"></div>
                             <span class="bx-composer__files-label d-none" id="bx-files-label"></span>
                             <button type="button"
                                     class="bx-composer__send"
@@ -409,6 +429,34 @@
             </div>
         </div>
     @endif
+</div>
+
+<div class="bx-sheet" id="bx-forward-sheet" hidden>
+    <button type="button" class="bx-sheet__backdrop" id="bx-forward-close-bg" aria-label="Закрыть"></button>
+    <div class="bx-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-forward-title">
+        <div class="bx-sheet__head">
+            <strong id="bx-forward-title">Переслать сообщения</strong>
+            <button type="button" class="bx-sheet__close" id="bx-forward-close" aria-label="Закрыть">×</button>
+        </div>
+        <div id="bx-forward-chats" class="bx-forward-chats">Загрузка чатов…</div>
+    </div>
+</div>
+
+<div class="bx-sheet" id="bx-media-sheet" hidden>
+    <button type="button" class="bx-sheet__backdrop" id="bx-media-close-bg" aria-label="Закрыть"></button>
+    <div class="bx-sheet__panel bx-media-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-media-title">
+        <div class="bx-sheet__head">
+            <strong id="bx-media-title">Медиа чата</strong>
+            <button type="button" class="bx-sheet__close" id="bx-media-close" aria-label="Закрыть">×</button>
+        </div>
+        <div class="bx-media-tabs" role="tablist">
+            <button type="button" class="is-active" data-media-tab="media">Медиа</button>
+            <button type="button" data-media-tab="files">Файлы</button>
+            <button type="button" data-media-tab="links">Ссылки</button>
+        </div>
+        <div id="bx-media-content" class="bx-media-content">Загрузка…</div>
+        <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="bx-media-more">Загрузить ещё</button>
+    </div>
 </div>
 
 <div id="bx-lightbox" class="bx-lightbox" hidden>
@@ -568,6 +616,68 @@
     const replyAuthor = document.getElementById('bx-reply-author');
     const filesInput = document.getElementById('bx-composer-files');
     const filesLabel = document.getElementById('bx-files-label');
+    const filesPreview = document.getElementById('bx-files-preview');
+    const FILES_MAX = 10;
+    let pendingFiles = [];
+
+    const syncFilesInput = () => {
+        if (!filesInput) return;
+        const dt = new DataTransfer();
+        pendingFiles.forEach((f) => dt.items.add(f));
+        filesInput.files = dt.files;
+        renderFilesPreview();
+    };
+
+    const renderFilesPreview = () => {
+        if (!filesPreview || !filesLabel) return;
+        const n = pendingFiles.length;
+        if (!n) {
+            filesPreview.classList.add('d-none');
+            filesPreview.innerHTML = '';
+            filesLabel.classList.add('d-none');
+            filesLabel.textContent = '';
+            return;
+        }
+        filesLabel.textContent = n + '/' + FILES_MAX;
+        filesLabel.classList.remove('d-none');
+        filesPreview.classList.remove('d-none');
+        filesPreview.innerHTML = pendingFiles.map((f, idx) => {
+            const isImg = /^image\//.test(f.type || '');
+            const url = isImg ? URL.createObjectURL(f) : '';
+            const name = escapeHtml(f.name || 'файл');
+            return `<div class="bx-file-chip" data-idx="${idx}" title="${name}">
+                ${isImg ? `<img src="${url}" alt="">` : `<span class="bx-file-chip__ext">${escapeHtml((f.name || '').split('.').pop() || 'file')}</span>`}
+                <span class="bx-file-chip__name">${name}</span>
+                <button type="button" class="bx-file-chip__rm" data-rm="${idx}" aria-label="Убрать">×</button>
+            </div>`;
+        }).join('');
+    };
+
+    filesPreview?.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-rm]');
+        if (!btn) return;
+        const idx = parseInt(btn.getAttribute('data-rm'), 10);
+        if (!Number.isFinite(idx)) return;
+        pendingFiles.splice(idx, 1);
+        syncFilesInput();
+    });
+
+    filesInput?.addEventListener('change', () => {
+        const incoming = [...(filesInput.files || [])];
+        if (!incoming.length) return;
+        const room = FILES_MAX - pendingFiles.length;
+        if (room <= 0) {
+            alert('Можно прикрепить не больше ' + FILES_MAX + ' файлов за раз');
+            syncFilesInput();
+            return;
+        }
+        const add = incoming.slice(0, room);
+        if (incoming.length > room) {
+            alert('Добавлено ' + add.length + ' из ' + incoming.length + ' (лимит ' + FILES_MAX + ')');
+        }
+        pendingFiles = pendingFiles.concat(add);
+        syncFilesInput();
+    });
     const mentionMenu = document.getElementById('bx-mention-menu');
     const composer = document.getElementById('bx-composer');
     const taskSearch = document.getElementById('bx-task-search');
@@ -722,17 +832,6 @@
         autosize();
     });
 
-    filesInput?.addEventListener('change', () => {
-        const n = filesInput.files?.length || 0;
-        if (!filesLabel) return;
-        if (n > 0) {
-            filesLabel.textContent = n + ' файл(ов)';
-            filesLabel.classList.remove('d-none');
-        } else {
-            filesLabel.classList.add('d-none');
-        }
-    });
-
     /* Task attach: search by id / name */
     const renderTaskResults = (tasks) => {
         if (!taskResults) return;
@@ -883,6 +982,148 @@
         || document.querySelector('meta[name="csrf-token"]')?.content
         || document.querySelector('input[name="_token"]')?.value
         || '';
+
+    /* Выбор и пересылка сообщений */
+    const selectedMessageIds = new Set();
+    const selectionBar = document.getElementById('bx-selection-bar');
+    const selectionCount = document.getElementById('bx-selection-count');
+    const forwardSelected = document.getElementById('bx-forward-selected');
+    const forwardSheet = document.getElementById('bx-forward-sheet');
+    const forwardChats = document.getElementById('bx-forward-chats');
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+    }[char]));
+    const updateSelection = () => {
+        const count = selectedMessageIds.size;
+        selectionBar?.toggleAttribute('hidden', count === 0);
+        if (selectionCount) selectionCount.textContent = 'Выбрано: ' + count;
+        if (forwardSelected) forwardSelected.textContent = 'Переслать (' + count + ')';
+        document.querySelectorAll('.bx-msg__select-btn').forEach((button) => {
+            const selected = selectedMessageIds.has(Number(button.getAttribute('data-message-id')));
+            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            button.closest('.bx-msg')?.classList.toggle('is-selected', selected);
+        });
+    };
+    const toggleMessageSelection = (id) => {
+        if (!id) return;
+        if (selectedMessageIds.has(id)) selectedMessageIds.delete(id);
+        else if (selectedMessageIds.size < 20) selectedMessageIds.add(id);
+        updateSelection();
+    };
+    document.addEventListener('click', (e) => {
+        const select = e.target.closest?.('.bx-msg__select-btn');
+        if (select) {
+            e.preventDefault();
+            toggleMessageSelection(Number(select.getAttribute('data-message-id')));
+        }
+    });
+    document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
+        let timer;
+        message.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' || e.target.closest('button,a,input')) return;
+            timer = window.setTimeout(() => toggleMessageSelection(Number(message.id.replace('chat-msg-', ''))), 550);
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach((event) => message.addEventListener(event, () => clearTimeout(timer)));
+    });
+    document.getElementById('bx-selection-cancel')?.addEventListener('click', () => {
+        selectedMessageIds.clear();
+        updateSelection();
+    });
+    const closeForward = () => forwardSheet?.setAttribute('hidden', '');
+    document.getElementById('bx-forward-close')?.addEventListener('click', closeForward);
+    document.getElementById('bx-forward-close-bg')?.addEventListener('click', closeForward);
+    forwardSelected?.addEventListener('click', async () => {
+        const pickerUrl = root?.getAttribute('data-chats-picker-url');
+        if (!pickerUrl || !selectedMessageIds.size) return;
+        forwardSheet?.removeAttribute('hidden');
+        if (forwardChats) forwardChats.textContent = 'Загрузка чатов…';
+        try {
+            const response = await fetch(pickerUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Не удалось загрузить чаты');
+            if (forwardChats) {
+                forwardChats.innerHTML = (data.chats || []).map((chat) =>
+                    `<button type="button" class="bx-forward-chat" data-target-chat="${chat.id}">${escapeHtml(chat.title)}</button>`
+                ).join('') || '<div class="text-muted">Нет доступных чатов</div>';
+            }
+        } catch (error) {
+            if (forwardChats) forwardChats.textContent = error.message || 'Не удалось загрузить чаты';
+        }
+    });
+    forwardChats?.addEventListener('click', async (e) => {
+        const target = e.target.closest?.('[data-target-chat]');
+        const forwardUrl = root?.getAttribute('data-forward-url');
+        if (!target || !forwardUrl) return;
+        target.disabled = true;
+        try {
+            const response = await fetch(forwardUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                body: JSON.stringify({ message_ids: [...selectedMessageIds], target_chat_id: Number(target.getAttribute('data-target-chat')) }),
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Не удалось переслать сообщения');
+            selectedMessageIds.clear();
+            updateSelection();
+            closeForward();
+        } catch (error) {
+            target.disabled = false;
+            alert(error.message || 'Не удалось переслать сообщения');
+        }
+    });
+
+    /* Галерея чата */
+    const mediaSheet = document.getElementById('bx-media-sheet');
+    const mediaContent = document.getElementById('bx-media-content');
+    const mediaMore = document.getElementById('bx-media-more');
+    let mediaTab = 'media';
+    let mediaPage = 1;
+    const closeMedia = () => mediaSheet?.setAttribute('hidden', '');
+    document.getElementById('bx-open-media')?.addEventListener('click', () => {
+        mediaSheet?.removeAttribute('hidden');
+        mediaPage = 1;
+        loadMedia(true);
+    });
+    document.getElementById('bx-media-close')?.addEventListener('click', closeMedia);
+    document.getElementById('bx-media-close-bg')?.addEventListener('click', closeMedia);
+    const loadMedia = async (replace) => {
+        const mediaUrl = root?.getAttribute('data-media-url');
+        if (!mediaUrl || !mediaContent) return;
+        if (replace) mediaContent.textContent = 'Загрузка…';
+        try {
+            const response = await fetch(`${mediaUrl}?tab=${encodeURIComponent(mediaTab)}&page=${mediaPage}`, {
+                credentials: 'same-origin', headers: { Accept: 'application/json' },
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Не удалось загрузить материалы');
+            const html = (data.items || []).map((item) => {
+                if (mediaTab === 'media') {
+                    return `<a class="bx-media-image" href="${escapeHtml(item.url)}" data-bx-lightbox="${escapeHtml(item.url)}" title="${escapeHtml(item.name)}"><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)}" loading="lazy"></a>`;
+                }
+                if (mediaTab === 'files') {
+                    return `<a class="bx-media-file" href="${escapeHtml(item.download_url)}">${escapeHtml(item.name)}</a>`;
+                }
+                return `<a class="bx-media-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a>`;
+            }).join('') || (replace ? '<div class="text-muted">Пока ничего нет</div>' : '');
+            if (replace) mediaContent.innerHTML = html;
+            else mediaContent.insertAdjacentHTML('beforeend', html);
+            mediaMore?.classList.toggle('d-none', !data.has_more);
+        } catch (error) {
+            if (replace) mediaContent.textContent = error.message || 'Не удалось загрузить материалы';
+        }
+    };
+    document.querySelectorAll('[data-media-tab]').forEach((button) => button.addEventListener('click', () => {
+        mediaTab = button.getAttribute('data-media-tab') || 'media';
+        mediaPage = 1;
+        document.querySelectorAll('[data-media-tab]').forEach((tab) => tab.classList.toggle('is-active', tab === button));
+        loadMedia(true);
+    }));
+    mediaMore?.addEventListener('click', () => {
+        mediaPage++;
+        loadMedia(false);
+    });
+
     const sendUrl = root?.getAttribute('data-send-url')
         || document.getElementById('bx-composer-send')?.getAttribute('data-send-url')
         || '';
@@ -1165,7 +1406,7 @@
 
         const activeChat = root?.getAttribute('data-active-chat') || '';
         if (activeChat && payload.preview != null) {
-            const link = document.querySelector('.bx-chat-item[href*="/chats/' + activeChat + '"]');
+            const link = document.querySelector('.bx-chat-item[data-chat-id="' + activeChat + '"]');
             const preview = link?.querySelector('.bx-chat-item__preview');
             if (preview) preview.textContent = payload.preview;
         }
@@ -1254,6 +1495,8 @@
         taskPicked?.classList.add('d-none');
         if (taskPicked) taskPicked.innerHTML = '';
         if (filesInput) filesInput.value = '';
+        pendingFiles = [];
+        renderFilesPreview();
         filesLabel?.classList.add('d-none');
         if (filesLabel) filesLabel.textContent = '';
         hideMentionMenu();
@@ -1263,7 +1506,7 @@
     const sendMessageAjax = async (extraFormData = null) => {
         if (!sendUrl || sending) return;
         const text = (input?.value || '').trim();
-        const hasFiles = filesInput?.files?.length > 0;
+        const hasFiles = pendingFiles.length > 0;
         const hasTask = !!(taskIdInput?.value);
         const hasVoice = extraFormData && extraFormData.has('message_voice');
         if (!text && !hasFiles && !hasTask && !hasVoice) return;
@@ -1278,9 +1521,7 @@
                 fd.append('message[text]', input?.value || '');
                 if (parentInput?.value) fd.append('message[parent_id]', parentInput.value);
                 if (taskIdInput?.value) fd.append('message[task_id]', taskIdInput.value);
-                if (filesInput?.files) {
-                    [...filesInput.files].forEach((f) => fd.append('message_files[]', f));
-                }
+                pendingFiles.slice(0, FILES_MAX).forEach((f) => fd.append('message_files[]', f));
             }
             if (csrf && !fd.has('_token')) fd.append('_token', csrf);
 
@@ -1951,7 +2192,7 @@
                 localStorage.setItem(storageKey, String(since));
             }
             (data.chats || []).forEach((c) => {
-                const link = document.querySelector('.bx-chat-item[href*="/chats/' + c.id + '"]');
+                const link = document.querySelector('.bx-chat-item[data-chat-id="' + c.id + '"]');
                 if (!link) return;
                 let b = link.querySelector('.bx-chat-item__badge');
                 if (c.unread > 0) {

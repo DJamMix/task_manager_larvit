@@ -4,8 +4,8 @@ namespace App\Orchid\Screens\MyTasks;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
+use App\Models\TaskLink;
 use App\Models\TrackingTime;
-use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Orchid\Layouts\MyTasks\HoursSpentTask;
 use App\Orchid\Layouts\MyTasks\TaskEvaluationLayout;
 use App\Orchid\Layouts\Task\TaskObserversLayout;
@@ -27,7 +27,7 @@ class MyTasksViewScreen extends Screen
     {
         $this->authorizeAccess($task);
 
-        $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue']);
 
         $comments = $task->comments()
             ->with(['user', 'parent.user', 'attachment'])
@@ -69,12 +69,26 @@ class MyTasksViewScreen extends Screen
             $statusHint = 'Нажмите «Взять в работу» сверху, чтобы начать.';
         }
 
+        $linkOptions = Task::query()
+            ->where('id', '!=', $task->id)
+            ->when($task->project_id, fn ($q) => $q->where('project_id', $task->project_id))
+            ->with('queue')
+            ->orderByDesc('id')
+            ->limit(80)
+            ->get()
+            ->mapWithKeys(fn (Task $t) => [$t->id => $t->displayKey() . ' · ' . \Illuminate\Support\Str::limit($t->name, 40)])
+            ->all();
+
         return [
             'task' => $task,
             'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
             'discussion_comments' => $comments,
+            'history_comments' => $comments->where('is_system', true)->values(),
             'notify_options' => $task->participantsForNotify(),
             'can_discuss' => $task->canDiscuss((int) $user->id),
+            'can_manage_links' => $task->canManageTask((int) $user->id) || (int) $task->executor_id === (int) $user->id,
+            'related_links' => $task->links,
+            'link_task_options' => $linkOptions,
             'is_observer_only' => $isObserverOnly,
             'viewer_role' => 'employee',
             'show_time_link' => !$isObserverOnly && $task->canTrackTime((int) $user->id),
@@ -158,14 +172,7 @@ class MyTasksViewScreen extends Screen
     {
         $layouts = [
             Layout::view('orchid.layouts.task-workspace'),
-            Layout::view('orchid.layouts.composer-anchor'),
         ];
-
-        if ($this->task && $this->task->canDiscuss()) {
-            $layouts[] = Layout::wrapper('orchid.layouts.composer-shell', [
-                'composer' => DiscussionComposerLayout::class,
-            ]);
-        }
 
         $layouts[] = Layout::modal('timeTrackingModal', [HoursSpentTask::class])
             ->title('Учет рабочего времени')
@@ -195,6 +202,54 @@ class MyTasksViewScreen extends Screen
         Toast::success('Сообщение отправлено');
 
         return redirect()->route('platform.systems.my_tasks.view', $task);
+    }
+
+    public function addLink(Request $request, Task $task)
+    {
+        $this->authorizeAccess($task);
+        if (!$task->canManageTask() && (int) $task->executor_id !== (int) $request->user()->id) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'related_task_id' => 'required|integer|exists:tasks,id|different:task_id',
+            'relation' => 'required|string|in:' . implode(',', array_keys(TaskLink::relationLabels())),
+        ]);
+
+        if ((int) $data['related_task_id'] === (int) $task->id) {
+            Toast::error('Нельзя связать задачу саму с собой');
+            return back();
+        }
+
+        TaskLink::query()->firstOrCreate([
+            'task_id' => $task->id,
+            'related_task_id' => (int) $data['related_task_id'],
+            'relation' => $data['relation'],
+        ], [
+            'created_by' => $request->user()->id,
+        ]);
+
+        Toast::success('Связь добавлена');
+
+        return back();
+    }
+
+    public function removeLink(Request $request, Task $task)
+    {
+        $this->authorizeAccess($task);
+        if (!$task->canManageTask() && (int) $task->executor_id !== (int) $request->user()->id) {
+            abort(403);
+        }
+
+        $linkId = (int) $request->input('link_id');
+        TaskLink::query()
+            ->where('task_id', $task->id)
+            ->whereKey($linkId)
+            ->delete();
+
+        Toast::info('Связь удалена');
+
+        return back();
     }
 
     public function saveObservers(Request $request, Task $task)

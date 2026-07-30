@@ -5,9 +5,15 @@
         $canDiscuss = $can_discuss ?? true;
         $isObserverOnly = $is_observer_only ?? false;
         $discussion = $discussion_comments ?? collect();
+        $history = $history_comments ?? $discussion->where('is_system', true)->values();
         $pipeline = $status_pipeline ?? [];
         $statusActions = $status_actions ?? [];
         $statusHint = $status_hint ?? null;
+        $relatedLinks = $related_links ?? collect();
+        $linkOptions = $link_task_options ?? [];
+        $relationLabels = \App\Models\TaskLink::relationLabels();
+        $canManageLinks = $can_manage_links ?? false;
+        $viewRoute = $task_view_route ?? route('platform.systems.my_tasks.view', $task);
     @endphp
 
     <div class="task-workspace__grid">
@@ -15,7 +21,7 @@
             <div class="tw-card">
                 <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                     <div>
-                        <div class="text-muted small text-uppercase mb-1">Задача #{{ $task->id }}</div>
+                        <div class="text-muted small text-uppercase mb-1">{{ $task->displayKey() }}</div>
                         <h2 class="h5 mb-0 text-body-emphasis">{{ $task->name }}</h2>
                     </div>
                     @if($statusEnum)
@@ -24,6 +30,10 @@
                 </div>
 
                 <div class="tw-meta">
+                    <div class="tw-meta__row">
+                        <span>Очередь</span>
+                        <strong>{{ $task->queue?->key ?? '—' }}</strong>
+                    </div>
                     <div class="tw-meta__row">
                         <span>Проект</span>
                         <strong>{{ $task->project?->name ?? '—' }}</strong>
@@ -114,18 +124,49 @@
             @endif
 
             <div class="tw-card mt-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div class="fw-semibold">Файлы</div>
-                    <span class="badge text-bg-light border">{{ $task->attachment->count() }}</span>
-                </div>
-                @forelse($task->attachment as $file)
-                    <div class="d-flex justify-content-between align-items-center border-bottom py-2 gap-2">
-                        <div class="small text-truncate" title="{{ $file->original_name }}">{{ $file->original_name }}</div>
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('platform.task.attachment.download', $file) }}">↓</a>
-                    </div>
-                @empty
-                    <div class="text-muted small">Нет файлов</div>
-                @endforelse
+                <div class="fw-semibold mb-2">Связанные задачи</div>
+                <ul class="tw-related-list">
+                    @forelse($relatedLinks as $link)
+                        @php $related = $link->relatedTask; @endphp
+                        @if($related)
+                            <li class="tw-related-item">
+                                <div>
+                                    <div class="tw-related-item__rel">{{ $link->label() }}</div>
+                                    <a href="{{ route('platform.systems.my_tasks.view', $related) }}" class="tw-related-item__link">
+                                        {{ $related->displayKey() }} · {{ \Illuminate\Support\Str::limit($related->name, 42) }}
+                                    </a>
+                                </div>
+                                @if($canManageLinks)
+                                    <form method="post" action="{{ url()->current() }}/removeLink">
+                                        @csrf
+                                        <input type="hidden" name="link_id" value="{{ $link->id }}">
+                                        <button type="submit" class="btn btn-sm btn-link text-danger px-0" title="Убрать">×</button>
+                                    </form>
+                                @endif
+                            </li>
+                        @endif
+                    @empty
+                        <li class="text-muted small">Пока нет связей</li>
+                    @endforelse
+                </ul>
+
+                @if($canManageLinks)
+                    <form method="post" action="{{ url()->current() }}/addLink" class="tw-related-form mt-2">
+                        @csrf
+                        <select name="related_task_id" class="form-select form-select-sm" required>
+                            <option value="">Задача…</option>
+                            @foreach($linkOptions as $id => $label)
+                                <option value="{{ $id }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <select name="relation" class="form-select form-select-sm" required>
+                            @foreach($relationLabels as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">Связать</button>
+                    </form>
+                @endif
             </div>
 
             @if(!empty($show_time_link) && !empty($time_route))
@@ -143,20 +184,26 @@
                     {!! $task->description ?: '<span class="text-muted">Описание не заполнено</span>' !!}
                 </div>
             </div>
+        </section>
+    </div>
 
-            <div class="tw-card tw-discussion mt-3">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="h5 mb-0">Обсуждение</h3>
-                    <span class="badge text-bg-secondary">{{ $discussion->count() }}</span>
-                </div>
+    <div class="tw-card tw-bottom mt-3">
+        <div class="tw-tabs" role="tablist">
+            <button type="button" class="tw-tabs__btn is-active" data-tw-tab="discussion">Обсуждение <span>{{ $discussion->where('is_system', false)->count() }}</span></button>
+            <button type="button" class="tw-tabs__btn" data-tw-tab="files">Вложения <span>{{ $task->attachment->count() }}</span></button>
+            <button type="button" class="tw-tabs__btn" data-tw-tab="history">История <span>{{ $history->count() }}</span></button>
+            <button type="button" class="tw-tabs__btn" data-tw-tab="commits">Коммиты</button>
+        </div>
 
+        <div class="tw-tab-panel is-active" data-tw-panel="discussion">
+            <div class="tw-discussion tw-discussion--docked">
                 <div class="tw-feed" id="task-discussion-feed">
-                    @forelse($discussion as $comment)
+                    @forelse($discussion->where('is_system', false) as $comment)
                         @php
                             $isMine = (int)($comment->user_id) === (int)auth()->id();
                             $parent = $comment->parent;
                         @endphp
-                        <article class="tw-msg {{ $isMine ? 'tw-msg--mine' : '' }} {{ $comment->is_system ? 'tw-msg--system' : '' }}"
+                        <article class="tw-msg {{ $isMine ? 'tw-msg--mine' : '' }}"
                                  id="comment-{{ $comment->id }}"
                                  data-comment-id="{{ $comment->id }}"
                                  data-author="{{ $comment->user?->displayName() ?? 'Участник' }}">
@@ -186,7 +233,7 @@
                                 </div>
                             @endif
 
-                            @if(!$comment->is_system && $canDiscuss)
+                            @if($canDiscuss)
                                 <div class="tw-msg__actions">
                                     <button type="button"
                                             class="btn btn-sm btn-link px-0 tw-reply-btn"
@@ -202,11 +249,72 @@
                     @endforelse
                 </div>
 
-                @if(!$canDiscuss)
-                    <div class="alert alert-warning mb-0 mt-3">Нет прав писать в обсуждении</div>
+                @if($canDiscuss)
+                    <form class="tw-composer" id="tw-composer" method="post" action="{{ url()->current() }}/addComment" enctype="multipart/form-data">
+                        @csrf
+                        <input type="hidden" name="comment[parent_id]" id="comment-parent-id" value="">
+                        <div id="tw-reply-banner" class="tw-composer__reply d-none">
+                            <div>Ответ для <strong id="tw-reply-author"></strong></div>
+                            <button type="button" class="btn btn-sm btn-link" id="tw-reply-cancel">Отмена</button>
+                        </div>
+                        <textarea name="comment[text]"
+                                  id="tw-composer-input"
+                                  class="tw-composer__input"
+                                  rows="2"
+                                  placeholder="Написать сообщение… Enter — отправить, Shift+Enter — новая строка"></textarea>
+                        <div class="tw-composer__bar">
+                            <label class="tw-composer__attach" title="Файлы">
+                                <input type="file" name="comment_files[]" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt">
+                                <span>Файлы</span>
+                            </label>
+                            <span class="tw-composer__files-label text-muted small d-none" id="tw-files-label"></span>
+                            <button type="submit" class="btn btn-primary btn-sm tw-composer__send">Отправить</button>
+                        </div>
+                    </form>
+                @else
+                    <div class="alert alert-warning mb-0 mt-2">Нет прав писать в обсуждении</div>
                 @endif
             </div>
-        </section>
+        </div>
+
+        <div class="tw-tab-panel" data-tw-panel="files" hidden>
+            <div class="tw-files-grid">
+                @forelse($task->attachment as $file)
+                    <div class="tw-file-row">
+                        <div class="text-truncate" title="{{ $file->original_name }}">{{ $file->original_name }}</div>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('platform.task.attachment.download', $file) }}">Скачать</a>
+                    </div>
+                @empty
+                    <div class="text-muted small py-3">Нет вложений у задачи</div>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="tw-tab-panel" data-tw-panel="history" hidden>
+            <div class="tw-feed tw-feed--history">
+                @forelse($history as $comment)
+                    <article class="tw-msg tw-msg--system">
+                        <div class="tw-msg__head">
+                            <strong>{{ $comment->user?->displayName() ?? 'Система' }}</strong>
+                            <span class="text-muted">{{ $comment->created_at?->format('d.m.Y H:i') }}</span>
+                        </div>
+                        <div class="tw-msg__body">{!! $comment->formatted_text !!}</div>
+                    </article>
+                @empty
+                    <div class="text-muted text-center py-4">История пока пуста</div>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="tw-tab-panel" data-tw-panel="commits" hidden>
+            <div class="tw-commits-empty">
+                <div class="fw-semibold mb-1">Коммиты</div>
+                <p class="text-muted small mb-0">
+                    Вкладка готова под интеграцию с Git (как в Яндекс Трекере).
+                    Пока коммиты сюда не подтягиваются — подключение репозитория можно добавить отдельно.
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -214,9 +322,73 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 (() => {
-    if (!window.hljs) return;
-    document.querySelectorAll('.tw-codeblock code').forEach((el) => {
-        try { window.hljs.highlightElement(el); } catch (e) {}
+    if (window.hljs) {
+        document.querySelectorAll('.tw-codeblock code').forEach((el) => {
+            try { window.hljs.highlightElement(el); } catch (e) {}
+        });
+    }
+
+    document.querySelectorAll('.tw-tabs__btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tw-tab');
+            document.querySelectorAll('.tw-tabs__btn').forEach((b) => b.classList.toggle('is-active', b === btn));
+            document.querySelectorAll('.tw-tab-panel').forEach((panel) => {
+                const on = panel.getAttribute('data-tw-panel') === tab;
+                panel.classList.toggle('is-active', on);
+                panel.hidden = !on;
+            });
+        });
     });
+
+    const input = document.getElementById('tw-composer-input');
+    const parentInput = document.getElementById('comment-parent-id');
+    const replyBanner = document.getElementById('tw-reply-banner');
+    const replyAuthor = document.getElementById('tw-reply-author');
+    const filesInput = document.getElementById('tw-composer-files');
+    const filesLabel = document.getElementById('tw-files-label');
+    const MAX_H = 180;
+
+    const autosize = () => {
+        if (!input) return;
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, MAX_H) + 'px';
+        input.style.overflowY = input.scrollHeight > MAX_H ? 'auto' : 'hidden';
+    };
+    input?.addEventListener('input', autosize);
+    autosize();
+
+    input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('tw-composer')?.requestSubmit();
+        }
+    });
+
+    filesInput?.addEventListener('change', () => {
+        const n = filesInput.files?.length || 0;
+        if (!filesLabel) return;
+        if (n > 0) {
+            filesLabel.textContent = n + ' файл(ов)';
+            filesLabel.classList.remove('d-none');
+        } else {
+            filesLabel.classList.add('d-none');
+        }
+    });
+
+    document.querySelectorAll('.tw-reply-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (parentInput) parentInput.value = btn.getAttribute('data-parent-id') || '';
+            if (replyAuthor) replyAuthor.textContent = btn.getAttribute('data-author') || '';
+            replyBanner?.classList.remove('d-none');
+            input?.focus();
+        });
+    });
+    document.getElementById('tw-reply-cancel')?.addEventListener('click', () => {
+        if (parentInput) parentInput.value = '';
+        replyBanner?.classList.add('d-none');
+    });
+
+    const feed = document.getElementById('task-discussion-feed');
+    if (feed) feed.scrollTop = feed.scrollHeight;
 })();
 </script>

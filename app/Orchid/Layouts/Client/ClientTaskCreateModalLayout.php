@@ -5,6 +5,7 @@ namespace App\Orchid\Layouts\Client;
 use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\TaskCategory;
+use App\Models\TaskQueue;
 use App\Support\UploadLimits;
 use Orchid\Screen\Field;
 use Orchid\Screen\Fields\Group;
@@ -30,6 +31,13 @@ class ClientTaskCreateModalLayout extends Rows
                 ->class('tc-field-title'),
 
             Group::make([
+                Select::make('task.queue_id')
+                    ->options(TaskQueue::optionsForSelect())
+                    ->title('Очередь')
+                    ->required()
+                    ->empty('Очередь')
+                    ->class('tc-field-chip'),
+
                 Select::make('task.task_category_id')
                     ->fromModel(TaskCategory::class, 'name', 'id')
                     ->title('Категория')

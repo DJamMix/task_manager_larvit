@@ -109,14 +109,22 @@ class ClientListTaskScreen extends Screen
         $validated = $request->validate([
             'task.name' => 'required|string|max:255',
             'task.description' => 'required|string',
+            'task.queue_id' => 'required|exists:task_queues,id',
             'task.task_category_id' => 'required|exists:task_categories,id',
             'task.type_task' => 'required|string',
             'task.priority' => 'required|string',
         ]);
 
+        $queue = \App\Models\TaskQueue::query()
+            ->whereKey($validated['task']['queue_id'])
+            ->where('is_active', true)
+            ->firstOrFail();
+
         $task->fill($validated['task']);
         $task->creator_id = auth()->id();
         $task->project_id = $project->id;
+        $task->queue_id = $queue->id;
+        $task->queue_number = $queue->allocateNextNumber();
         $task->status = TaskStatusEnum::DRAFT->value;
         $task->save();
 
@@ -128,7 +136,7 @@ class ClientListTaskScreen extends Screen
             $task
         );
 
-        Toast::info('Задача успешно создана и передана на согласование');
+        Toast::info('Задача ' . $task->displayKey() . ' создана');
 
         return redirect()->route('platform.systems.client.project.tasks', ['project' => $project->id]);
     }

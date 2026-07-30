@@ -96,7 +96,12 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make(__('adminpanel.TaskCategories'))
                 ->icon('bs.bookmarks')
                 ->route('platform.systems.task_categories')
-                ->permission('platform.systems.task_categories')
+                ->permission('platform.systems.task_categories'),
+
+            Menu::make('Очереди задач')
+                ->icon('bs.collection')
+                ->route('platform.systems.task_queues')
+                ->permission('platform.systems.tasks')
                 ->divider(),
         ];
     }

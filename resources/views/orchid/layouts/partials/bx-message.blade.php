@@ -54,6 +54,13 @@
             </div>
         @endif
 
+        @if($message->forwarded_from_message_id)
+            <div class="bx-msg__forwarded">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/><path d="M10 4L6 8l4 4"/></svg>
+                Переслано
+            </div>
+        @endif
+
         @unless($message->is_system)
             <div class="bx-msg__meta">
                 <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
@@ -163,6 +170,12 @@
                         data-parent-id="{{ $message->id }}"
                         data-author="{{ $message->user?->displayName() ?? 'участник' }}">
                     Ответить
+                </button>
+                <button type="button"
+                        class="bx-msg__select-btn"
+                        data-message-id="{{ $message->id }}"
+                        aria-pressed="false">
+                    Выбрать
                 </button>
             @endunless
 

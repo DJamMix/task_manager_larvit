@@ -254,6 +254,154 @@ class ChatService
             });
     }
 
+    /**
+     * Короткий список чатов для выбора назначения при пересылке.
+     *
+     * @return list<array{id: int, title: string}>
+     */
+    public function chatPickerPayload(User $user): array
+    {
+        return $this->chatsFor($user)
+            ->map(fn (Chat $chat) => [
+                'id' => (int) $chat->id,
+                'title' => $chat->displayTitle($user->id),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Пересылает до 20 сообщений текущего чата в доступный пользователю чат.
+     *
+     * @param  list<int>  $messageIds
+     */
+    public function forwardMessages(Chat $source, Chat $target, User $actor, array $messageIds): void
+    {
+        if (!$source->isMember($actor->id) || !$target->isMember($actor->id)) {
+            abort(403);
+        }
+
+        $this->assertCanWriteInChat($target, $actor);
+        $ids = collect($messageIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty() || $ids->count() > 20) {
+            abort(422, 'Можно переслать от 1 до 20 сообщений');
+        }
+
+        $messages = ChatMessage::query()
+            ->where('chat_id', $source->id)
+            ->whereIn('id', $ids)
+            ->where('is_system', false)
+            ->with('attachment')
+            ->orderBy('id')
+            ->get();
+
+        if ($messages->count() !== $ids->count()) {
+            abort(422, 'Некоторые сообщения недоступны для пересылки');
+        }
+
+        DB::transaction(function () use ($messages, $source, $target, $actor) {
+            foreach ($messages as $original) {
+                $forwarded = $target->messages()->create([
+                    'user_id' => $actor->id,
+                    'text' => $original->text,
+                    'plain_text' => $original->plain_text,
+                    'task_id' => $original->task_id,
+                    'is_system' => false,
+                    'forwarded_from_message_id' => $original->id,
+                    'forwarded_from_chat_id' => $source->id,
+                ]);
+
+                $forwarded->attachment()->sync($original->attachment->pluck('id')->all());
+                $this->notifyMembers($target, $actor, $forwarded, []);
+            }
+
+            $target->touch();
+            $this->markRead($target, $actor);
+        });
+    }
+
+    /**
+     * Вложения и ссылки чата постранично для окна «Медиа».
+     *
+     * @return array{items: list<array>, page: int, has_more: bool}
+     */
+    public function chatMediaPayload(Chat $chat, User $user, string $tab = 'media', int $page = 1, int $perPage = 60): array
+    {
+        if (!$chat->isMember($user->id)) {
+            abort(403);
+        }
+
+        $tab = in_array($tab, ['media', 'files', 'links'], true) ? $tab : 'media';
+        $page = max(1, $page);
+        $perPage = max(1, min(60, $perPage));
+        $offset = ($page - 1) * $perPage;
+
+        if ($tab === 'links') {
+            $items = [];
+            $messages = ChatMessage::query()
+                ->where('chat_id', $chat->id)
+                ->where('is_system', false)
+                ->whereNotNull('plain_text')
+                ->orderByDesc('id')
+                ->get(['id', 'plain_text', 'created_at']);
+
+            foreach ($messages as $message) {
+                preg_match_all('~https?://[^\s<>"\']+~iu', (string) $message->plain_text, $matches);
+                foreach ($matches[0] ?? [] as $url) {
+                    $items[] = [
+                        'id' => (int) $message->id,
+                        'url' => rtrim($url, '.,;:!?)]}'),
+                        'text' => \Illuminate\Support\Str::limit((string) $message->plain_text, 120),
+                        'created_at' => $message->created_at?->format('d.m.Y H:i'),
+                    ];
+                }
+            }
+
+            $slice = array_slice($items, $offset, $perPage);
+
+            return ['items' => $slice, 'page' => $page, 'has_more' => count($items) > $offset + $perPage];
+        }
+
+        $messages = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->where('is_system', false)
+            ->with('attachment')
+            ->orderByDesc('id')
+            ->get();
+        $items = [];
+
+        foreach ($messages as $message) {
+            foreach ($message->attachment as $file) {
+                $mime = strtolower((string) ($file->mime ?? ''));
+                $extension = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
+                $isImage = str_starts_with($mime, 'image/')
+                    || in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+
+                if (($tab === 'media') !== $isImage) {
+                    continue;
+                }
+
+                $items[] = [
+                    'id' => (int) $file->id,
+                    'message_id' => (int) $message->id,
+                    'name' => (string) $file->original_name,
+                    'url' => route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]),
+                    'download_url' => route('platform.task.attachment.download', $file),
+                    'created_at' => $message->created_at?->format('d.m.Y H:i'),
+                ];
+            }
+        }
+
+        $slice = array_slice($items, $offset, $perPage);
+
+        return ['items' => $slice, 'page' => $page, 'has_more' => count($items) > $offset + $perPage];
+    }
+
     public function pollState(User $user, ?int $sinceMessageId = null, ?int $activeChatId = null): array
     {
         $this->touchPresence($user);
@@ -1031,13 +1179,18 @@ class ChatService
         }
 
         if ($request->hasFile('message_files')) {
+            $count = 0;
             foreach ((array) $request->file('message_files') as $uploaded) {
+                if ($count >= 10) {
+                    break;
+                }
                 if (!$uploaded || !$uploaded->isValid()) {
                     continue;
                 }
                 $file = new \Orchid\Attachment\File($uploaded, 'public');
                 $attachment = $file->load();
                 $attachmentIds->push($attachment->id);
+                $count++;
             }
         }
 

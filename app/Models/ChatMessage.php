@@ -22,6 +22,8 @@ class ChatMessage extends Model
         'mentioned_user_ids',
         'task_id',
         'is_system',
+        'forwarded_from_message_id',
+        'forwarded_from_chat_id',
     ];
 
     protected $casts = [
@@ -55,6 +57,16 @@ class ChatMessage extends Model
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
+    }
+
+    public function forwardedFromMessage(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'forwarded_from_message_id');
+    }
+
+    public function forwardedFromChat(): BelongsTo
+    {
+        return $this->belongsTo(Chat::class, 'forwarded_from_chat_id');
     }
 
     public function getFormattedTextAttribute(): string

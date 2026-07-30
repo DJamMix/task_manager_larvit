@@ -317,6 +317,24 @@ Route::screen('task_categories/create', TaskCategoryEditScreen::class)
         ->parent('platform.systems.task_categories')
         ->push(__('project.add'), route('platform.systems.task_categories.create')));
 
+Route::screen('task_queues', \App\Orchid\Screens\TaskQueue\TaskQueueListScreen::class)
+    ->name('platform.systems.task_queues')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Очереди задач', route('platform.systems.task_queues')));
+
+Route::screen('task_queues/{queue}/edit', \App\Orchid\Screens\TaskQueue\TaskQueueEditScreen::class)
+    ->name('platform.systems.task_queues.edit')
+    ->breadcrumbs(fn (Trail $trail, $queue) => $trail
+        ->parent('platform.systems.task_queues')
+        ->push($queue->key ?? 'Очередь', route('platform.systems.task_queues.edit', $queue)));
+
+Route::screen('task_queues/create', \App\Orchid\Screens\TaskQueue\TaskQueueEditScreen::class)
+    ->name('platform.systems.task_queues.create')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.systems.task_queues')
+        ->push('Создать', route('platform.systems.task_queues.create')));
+
 Route::screen('my_tasks', MyTasksListScreen::class)
     ->name('platform.systems.my_tasks')
     ->breadcrumbs(fn (Trail $trail) => $trail
@@ -400,6 +418,79 @@ Route::get('chats-tasks', function (\Illuminate\Http\Request $request, \App\Serv
         'tasks' => $chats->attachableTasksFor($request->user(), $request->string('q')->toString(), 30),
     ]);
 })->name('platform.systems.chats.tasks');
+
+Route::get('chats-picker', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    return response()->json(['chats' => $chats->chatPickerPayload($request->user())]);
+})->name('platform.systems.chats.picker');
+
+Route::post('chats/{chat}/forward', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $data = $request->validate([
+        'message_ids' => 'required|array|min:1|max:20',
+        'message_ids.*' => 'integer',
+        'target_chat_id' => 'required|integer|exists:chats,id',
+    ]);
+    $target = \App\Models\Chat::query()->findOrFail($data['target_chat_id']);
+    $chats->forwardMessages($chat, $target, $request->user(), $data['message_ids']);
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.chats.forward');
+
+Route::get('chats/{chat}/media', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+
+    return response()->json($chats->chatMediaPayload(
+        $chat,
+        $request->user(),
+        $request->string('tab')->toString(),
+        $request->integer('page') ?: 1,
+        60
+    ));
+})->name('platform.systems.chats.media');
+
+Route::get('web-push/vapid-key', function () {
+    return response()->json(['public_key' => (string) config('webpush.public_key')]);
+})->name('platform.web-push.vapid-key');
+
+Route::post('web-push/subscribe', function (\Illuminate\Http\Request $request) {
+    $data = $request->validate([
+        'endpoint' => 'required|string',
+        'keys.p256dh' => 'required|string',
+        'keys.auth' => 'required|string',
+    ]);
+
+    \App\Models\PushSubscription::query()->updateOrCreate(
+        ['endpoint' => $data['endpoint']],
+        [
+            'user_id' => $request->user()->id,
+            'public_key' => $data['keys']['p256dh'],
+            'auth_token' => $data['keys']['auth'],
+            'user_agent' => substr((string) $request->userAgent(), 0, 65535),
+        ]
+    );
+
+    return response()->json(['ok' => true]);
+})->name('platform.web-push.subscribe');
+
+Route::delete('web-push/subscribe', function (\Illuminate\Http\Request $request) {
+    $data = $request->validate(['endpoint' => 'required|string']);
+    \App\Models\PushSubscription::query()
+        ->where('user_id', $request->user()->id)
+        ->where('endpoint', $data['endpoint'])
+        ->delete();
+
+    return response()->json(['ok' => true]);
+})->name('platform.web-push.unsubscribe');
 
 Route::post('chats/{chat}/calls', function (
     \Illuminate\Http\Request $request,

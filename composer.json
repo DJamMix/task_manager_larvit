@@ -15,6 +15,7 @@
         "laravel/scout": "^10.19",
         "laravel/tinker": "^2.10.1",
         "meilisearch/meilisearch-php": "^1.16",
+        "minishlink/web-push": "^10.0",
         "orchid/platform": "^14.48",
         "spatie/laravel-permission": "^6.16"
     },

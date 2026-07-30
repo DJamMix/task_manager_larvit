@@ -5,8 +5,8 @@ namespace App\Orchid\Screens\Client;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskLink;
 use App\Orchid\Layouts\Client\ClientTaskCreateModalLayout;
-use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Services\CommentService;
 use App\Services\TaskLogger;
 use Illuminate\Http\Request;
@@ -49,19 +49,33 @@ class ClientViewTaskScreen extends Screen
             abort(403, 'Нет доступа к этой задаче');
         }
 
-        $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue']);
+
+        $comments = $task->comments()
+            ->with(['user', 'parent.user', 'attachment'])
+            ->orderBy('created_at')
+            ->get();
 
         return [
             'user' => $user,
             'project' => $project,
             'task' => $task,
             'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
-            'discussion_comments' => $task->comments()
-                ->with(['user', 'parent.user', 'attachment'])
-                ->orderBy('created_at')
-                ->get(),
+            'discussion_comments' => $comments,
+            'history_comments' => $comments->where('is_system', true)->values(),
             'notify_options' => $task->participantsForNotify(),
             'can_discuss' => true,
+            'can_manage_links' => true,
+            'related_links' => $task->links,
+            'link_task_options' => Task::query()
+                ->where('project_id', $project->id)
+                ->where('id', '!=', $task->id)
+                ->with('queue')
+                ->orderByDesc('id')
+                ->limit(80)
+                ->get()
+                ->mapWithKeys(fn (Task $t) => [$t->id => $t->displayKey() . ' · ' . \Illuminate\Support\Str::limit($t->name, 40)])
+                ->all(),
             'is_observer_only' => false,
             'viewer_role' => 'client',
             'show_time_link' => false,
@@ -303,10 +317,6 @@ class ClientViewTaskScreen extends Screen
     {
         return [
             Layout::view('orchid.layouts.task-workspace'),
-            Layout::view('orchid.layouts.composer-anchor'),
-            Layout::wrapper('orchid.layouts.composer-shell', [
-                'composer' => DiscussionComposerLayout::class,
-            ]),
 
             Layout::modal('editTaskModal', [
                 Layout::wrapper('orchid.layouts.task-create-shell', [
@@ -348,6 +358,43 @@ class ClientViewTaskScreen extends Screen
     {
         $comments->addFromRequest($task, $request->user(), $request);
         Toast::success('Сообщение отправлено. Участники получат уведомление.');
+
+        return back();
+    }
+
+    public function addLink(Request $request, Task $task)
+    {
+        $data = $request->validate([
+            'related_task_id' => 'required|integer|exists:tasks,id',
+            'relation' => 'required|string|in:' . implode(',', array_keys(TaskLink::relationLabels())),
+        ]);
+
+        if ((int) $data['related_task_id'] === (int) $task->id) {
+            Toast::error('Нельзя связать задачу саму с собой');
+            return back();
+        }
+
+        TaskLink::query()->firstOrCreate([
+            'task_id' => $task->id,
+            'related_task_id' => (int) $data['related_task_id'],
+            'relation' => $data['relation'],
+        ], [
+            'created_by' => $request->user()->id,
+        ]);
+
+        Toast::success('Связь добавлена');
+
+        return back();
+    }
+
+    public function removeLink(Request $request, Task $task)
+    {
+        TaskLink::query()
+            ->where('task_id', $task->id)
+            ->whereKey((int) $request->input('link_id'))
+            ->delete();
+
+        Toast::info('Связь удалена');
 
         return back();
     }

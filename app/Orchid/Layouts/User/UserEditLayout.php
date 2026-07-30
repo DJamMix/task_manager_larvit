@@ -37,7 +37,8 @@ class UserEditLayout extends Rows
                 ->empty('Не указана')
                 ->title('Должность')
                 ->help('Backend, Frontend, Designer и т.д. — видно рядом с именем в списках и комментариях')
-                ->allowAdd(),
+                ->allowAdd()
+                ->canSee(auth()->user()?->hasAccess('platform.systems.users') ?? false),
 
             Input::make('user.email')
                 ->type('email')

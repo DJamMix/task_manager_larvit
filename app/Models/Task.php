@@ -35,6 +35,8 @@ class Task extends Model
         'end_datetime',
         'cost_estimation',
         'project_id',
+        'queue_id',
+        'queue_number',
         'status',
         'pay_status',
         'hours_spent',
@@ -137,6 +139,37 @@ class Task extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class, 'project_id');
+    }
+
+    public function queue(): BelongsTo
+    {
+        return $this->belongsTo(TaskQueue::class, 'queue_id');
+    }
+
+    public function links(): HasMany
+    {
+        return $this->hasMany(TaskLink::class, 'task_id');
+    }
+
+    public function incomingLinks(): HasMany
+    {
+        return $this->hasMany(TaskLink::class, 'related_task_id');
+    }
+
+    /** Ключ задачи: PHP-42 или #123 если очередь не задана. */
+    public function displayKey(): string
+    {
+        if ($this->queue_id && $this->queue_number) {
+            $key = $this->relationLoaded('queue')
+                ? $this->queue?->key
+                : $this->queue()->value('key');
+
+            if ($key) {
+                return strtoupper((string) $key) . '-' . $this->queue_number;
+            }
+        }
+
+        return '#' . $this->id;
     }
 
     /**

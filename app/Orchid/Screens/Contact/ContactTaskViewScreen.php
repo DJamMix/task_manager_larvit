@@ -4,7 +4,6 @@ namespace App\Orchid\Screens\Contact;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
-use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Services\CommentService;
 use Illuminate\Http\Request;
 use Orchid\Screen\Actions\Link;
@@ -22,7 +21,7 @@ class ContactTaskViewScreen extends Screen
         abort_unless($user?->hasAccess('platform.systems.contact.tasks'), 403);
         abort_unless($task->canView((int) $user->id), 403, 'Нет доступа к этой задаче');
 
-        $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue']);
 
         $comments = $task->comments()
             ->with(['user', 'parent.user', 'attachment'])
@@ -33,8 +32,12 @@ class ContactTaskViewScreen extends Screen
             'task' => $task,
             'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
             'discussion_comments' => $comments,
+            'history_comments' => $comments->where('is_system', true)->values(),
             'notify_options' => $task->participantsForNotify(),
             'can_discuss' => $task->canDiscuss((int) $user->id),
+            'can_manage_links' => false,
+            'related_links' => $task->links,
+            'link_task_options' => [],
             'is_observer_only' => true,
             'viewer_role' => 'contact',
             'show_time_link' => false,
@@ -72,18 +75,9 @@ class ContactTaskViewScreen extends Screen
 
     public function layout(): iterable
     {
-        $layouts = [
+        return [
             Layout::view('orchid.layouts.task-workspace'),
-            Layout::view('orchid.layouts.composer-anchor'),
         ];
-
-        if ($this->task && $this->task->canDiscuss()) {
-            $layouts[] = Layout::wrapper('orchid.layouts.composer-shell', [
-                'composer' => DiscussionComposerLayout::class,
-            ]);
-        }
-
-        return $layouts;
     }
 
     public function addComment(Request $request, Task $task, CommentService $comments)

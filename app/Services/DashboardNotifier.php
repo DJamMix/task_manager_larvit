@@ -32,6 +32,12 @@ class DashboardNotifier
                     ->action($actionUrl)
                     ->type($type)
             );
+            app(WebPushService::class)->send(
+                $user,
+                $title,
+                Str::limit(strip_tags($message), 240),
+                $actionUrl
+            );
         } catch (\Throwable) {
             // Не ломаем основное действие из‑за уведомления
         }

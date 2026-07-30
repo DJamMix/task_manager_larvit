@@ -7,6 +7,7 @@ use App\CoreLayer\Enums\TaskStatusEnum;
 use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\Project;
 use App\Models\TaskCategory;
+use App\Models\TaskQueue;
 use App\Models\User;
 use App\Support\UploadLimits;
 use Orchid\Screen\Field;
@@ -60,14 +61,7 @@ class TaskEditLayout extends Rows
                     ->max(255)
                     ->required()
                     ->title(__('task.name'))
-                    ->placeholder(__('task.name'))
-                    ->width('50%'),
-
-                Select::make('task.creator_id')
-                    ->options(User::optionsForSelect())
-                    ->required()
-                    ->title(__('task.creator_id'))
-                    ->width('50%'),
+                    ->placeholder(__('task.name')),
             ])->fullWidth(),
 
             Group::make([
@@ -81,21 +75,32 @@ class TaskEditLayout extends Rows
             ])->fullWidth(),
 
             Group::make([
+                Select::make('task.queue_id')
+                    ->options(TaskQueue::optionsForSelect())
+                    ->title('Очередь')
+                    ->help($isNew
+                        ? 'Ключ задачи: PHP-12, FRONTEND-5… Выбирается только при создании.'
+                        : 'Очередь нельзя сменить после создания')
+                    ->required($isNew)
+                    ->empty('Выберите очередь')
+                    ->disabled(!$isNew)
+                    ->width('50%'),
+
                 Select::make('task.status')
                     ->options(TaskStatusEnum::options())
                     ->value($this->query->get('task.status'))
                     ->title(__('task.status.label'))
                     ->required()
                     ->width('50%'),
+            ])->fullWidth(),
 
+            Group::make([
                 Select::make('task.task_category_id')
                     ->fromModel(TaskCategory::class, 'name', 'id')
                     ->title(__('task.task_category_id'))
                     ->required()
                     ->width('50%'),
-            ])->fullWidth(),
 
-            Group::make([
                 Select::make('task.priority')
                     ->options(
                         collect(TaskPriorityEnum::orderedCases())
@@ -107,16 +112,16 @@ class TaskEditLayout extends Rows
                     ->help('P0 — критично, P3 — обычная очередь')
                     ->value(TaskPriorityEnum::MEDIUM->value)
                     ->width('50%'),
+            ])->fullWidth(),
 
+            Group::make([
                 Select::make('task.type_task')
                     ->options(TaskTypeEnum::options())
                     ->title('Тип задачи')
                     ->required()
                     ->help('Выберите тип задачи')
                     ->width('50%'),
-            ])->fullWidth(),
 
-            Group::make([
                 Input::make('task.estimation_hours')
                     ->type('number')
                     ->title('Оценка в часах')
@@ -125,7 +130,9 @@ class TaskEditLayout extends Rows
                     ->help('Плановое время. Не зависит от фактического трекинга.')
                     ->readonly()
                     ->width('50%'),
+            ])->fullWidth(),
 
+            Group::make([
                 DateTimer::make('task.end_datetime')
                     ->title('Дедлайн')
                     ->enableTime()

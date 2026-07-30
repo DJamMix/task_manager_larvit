@@ -4,8 +4,8 @@ namespace App\Orchid\Screens\Task;
 
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
+use App\Models\TaskLink;
 use App\Orchid\Layouts\Client\ClientTaskFilesLayout;
-use App\Orchid\Layouts\Comment\DiscussionComposerLayout;
 use App\Orchid\Layouts\Task\TaskEditLayout;
 use App\Orchid\Layouts\Task\TaskObserversLayout;
 use App\Services\CommentService;
@@ -35,24 +35,39 @@ class TaskEditScreen extends Screen
         }
 
         if ($task->exists) {
-            $task->load(['project', 'executor', 'creator', 'category', 'attachment']);
+            $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue']);
         }
 
         $user = auth()->user();
+        $comments = $task->exists
+            ? $task->comments()->with(['user', 'parent.user', 'attachment'])->orderBy('created_at')->get()
+            : collect();
+
+        $linkOptions = [];
+        if ($task->exists) {
+            $linkOptions = Task::query()
+                ->where('id', '!=', $task->id)
+                ->when($task->project_id, fn ($q) => $q->where('project_id', $task->project_id))
+                ->with('queue')
+                ->orderByDesc('id')
+                ->limit(80)
+                ->get()
+                ->mapWithKeys(fn (Task $t) => [$t->id => $t->displayKey() . ' · ' . Str::limit($t->name, 40)])
+                ->all();
+        }
 
         return [
             'task' => $task,
             'task_status_label' => $task->exists
                 ? TaskStatusEnum::tryFrom($task->status)?->label()
                 : null,
-            'discussion_comments' => $task->exists
-                ? $task->comments()
-                    ->with(['user', 'parent.user', 'attachment'])
-                    ->orderBy('created_at')
-                    ->get()
-                : collect(),
+            'discussion_comments' => $comments,
+            'history_comments' => $comments->where('is_system', true)->values(),
             'notify_options' => $task->exists ? $task->participantsForNotify() : [],
             'can_discuss' => $task->exists && $task->canDiscuss((int) $user->id),
+            'can_manage_links' => $task->exists,
+            'related_links' => $task->exists ? $task->links : collect(),
+            'link_task_options' => $linkOptions,
             'is_observer_only' => false,
             'viewer_role' => 'admin',
             'show_time_link' => false,
@@ -124,10 +139,6 @@ class TaskEditScreen extends Screen
             Layout::tabs([
                 'Задача и обсуждение' => [
                     Layout::view('orchid.layouts.task-workspace'),
-                    Layout::view('orchid.layouts.composer-anchor'),
-                    Layout::wrapper('orchid.layouts.composer-shell', [
-                        'composer' => DiscussionComposerLayout::class,
-                    ]),
                 ],
                 'Редактирование' => [
                     TaskEditLayout::class,
@@ -165,6 +176,24 @@ class TaskEditScreen extends Screen
             if ($contextId) {
                 $data['project_id'] = $contextId;
             }
+        }
+
+        if (!$task->exists) {
+            $data['creator_id'] = $request->user()->id;
+            $queueId = (int) ($data['queue_id'] ?? 0);
+            if ($queueId <= 0) {
+                Toast::error('Выберите очередь задачи');
+                return back();
+            }
+            $queue = \App\Models\TaskQueue::query()->whereKey($queueId)->where('is_active', true)->first();
+            if (!$queue) {
+                Toast::error('Очередь не найдена');
+                return back();
+            }
+            $data['queue_id'] = $queue->id;
+            $data['queue_number'] = $queue->allocateNextNumber();
+        } else {
+            unset($data['creator_id'], $data['queue_id'], $data['queue_number']);
         }
 
         if (array_key_exists('observers_ids', $data)) {
@@ -208,5 +237,42 @@ class TaskEditScreen extends Screen
         Toast::success('Сообщение отправлено');
 
         return redirect()->route('platform.systems.tasks.edit', $task);
+    }
+
+    public function addLink(Request $request, Task $task)
+    {
+        $data = $request->validate([
+            'related_task_id' => 'required|integer|exists:tasks,id',
+            'relation' => 'required|string|in:' . implode(',', array_keys(TaskLink::relationLabels())),
+        ]);
+
+        if ((int) $data['related_task_id'] === (int) $task->id) {
+            Toast::error('Нельзя связать задачу саму с собой');
+            return back();
+        }
+
+        TaskLink::query()->firstOrCreate([
+            'task_id' => $task->id,
+            'related_task_id' => (int) $data['related_task_id'],
+            'relation' => $data['relation'],
+        ], [
+            'created_by' => $request->user()->id,
+        ]);
+
+        Toast::success('Связь добавлена');
+
+        return back();
+    }
+
+    public function removeLink(Request $request, Task $task)
+    {
+        TaskLink::query()
+            ->where('task_id', $task->id)
+            ->whereKey((int) $request->input('link_id'))
+            ->delete();
+
+        Toast::info('Связь удалена');
+
+        return back();
     }
 }

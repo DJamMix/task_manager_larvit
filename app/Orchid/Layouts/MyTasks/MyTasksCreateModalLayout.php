@@ -6,6 +6,7 @@ use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskTypeEnum;
 use App\Models\Project;
 use App\Models\TaskCategory;
+use App\Models\TaskQueue;
 use App\Services\ProjectContext;
 use App\Support\UploadLimits;
 use Orchid\Screen\Field;
@@ -56,6 +57,14 @@ class MyTasksCreateModalLayout extends Rows
                 ->empty('Проект')
                 ->class('tc-field-chip');
         }
+
+        $meta[] = Select::make('task.queue_id')
+            ->options(TaskQueue::optionsForSelect())
+            ->title('Очередь')
+            ->required()
+            ->empty('Очередь')
+            ->help('PHP-12, FRONTEND-5…')
+            ->class('tc-field-chip');
 
         $meta[] = Select::make('task.task_category_id')
             ->fromModel(TaskCategory::class, 'name', 'id')

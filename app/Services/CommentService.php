@@ -20,7 +20,19 @@ class CommentService
         $quillContent = $this->normalizeQuill($request->input('comment.text'));
         $plainText = $this->extractPlainText($quillContent);
 
-        if (trim($plainText) === '' && empty($request->input('comment.attachments'))) {
+        $attachmentIds = collect($request->input('comment.attachments', []))->filter();
+
+        if ($request->hasFile('comment_files')) {
+            foreach ((array) $request->file('comment_files') as $uploaded) {
+                if (!$uploaded || !$uploaded->isValid()) {
+                    continue;
+                }
+                $file = new \Orchid\Attachment\File($uploaded, 'public');
+                $attachmentIds->push($file->load()->id);
+            }
+        }
+
+        if (trim($plainText) === '' && $attachmentIds->isEmpty()) {
             abort(422, 'Напишите сообщение или прикрепите файл');
         }
 
@@ -55,9 +67,8 @@ class CommentService
             'mentioned_user_ids' => $mentionIds->all(),
         ]);
 
-        $attachmentIds = $request->input('comment.attachments', []);
-        if (!empty($attachmentIds)) {
-            $comment->attachment()->syncWithoutDetaching($attachmentIds);
+        if ($attachmentIds->isNotEmpty()) {
+            $comment->attachment()->syncWithoutDetaching($attachmentIds->all());
         }
 
         $this->notifyAboutComment($task, $actor, $comment, $parent, $mentionIds->all());
