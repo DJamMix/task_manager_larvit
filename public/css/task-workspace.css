@@ -1406,16 +1406,16 @@
 /* Messenger full-bleed page (рядом с боковым меню Orchid) */
 html.bx-messenger-page,
 body.bx-messenger-page {
-    overflow: hidden;
+    overflow-x: hidden;
 }
 body.bx-messenger-page .breadcrumb,
 body.bx-messenger-page nav[aria-label="breadcrumb"],
 body.bx-messenger-page .page-header,
 body.bx-messenger-page .header-tittle,
 body.bx-messenger-page .header-bar,
-body.bx-messenger-page h1,
-body.bx-messenger-page .workspace > .mb-3:has(h1),
-body.bx-messenger-page .workspace > .row:has(h1),
+body.bx-messenger-page .workspace > h1,
+body.bx-messenger-page .workspace > .mb-3:has(> h1),
+body.bx-messenger-page .workspace > .row:has(> .col h1),
 body.bx-messenger-page .task-manager-footer {
     display: none !important;
 }
@@ -1434,38 +1434,25 @@ body.bx-messenger-page .command-bar {
     opacity: 0 !important;
     pointer-events: none !important;
 }
-body.bx-messenger-page main .container-fluid,
-body.bx-messenger-page .layout .wrapper > .content,
+/* Только контентная колонка — не трогаем .aside / колонки меню */
 body.bx-messenger-page .workspace,
-body.bx-messenger-page .aside ~ .workspace,
-body.bx-messenger-page #post-form,
 body.bx-messenger-page #post-form > .container-fluid,
-body.bx-messenger-page .container-fluid,
-body.bx-messenger-page .container-xxl,
-body.bx-messenger-page .row > [class*="col"] {
+body.bx-messenger-page .workspace > .container-fluid {
     padding-left: 0 !important;
     padding-right: 0 !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
     margin-bottom: 0 !important;
     max-width: none !important;
-    width: 100% !important;
-}
-body.bx-messenger-page .row {
-    --bs-gutter-x: 0;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
 }
 body.bx-messenger-page .bx-messenger {
-    height: calc(100dvh - 0px);
-    max-height: 100dvh;
+    height: calc(100dvh - 8px);
+    max-height: calc(100dvh - 8px);
     min-height: 280px;
     border-radius: 0;
     border-left: none;
     border-right: none;
-    margin-bottom: 0;
+    margin: 0;
     width: 100%;
 }
 
