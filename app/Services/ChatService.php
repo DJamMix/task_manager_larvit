@@ -500,6 +500,7 @@ class ChatService
                     'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
                     'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? '', 48),
                     'muted' => (bool) $chat->is_muted,
+                    'pinned' => (bool) $chat->is_pinned,
                     'peer_id' => $peerId ? (int) $peerId : null,
                 ];
             })->values()->all(),

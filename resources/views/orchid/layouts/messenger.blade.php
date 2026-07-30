@@ -1582,8 +1582,66 @@
             const link = document.querySelector('.bx-chat-item[data-chat-id="' + activeChat + '"]');
             const preview = link?.querySelector('.bx-chat-item__preview');
             if (preview) preview.textContent = payload.preview;
+            bumpChatInList(activeChat);
         }
         return true;
+    };
+
+    const bumpChatInList = (chatId) => {
+        const list = document.getElementById('bx-chat-list');
+        const link = list?.querySelector('.bx-chat-item[data-chat-id="' + chatId + '"]');
+        if (!list || !link) return;
+        if (link.classList.contains('is-pinned')) {
+            // Среди закреплённых — наверх закреплённого блока
+            const firstPinned = list.querySelector('.bx-chat-item.is-pinned');
+            if (firstPinned && firstPinned !== link) {
+                list.insertBefore(link, firstPinned);
+            } else if (!firstPinned) {
+                list.insertBefore(link, list.firstChild);
+            }
+            return;
+        }
+        // Незакреплённые — сразу после последнего закреплённого
+        const pinned = list.querySelectorAll('.bx-chat-item.is-pinned');
+        const lastPinned = pinned.length ? pinned[pinned.length - 1] : null;
+        if (lastPinned) {
+            lastPinned.after(link);
+        } else {
+            list.insertBefore(link, list.firstChild);
+        }
+    };
+
+    const applyChatsFromPoll = (chats) => {
+        const list = document.getElementById('bx-chat-list');
+        if (!list || !Array.isArray(chats) || !chats.length) return;
+
+        chats.forEach((c) => {
+            const link = list.querySelector('.bx-chat-item[data-chat-id="' + c.id + '"]');
+            if (!link) return;
+
+            link.classList.toggle('is-pinned', !!c.pinned);
+            link.classList.toggle('is-muted', !!c.muted);
+
+            let b = link.querySelector('.bx-chat-item__badge');
+            if (c.unread > 0) {
+                if (!b) {
+                    b = document.createElement('span');
+                    b.className = 'bx-chat-item__badge';
+                    link.querySelector('.bx-chat-item__top')?.appendChild(b);
+                }
+                b.textContent = String(c.unread);
+            } else if (b) {
+                b.remove();
+            }
+
+            if (c.preview != null) {
+                const preview = link.querySelector('.bx-chat-item__preview');
+                if (preview) preview.textContent = c.preview || 'Нет сообщений';
+            }
+
+            // Порядок как с сервера: pinned → по последнему сообщению
+            list.appendChild(link);
+        });
     };
 
     /* Подгрузка старых сообщений (скролл вверх) */
@@ -2456,25 +2514,7 @@
                 since = maxId;
                 localStorage.setItem(storageKey, String(since));
             }
-            (data.chats || []).forEach((c) => {
-                const link = document.querySelector('.bx-chat-item[data-chat-id="' + c.id + '"]');
-                if (!link) return;
-                let b = link.querySelector('.bx-chat-item__badge');
-                if (c.unread > 0) {
-                    if (!b) {
-                        b = document.createElement('span');
-                        b.className = 'bx-chat-item__badge';
-                        link.querySelector('.bx-chat-item__top')?.appendChild(b);
-                    }
-                    b.textContent = String(c.unread);
-                } else if (b) {
-                    b.remove();
-                }
-                if (c.preview != null) {
-                    const preview = link.querySelector('.bx-chat-item__preview');
-                    if (preview) preview.textContent = c.preview || 'Нет сообщений';
-                }
-            });
+            applyChatsFromPoll(data.chats || []);
 
             (data.receipts || []).forEach((r) => {
                 const article = document.getElementById('chat-msg-' + r.id);
