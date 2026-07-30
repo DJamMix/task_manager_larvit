@@ -500,8 +500,11 @@ Route::get('chats/{chat}/media', function (
     ));
 })->name('platform.systems.chats.media');
 
-Route::get('web-push/vapid-key', function () {
-    return response()->json(['public_key' => (string) config('webpush.public_key')]);
+Route::get('web-push/vapid-key', function (\App\Services\WebPushService $push) {
+    return response()->json([
+        'public_key' => $push->publicKey(),
+        'configured' => $push->isConfigured(),
+    ]);
 })->name('platform.web-push.vapid-key');
 
 Route::post('web-push/subscribe', function (\Illuminate\Http\Request $request) {
@@ -533,6 +536,24 @@ Route::delete('web-push/subscribe', function (\Illuminate\Http\Request $request)
 
     return response()->json(['ok' => true]);
 })->name('platform.web-push.unsubscribe');
+
+Route::post('web-push/test', function (\Illuminate\Http\Request $request, \App\Services\WebPushService $push) {
+    abort_unless($push->isConfigured(), 422, 'Web Push не настроен');
+
+    $count = \App\Models\PushSubscription::query()->where('user_id', $request->user()->id)->count();
+    if ($count === 0) {
+        return response()->json(['message' => 'Нет подписки. Нажмите «Включить push» ещё раз.'], 422);
+    }
+
+    $push->send(
+        $request->user(),
+        'Проверка push',
+        'Если вы видите это — серверные уведомления работают.',
+        route('platform.systems.chats')
+    );
+
+    return response()->json(['ok' => true, 'subscriptions' => $count]);
+})->name('platform.web-push.test');
 
 Route::post('chats/{chat}/calls', function (
     \Illuminate\Http\Request $request,

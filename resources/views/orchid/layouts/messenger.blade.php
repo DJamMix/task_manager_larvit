@@ -17,6 +17,7 @@
      data-vapid-key-url="{{ route('platform.web-push.vapid-key') }}"
      data-push-subscribe-url="{{ route('platform.web-push.subscribe') }}"
      data-push-unsubscribe-url="{{ route('platform.web-push.unsubscribe') }}"
+     data-push-test-url="{{ route('platform.web-push.test') }}"
      data-push-configured="{{ app(\App\Services\WebPushService::class)->isConfigured() ? '1' : '0' }}"
      data-csrf="{{ csrf_token() }}">
     @php
@@ -244,7 +245,11 @@
                                     <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
                                     <span id="bx-push-action-label">Включить push</span>
                                 </button>
-                                <div class="bx-push-hint" id="bx-push-hint">Работают в Chrome/Firefox/Edge при HTTPS. На Linux разрешите уведомления в браузере и системе.</div>
+                                <button type="button" class="bx-header-menu__item" id="bx-test-push" hidden>
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+                                    <span>Проверить push</span>
+                                </button>
+                                <div class="bx-push-hint" id="bx-push-hint">Нажмите «Включить push» — браузер покажет запрос разрешения. Нужны HTTPS, Chrome/Firefox/Edge.</div>
                             </div>
                         </div>
                     </div>
@@ -2369,6 +2374,30 @@
         } catch (e) {}
     };
 
+    const showDesktopNotify = (payload) => {
+        if (!payload || !('Notification' in window) || Notification.permission !== 'granted') return;
+        const activeChat = String(root?.getAttribute('data-active-chat') || '');
+        const notifyUrl = String(payload.url || '');
+        const viewingSameChat = activeChat
+            && !document.hidden
+            && (notifyUrl.includes('/chats/' + activeChat) || notifyUrl.endsWith('/' + activeChat));
+        if (viewingSameChat) return;
+        try {
+            const n = new Notification(payload.title || 'Новое сообщение', {
+                body: payload.body || '',
+                icon: '/favicon.ico',
+                tag: 'tml-chat-' + String(payload.message_id || Date.now()),
+                renotify: true,
+            });
+            n.onclick = () => {
+                try { window.focus(); } catch (e) {}
+                if (payload.url) window.location.href = payload.url;
+                n.close();
+            };
+            setTimeout(() => { try { n.close(); } catch (e) {} }, 8000);
+        } catch (e) {}
+    };
+
     const poll = async () => {
         if (!pollUrl) return;
         if (window.__bxMessengerPolling) return;
@@ -2394,6 +2423,7 @@
                 const now = Date.now();
                 if (now - lastBeepAt > 1200) {
                     playNotifySound();
+                    if (data.notify) showDesktopNotify(data.notify);
                     lastBeepAt = now;
                 }
                 lastBeepMaxId = maxId;

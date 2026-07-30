@@ -453,15 +453,27 @@ class ChatService
             ->max('id') ?? 0);
 
         $sound = false;
+        $notify = null;
         if ($sinceMessageId && $sinceMessageId > 0) {
             // Звук для любых новых чужих сообщений (кроме замьюченных чатов).
-            // Активный чат тоже учитываем — клиент сам решит, играть ли при открытой вкладке.
-            $sound = ChatMessage::query()
+            $latest = ChatMessage::query()
                 ->where('user_id', '!=', $user->id)
                 ->where('id', '>', $sinceMessageId)
                 ->whereIn('chat_id', $chatIds)
                 ->when($mutedIds !== [], fn ($q) => $q->whereNotIn('chat_id', $mutedIds))
-                ->exists();
+                ->with(['user', 'chat'])
+                ->orderByDesc('id')
+                ->first();
+
+            $sound = $latest !== null;
+            if ($latest) {
+                $notify = [
+                    'title' => $latest->chat?->displayTitle($user->id) ?: 'Новое сообщение',
+                    'body' => trim(($latest->user?->displayName() ?: 'Участник') . ': ' . \Illuminate\Support\Str::limit((string) $latest->plain_text, 120)),
+                    'url' => route('platform.systems.chats.view', $latest->chat_id),
+                    'message_id' => (int) $latest->id,
+                ];
+            }
         }
 
         $memberIds = $chats
@@ -475,6 +487,7 @@ class ChatService
         return [
             'unread_total' => (int) $chats->sum('unread_count'),
             'sound' => $sound,
+            'notify' => $notify,
             'max_id' => $maxId,
             'chats' => $chats->map(function (Chat $chat) use ($user) {
                 $peerId = $chat->type === 'direct'

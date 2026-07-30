@@ -14,6 +14,8 @@ self.addEventListener('push', (event) => {
         payload = { body: event.data ? event.data.text() : '' };
     }
 
+    // Всегда показываем системное уведомление — и при открытой, и при закрытой вкладке.
+    // Дубли с poll-уведомлениями режутся по tag на стороне ОС.
     event.waitUntil(self.registration.showNotification(payload.title || 'TaskManagerLarVit', {
         body: payload.body || '',
         icon: payload.icon || '/favicon.ico',
@@ -21,6 +23,7 @@ self.addEventListener('push', (event) => {
         data: { url: payload.url || '/' },
         tag: payload.tag || 'tml-chat',
         renotify: true,
+        requireInteraction: false,
     }));
 });
 
