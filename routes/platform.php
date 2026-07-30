@@ -411,6 +411,48 @@ Route::get('chats/{chat}/messages', function (
     );
 })->name('platform.systems.chats.messages');
 
+Route::get('tasks-link-search', function (\Illuminate\Http\Request $request) {
+    $user = $request->user();
+    abort_unless($user, 403);
+
+    $q = trim($request->string('q')->toString());
+    $exclude = $request->integer('exclude');
+    $projectId = $request->integer('project_id') ?: null;
+
+    $tasks = \App\Models\Task::query()
+        ->with(['queue', 'project'])
+        ->when($exclude > 0, fn ($query) => $query->where('id', '!=', $exclude))
+        ->when($projectId > 0, fn ($query) => $query->where('project_id', $projectId))
+        ->when($q !== '', function ($query) use ($q) {
+            $query->where(function ($w) use ($q) {
+                $w->where('name', 'like', '%' . $q . '%');
+                if (ctype_digit($q)) {
+                    $w->orWhere('id', (int) $q);
+                }
+                if (preg_match('/^([A-Za-z][A-Za-z0-9_]*)-?(\d+)$/', $q, $m)) {
+                    $w->orWhere(function ($x) use ($m) {
+                        $x->where('queue_number', (int) $m[2])
+                            ->whereHas('queue', fn ($qq) => $qq->where('key', strtoupper($m[1])));
+                    });
+                }
+            });
+        })
+        ->orderByDesc('id')
+        ->limit(40)
+        ->get()
+        ->filter(fn (\App\Models\Task $task) => $task->canView((int) $user->id))
+        ->values()
+        ->map(fn (\App\Models\Task $task) => [
+            'id' => $task->id,
+            'key' => $task->displayKey(),
+            'name' => $task->name,
+            'status' => \App\CoreLayer\Enums\TaskStatusEnum::tryFrom((string) $task->status)?->label() ?? (string) $task->status,
+            'label' => $task->displayKey() . ' · ' . \Illuminate\Support\Str::limit($task->name, 60),
+        ]);
+
+    return response()->json(['tasks' => $tasks]);
+})->name('platform.systems.tasks.link-search');
+
 Route::get('chats-tasks', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
     abort_unless($chats->canAccessMessenger($request->user()), 403);
 

@@ -30,12 +30,45 @@ class TaskQueue extends Model
 
     public static function optionsForSelect(bool $activeOnly = true): array
     {
-        return static::query()
+        static::ensureDefaults();
+
+        $options = static::query()
             ->when($activeOnly, fn ($q) => $q->where('is_active', true))
             ->orderBy('key')
             ->get()
             ->mapWithKeys(fn (self $q) => [$q->id => "{$q->key} — {$q->name}"])
             ->all();
+
+        // Если активных нет — покажем все, чтобы создание задачи не ломалось
+        if ($options === [] && $activeOnly) {
+            return static::optionsForSelect(false);
+        }
+
+        return $options;
+    }
+
+    /** Гарантирует базовые очереди (PHP / FRONTEND / DEVOPS). */
+    public static function ensureDefaults(): void
+    {
+        if (static::query()->exists()) {
+            return;
+        }
+
+        foreach ([
+            ['key' => 'PHP', 'name' => 'Backend / PHP', 'description' => 'Задачи по бэкенду'],
+            ['key' => 'FRONTEND', 'name' => 'Frontend', 'description' => 'Задачи по фронтенду'],
+            ['key' => 'DEVOPS', 'name' => 'DevOps', 'description' => 'Инфраструктура и деплой'],
+        ] as $row) {
+            static::query()->firstOrCreate(
+                ['key' => $row['key']],
+                [
+                    'name' => $row['name'],
+                    'description' => $row['description'],
+                    'next_number' => 1,
+                    'is_active' => true,
+                ]
+            );
+        }
     }
 
     /** Атомарно выдать следующий номер в очереди. */

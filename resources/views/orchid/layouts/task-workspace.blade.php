@@ -127,7 +127,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div>
                         <div class="fw-semibold">Связанные задачи</div>
-                        <div class="small text-muted">Необязательно — можно работать без связей</div>
+                        <div class="small text-muted">Необязательно</div>
                     </div>
                     <span class="badge text-bg-light border">{{ $relatedLinks->count() }}</span>
                 </div>
@@ -162,34 +162,21 @@
                             </div>
                         @endif
                     @empty
-                        <div class="tw-related-empty">Связей пока нет — это необязательно</div>
+                        <div class="tw-related-empty">Связей пока нет</div>
                     @endforelse
                 </div>
 
                 @if($canManageLinks)
-                    <div class="tw-related-add"
-                         data-add-url="{{ url()->current() }}/addLink"
-                         data-csrf="{{ csrf_token() }}">
-                        <input type="search"
-                               class="form-control form-control-sm tw-related-add__search"
-                               id="tw-link-search"
-                               placeholder="Поиск задачи…"
-                               autocomplete="off">
-                        <select id="tw-link-task" class="form-select form-select-sm">
-                            <option value="">Выберите задачу</option>
-                            @foreach($linkOptions as $id => $label)
-                                <option value="{{ $id }}" data-label="{{ mb_strtolower($label) }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        <select id="tw-link-relation" class="form-select form-select-sm">
-                            @foreach($relationLabels as $value => $label)
-                                <option value="{{ $value }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="tw-link-submit">
-                            Добавить связь
-                        </button>
-                    </div>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary w-100 mt-2"
+                            id="tw-open-link-modal"
+                            data-add-url="{{ url()->current() }}/addLink"
+                            data-search-url="{{ route('platform.systems.tasks.link-search') }}"
+                            data-csrf="{{ csrf_token() }}"
+                            data-task-id="{{ $task->id }}"
+                            data-project-id="{{ $task->project_id }}">
+                        + Добавить связь
+                    </button>
                 @endif
             </div>
 
@@ -301,7 +288,7 @@
                             <div>Ответ для <strong id="tw-reply-author"></strong></div>
                             <button type="button" class="btn btn-sm btn-link" id="tw-reply-cancel">Отмена</button>
                         </div>
-                        <div class="tw-composer__editor-wrap">
+                        <div class="tw-composer__editor-wrap" id="tw-composer-editor-wrap">
                             <div id="tw-quill-toolbar">
                                 <span class="ql-formats">
                                     <button type="button" class="ql-bold"></button>
@@ -317,14 +304,15 @@
                                 </span>
                             </div>
                             <div id="tw-quill-editor" class="tw-quill-host"></div>
+                            <div class="tw-composer__resize" id="tw-composer-resize" title="Потяните, чтобы изменить высоту"></div>
                         </div>
                         <div class="tw-composer__preview d-none" id="tw-files-preview"></div>
                         <div class="tw-composer__bar">
-                            <label class="tw-composer__clip" title="Прикрепить файл" for="tw-composer-files">
+                            <label class="tw-composer__clip" title="Прикрепить файл (до 256 МБ)" for="tw-composer-files">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
                                 </svg>
-                                <input type="file" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt">
+                                <input type="file" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.exe,.msi,.psd,.fig">
                             </label>
                             <span class="tw-composer__files-label text-muted small d-none" id="tw-files-label"></span>
                             <button type="button"
@@ -345,9 +333,34 @@
         <div class="tw-tab-panel" data-tw-panel="files" hidden>
             <div class="tw-files-grid">
                 @forelse($task->attachment as $file)
-                    <div class="tw-file-row">
-                        <div class="text-truncate" title="{{ $file->original_name }}">{{ $file->original_name }}</div>
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('platform.task.attachment.download', $file) }}">Скачать</a>
+                    @php
+                        $fileMime = strtolower((string) ($file->mime ?? ''));
+                        $fileExt = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
+                        $isImage = str_starts_with($fileMime, 'image/')
+                            || in_array($fileExt, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+                        $fileUrl = route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]);
+                        $downloadUrl = route('platform.task.attachment.download', $file);
+                        $sizeLabel = method_exists($file, 'size') || isset($file->size)
+                            ? number_format(((int) $file->size) / 1048576, 2) . ' МБ'
+                            : '';
+                    @endphp
+                    <div class="tw-file-card">
+                        @if($isImage)
+                            <a href="{{ $fileUrl }}" class="tw-file-card__preview" data-bx-lightbox="{{ $fileUrl }}" title="{{ $file->original_name }}">
+                                <img src="{{ $fileUrl }}" alt="{{ $file->original_name }}" loading="lazy" decoding="async">
+                            </a>
+                        @else
+                            <div class="tw-file-card__icon" title="{{ $fileExt ?: 'file' }}">
+                                <span>{{ strtoupper($fileExt ?: 'FILE') }}</span>
+                            </div>
+                        @endif
+                        <div class="tw-file-card__meta">
+                            <div class="tw-file-card__name" title="{{ $file->original_name }}">{{ $file->original_name }}</div>
+                            @if($sizeLabel)
+                                <div class="tw-file-card__size text-muted">{{ $sizeLabel }}</div>
+                            @endif
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ $downloadUrl }}">Скачать</a>
+                        </div>
                     </div>
                 @empty
                     <div class="text-muted small py-3">Нет вложений у задачи</div>
@@ -386,6 +399,36 @@
         </div>
     </div>
 </div>
+
+@if($canManageLinks)
+<div class="tw-sheet" id="tw-link-modal" hidden>
+    <button type="button" class="tw-sheet__backdrop" id="tw-link-modal-bg" aria-label="Закрыть"></button>
+    <div class="tw-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="tw-link-modal-title">
+        <div class="tw-sheet__head">
+            <strong id="tw-link-modal-title">Добавить связь</strong>
+            <button type="button" class="tw-sheet__close" id="tw-link-modal-close" aria-label="Закрыть">×</button>
+        </div>
+        <div class="tw-link-modal__body">
+            <label class="form-label small mb-1">Поиск задачи</label>
+            <input type="search"
+                   id="tw-link-modal-search"
+                   class="form-control"
+                   placeholder="Ключ (PHP-12) или название…"
+                   autocomplete="off">
+            <div id="tw-link-modal-results" class="tw-link-modal__results">Введите запрос или подождите…</div>
+            <input type="hidden" id="tw-link-modal-task-id" value="">
+            <div id="tw-link-modal-picked" class="tw-link-modal__picked d-none"></div>
+            <label class="form-label small mb-1 mt-2">Тип связи</label>
+            <select id="tw-link-modal-relation" class="form-select">
+                @foreach($relationLabels as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
+            <button type="button" class="btn btn-primary w-100 mt-3" id="tw-link-modal-submit" disabled>Добавить связь</button>
+        </div>
+    </div>
+</div>
+@endif
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
@@ -553,32 +596,138 @@
     composerEl?.addEventListener('paste', onPasteImages);
     quill?.root?.addEventListener('paste', onPasteImages);
 
-    document.getElementById('tw-link-submit')?.addEventListener('click', async () => {
-        const wrap = document.querySelector('.tw-related-add');
-        const sel = document.getElementById('tw-link-task');
-        const rel = document.getElementById('tw-link-relation');
-        if (!sel?.value) {
-            alert('Выберите задачу для связи');
-            return;
+    /* Растягивание высоты редактора */
+    const resizeHandle = document.getElementById('tw-composer-resize');
+    const editorWrap = document.getElementById('tw-composer-editor-wrap');
+    resizeHandle?.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const ql = editorWrap?.querySelector('.ql-editor');
+        if (!ql) return;
+        const startY = e.clientY;
+        const startH = ql.getBoundingClientRect().height;
+        const onMove = (ev) => {
+            const next = Math.min(480, Math.max(88, startH + (ev.clientY - startY)));
+            ql.style.minHeight = next + 'px';
+            ql.style.height = next + 'px';
+        };
+        const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    });
+
+    /* Модалка связей */
+    const openLinkBtn = document.getElementById('tw-open-link-modal');
+    const linkModal = document.getElementById('tw-link-modal');
+    const linkSearchInput = document.getElementById('tw-link-modal-search');
+    const linkResults = document.getElementById('tw-link-modal-results');
+    const linkPicked = document.getElementById('tw-link-modal-picked');
+    const linkTaskId = document.getElementById('tw-link-modal-task-id');
+    const linkRelation = document.getElementById('tw-link-modal-relation');
+    const linkSubmit = document.getElementById('tw-link-modal-submit');
+    let linkSearchTimer = null;
+    let selectedLinkTask = null;
+
+    const closeLinkModal = () => linkModal?.setAttribute('hidden', '');
+    const openLinkModal = () => {
+        linkModal?.removeAttribute('hidden');
+        selectedLinkTask = null;
+        if (linkTaskId) linkTaskId.value = '';
+        linkPicked?.classList.add('d-none');
+        if (linkPicked) linkPicked.innerHTML = '';
+        if (linkSubmit) linkSubmit.disabled = true;
+        if (linkSearchInput) {
+            linkSearchInput.value = '';
+            linkSearchInput.focus();
         }
-        const url = wrap?.getAttribute('data-add-url');
-        const token = wrap?.getAttribute('data-csrf');
-        if (!url) return;
-        const fd = new FormData();
-        fd.append('related_task_id', sel.value);
-        fd.append('relation', rel?.value || 'relates');
-        if (token) fd.append('_token', token);
+        searchLinkTasks('');
+    };
+    openLinkBtn?.addEventListener('click', openLinkModal);
+    document.getElementById('tw-link-modal-close')?.addEventListener('click', closeLinkModal);
+    document.getElementById('tw-link-modal-bg')?.addEventListener('click', closeLinkModal);
+
+    const searchLinkTasks = async (q) => {
+        const searchUrl = openLinkBtn?.getAttribute('data-search-url');
+        if (!searchUrl || !linkResults) return;
+        linkResults.textContent = 'Поиск…';
+        const params = new URLSearchParams({
+            q: q || '',
+            exclude: openLinkBtn.getAttribute('data-task-id') || '',
+            project_id: openLinkBtn.getAttribute('data-project-id') || '',
+        });
         try {
-            const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const res = await fetch(searchUrl + '?' + params.toString(), {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            const data = await res.json();
+            const tasks = data.tasks || [];
+            if (!tasks.length) {
+                linkResults.innerHTML = '<div class="text-muted small py-2">Ничего не найдено</div>';
+                return;
+            }
+            linkResults.innerHTML = tasks.map((t) =>
+                `<button type="button" class="tw-link-result" data-id="${t.id}" data-label="${(t.label || '').replace(/"/g, '&quot;')}">
+                    <strong>${t.key || ('#' + t.id)}</strong>
+                    <span>${(t.name || '').replace(/[<>]/g, '')}</span>
+                    <em>${(t.status || '').replace(/[<>]/g, '')}</em>
+                </button>`
+            ).join('');
+        } catch (e) {
+            linkResults.textContent = 'Ошибка поиска';
+        }
+    };
+
+    linkSearchInput?.addEventListener('input', () => {
+        clearTimeout(linkSearchTimer);
+        linkSearchTimer = setTimeout(() => searchLinkTasks(linkSearchInput.value.trim()), 250);
+    });
+
+    linkResults?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.tw-link-result');
+        if (!btn) return;
+        selectedLinkTask = {
+            id: btn.getAttribute('data-id'),
+            label: btn.getAttribute('data-label') || btn.textContent.trim(),
+        };
+        if (linkTaskId) linkTaskId.value = selectedLinkTask.id;
+        if (linkPicked) {
+            linkPicked.textContent = 'Выбрано: ' + selectedLinkTask.label;
+            linkPicked.classList.remove('d-none');
+        }
+        if (linkSubmit) linkSubmit.disabled = false;
+        linkResults.querySelectorAll('.tw-link-result').forEach((el) => {
+            el.classList.toggle('is-active', el === btn);
+        });
+    });
+
+    linkSubmit?.addEventListener('click', async () => {
+        const url = openLinkBtn?.getAttribute('data-add-url');
+        const token = openLinkBtn?.getAttribute('data-csrf');
+        if (!url || !linkTaskId?.value) return;
+        const fd = new FormData();
+        fd.append('related_task_id', linkTaskId.value);
+        fd.append('relation', linkRelation?.value || 'relates');
+        if (token) fd.append('_token', token);
+        linkSubmit.disabled = true;
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
             if (!res.ok) {
-                const t = await res.text();
                 alert('Не удалось добавить связь');
-                console.warn(t);
+                linkSubmit.disabled = false;
                 return;
             }
             window.location.reload();
         } catch (e) {
             alert('Не удалось добавить связь');
+            linkSubmit.disabled = false;
         }
     });
 
@@ -601,17 +750,6 @@
             } catch (e) {
                 alert('Не удалось удалить связь');
             }
-        });
-    });
-
-    const linkSearch = document.getElementById('tw-link-search');
-    const linkTask = document.getElementById('tw-link-task');
-    linkSearch?.addEventListener('input', () => {
-        const q = (linkSearch.value || '').trim().toLowerCase();
-        [...(linkTask?.options || [])].forEach((opt, idx) => {
-            if (idx === 0) return;
-            const label = opt.getAttribute('data-label') || opt.textContent.toLowerCase();
-            opt.hidden = q !== '' && !label.includes(q);
         });
     });
 

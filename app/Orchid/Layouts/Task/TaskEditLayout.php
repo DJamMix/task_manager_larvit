@@ -84,6 +84,7 @@ class TaskEditLayout extends Rows
                     ->required($isNew)
                     ->empty('Выберите очередь')
                     ->disabled(!$isNew)
+                    ->class('tc-field-queue')
                     ->width('50%'),
 
                 Select::make('task.status')
@@ -146,10 +147,10 @@ class TaskEditLayout extends Rows
 
             Upload::make('task.attachments')
                 ->title('Прикрепленные файлы')
-                ->acceptedFiles('image/*,application/pdf,.psd')
+                ->acceptedFiles('image/*,application/pdf,.psd,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.exe,.msi')
                 ->storage('public')
-                ->maxFileSize(UploadLimits::maxMb(50))
-                ->help('Допустимые форматы: JPG, PNG, PDF, PSD'),
+                ->maxFileSize(UploadLimits::maxMb(256))
+                ->help('До 256 МБ на файл. Форматы: изображения, PDF, архивы, документы, EXE/MSI'),
         ];
     }
 }

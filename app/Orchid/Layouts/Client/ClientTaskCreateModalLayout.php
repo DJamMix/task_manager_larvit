@@ -30,14 +30,15 @@ class ClientTaskCreateModalLayout extends Rows
                 ->placeholder('Название задачи')
                 ->class('tc-field-title'),
 
-            Group::make([
-                Select::make('task.queue_id')
-                    ->options(TaskQueue::optionsForSelect())
-                    ->title('Очередь')
-                    ->required()
-                    ->empty('Очередь')
-                    ->class('tc-field-chip'),
+            Select::make('task.queue_id')
+                ->options(TaskQueue::optionsForSelect())
+                ->title('Очередь')
+                ->required()
+                ->empty('Выберите очередь')
+                ->help('Определяет ключ задачи: PHP-12, FRONTEND-5…')
+                ->class('tc-field-queue'),
 
+            Group::make([
                 Select::make('task.task_category_id')
                     ->fromModel(TaskCategory::class, 'name', 'id')
                     ->title('Категория')
@@ -73,10 +74,11 @@ class ClientTaskCreateModalLayout extends Rows
 
             Upload::make('task.attachments')
                 ->title('Вложения')
-                ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig')
+                ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig,.exe,.msi,.7z')
                 ->storage('public')
-                ->maxFileSize(UploadLimits::maxMb(50))
-                ->maxFiles(8),
+                ->maxFileSize(UploadLimits::maxMb(256))
+                ->maxFiles(8)
+                ->help('До 256 МБ на файл'),
         ];
     }
 }

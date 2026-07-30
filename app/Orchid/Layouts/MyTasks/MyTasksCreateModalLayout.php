@@ -35,6 +35,14 @@ class MyTasksCreateModalLayout extends Rows
             ->placeholder('Название задачи')
             ->class('tc-field-title');
 
+        $fields[] = Select::make('task.queue_id')
+            ->options(TaskQueue::optionsForSelect())
+            ->title('Очередь')
+            ->required()
+            ->empty('Выберите очередь')
+            ->help('Определяет ключ задачи: PHP-12, FRONTEND-5…')
+            ->class('tc-field-queue');
+
         $meta = [];
 
         if ($context->has()) {
@@ -57,14 +65,6 @@ class MyTasksCreateModalLayout extends Rows
                 ->empty('Проект')
                 ->class('tc-field-chip');
         }
-
-        $meta[] = Select::make('task.queue_id')
-            ->options(TaskQueue::optionsForSelect())
-            ->title('Очередь')
-            ->required()
-            ->empty('Очередь')
-            ->help('PHP-12, FRONTEND-5…')
-            ->class('tc-field-chip');
 
         $meta[] = Select::make('task.task_category_id')
             ->fromModel(TaskCategory::class, 'name', 'id')
@@ -109,10 +109,11 @@ class MyTasksCreateModalLayout extends Rows
 
         $fields[] = Upload::make('task.attachments')
             ->title('Вложения')
-            ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig')
+            ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.psd,.fig,.exe,.msi,.7z')
             ->storage('public')
-            ->maxFileSize(UploadLimits::maxMb(50))
-            ->maxFiles(8);
+            ->maxFileSize(UploadLimits::maxMb(256))
+            ->maxFiles(8)
+            ->help('До 256 МБ на файл (нужен PHP upload_max_filesize ≥ 256M)');
 
         return $fields;
     }

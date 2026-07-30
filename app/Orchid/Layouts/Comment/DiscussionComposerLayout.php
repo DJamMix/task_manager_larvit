@@ -35,7 +35,7 @@ class DiscussionComposerLayout extends Rows
                     ->title('Файлы')
                     ->acceptedFiles('image/*,application/pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css')
                     ->storage('public')
-                    ->maxFileSize(UploadLimits::maxMb(50))
+                    ->maxFileSize(UploadLimits::maxMb(256))
                     ->maxFiles(5),
 
                 Select::make('comment.notify_user_ids.')

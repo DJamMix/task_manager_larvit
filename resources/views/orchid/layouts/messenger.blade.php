@@ -291,7 +291,7 @@
                                        class="d-none"
                                        form="post-form"
                                        multiple
-                                       accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,audio/*,video/*">
+                                       accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,.exe,.msi,audio/*,video/*">
                             </label>
 
                             <button type="button" class="bx-composer__tool" id="bx-tool-voice" title="Голосовое (до 3 мин). Удерживайте — проверить микрофон">

@@ -12,8 +12,9 @@ final class UploadLimits
 {
     /**
      * Максимальный размер файла в МБ для Upload::maxFileSize().
+     * Желаемый лимит 256 МБ (exe и крупные архивы); фактически не выше PHP upload_max_filesize.
      */
-    public static function maxMb(float $desired = 50): float
+    public static function maxMb(float $desired = 256): float
     {
         $server = (float) Init::maxFileUpload(Init::MB);
         if ($server <= 0) {
