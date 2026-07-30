@@ -130,12 +130,12 @@ return [
             '/css/footer.css',
             '/css/app-shell.css?v=20260730a',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260730k',
+            '/css/task-workspace.css?v=20260730m',
             '/css/act-composer.css',
         ],
         'scripts'     => [
             '/js/chat-notify.js?v=20260725h',
-            '/js/web-push.js?v=20260730f',
+            '/js/web-push.js?v=20260730h',
         ],
     ],
 

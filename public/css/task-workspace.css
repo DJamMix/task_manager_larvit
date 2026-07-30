@@ -1479,19 +1479,42 @@ body.bx-messenger-page .command-bar {
     }
 }
 
-/* Мобилка: на всю доступную высоту без лишнего page-scroll */
+/* Мобилка: на всю ширину и высоту без боковых полей Orchid */
 @media (max-width: 1199.98px) {
+    body.bx-messenger-page > .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        max-width: none !important;
+    }
+    body.bx-messenger-page > .container-fluid > .row {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    body.bx-messenger-page > .container-fluid > .row > [class*="col-"] {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
     body.bx-messenger-page .bx-messenger-workspace-wrap,
     body.bx-messenger-page .workspace,
-    body.bx-messenger-page #post-form {
+    body.bx-messenger-page #post-form,
+    body.bx-messenger-page .container-xl {
         margin: 0 !important;
         padding: 0 !important;
         max-width: none !important;
+        width: 100% !important;
     }
     body.bx-messenger-page .bx-messenger {
-        width: 100%;
-        border-radius: 0;
-        margin: 0;
+        width: 100% !important;
+        max-width: none !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
     }
 }
 
@@ -3528,11 +3551,18 @@ body.bx-lightbox-open { overflow: hidden; }
     body.bx-messenger-mobile .command-bar {
         display: none !important;
     }
-    body.bx-messenger-mobile main .container-fluid,
-    body.bx-messenger-mobile .layout .wrapper > .content,
-    body.bx-messenger-mobile .workspace {
+    body.bx-messenger-mobile:not(.bx-messenger-page) main .container-fluid,
+    body.bx-messenger-mobile:not(.bx-messenger-page) .layout .wrapper > .content,
+    body.bx-messenger-mobile:not(.bx-messenger-page) .workspace {
         padding-left: 0.35rem !important;
         padding-right: 0.35rem !important;
+    }
+    body.bx-messenger-page.bx-messenger-mobile .workspace,
+    body.bx-messenger-page.bx-messenger-mobile .bx-messenger-workspace-wrap,
+    body.bx-messenger-page.bx-messenger-mobile #post-form,
+    body.bx-messenger-page.bx-messenger-mobile > .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
     body.bx-messenger-mobile h1,
     body.bx-messenger-mobile .page-header,
@@ -3552,6 +3582,9 @@ body.bx-lightbox-open { overflow: hidden; }
     body.bx-messenger-page .bx-messenger {
         height: calc(100dvh - 48px);
         max-height: calc(100dvh - 48px);
+        width: 100%;
+        max-width: none;
+        border-radius: 0;
     }
     .bx-messenger.is-chat-open .bx-messenger__sidebar {
         display: none !important;

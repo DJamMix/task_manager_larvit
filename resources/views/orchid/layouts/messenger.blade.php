@@ -250,7 +250,7 @@
                                 <div class="bx-header-menu__item bx-header-menu__item--static">
                                     <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
                                     <span>Push-уведомления</span>
-                                    <span class="bx-push-status" id="bx-push-status">…</span>
+                                    <span class="bx-push-status" id="bx-push-status">Проверка…</span>
                                 </div>
                                 <button type="button" class="bx-header-menu__item" id="bx-enable-push">
                                     <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -260,7 +260,7 @@
                                     <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
                                     <span>Проверить push</span>
                                 </button>
-                                <div class="bx-push-hint" id="bx-push-hint">Нажмите «Включить push» — браузер покажет запрос разрешения. Нужны HTTPS, Chrome/Firefox/Edge.</div>
+                                <div class="bx-push-hint" id="bx-push-hint" hidden></div>
                             </div>
                         </div>
                     </div>
