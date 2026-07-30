@@ -405,16 +405,18 @@ async function renderChat(id: number, title: string) {
           <span id="voice-timer">0:00</span>
           <div class="meter"><span id="voice-meter"></span></div>
           <button type="button" class="voice-cancel-btn" id="voice-cancel" aria-label="Отмена">${icons.xMark()}</button>
+          <button type="button" class="voice-send-btn" id="voice-send" aria-label="Отправить">${icons.paperAirplane()}</button>
         </div>
         <form class="composer" id="composer">
           <button class="round-btn" type="button" id="btn-attach" title="Файл">${icons.paperClip()}</button>
           <input type="file" id="file-input" class="hidden" multiple accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,audio/*,video/*" />
           <div class="composer-input">
             <div id="mention-menu" class="mention-menu hidden" role="listbox"></div>
-            <textarea name="text" rows="1" placeholder="Сообщение" id="msg-input"></textarea>
+            <textarea name="text" rows="1" placeholder="Сообщение" id="msg-input" autocomplete="off"></textarea>
           </div>
           <div class="composer-tools">
-            <button class="round-btn send" type="button" id="btn-send" title="Отправить">${icons.microphone()}</button>
+            <button class="round-btn" type="button" id="btn-mention" title="Упомянуть">${icons.at()}</button>
+            <button class="round-btn send" type="button" id="btn-send" title="Отправить">${icons.paperAirplane()}</button>
           </div>
         </form>
       </div>
@@ -476,10 +478,33 @@ async function renderChat(id: number, title: string) {
   };
 
   const syncSendBtn = () => {
+    if (sendBtn.classList.contains('is-recording')) return;
+    // Как в Telegram: в покое самолётик; микрофон только во время удержания/записи
+    sendBtn.innerHTML = icons.paperAirplane();
     const hasPayload = input.value.trim().length > 0 || pendingFiles.length > 0;
-    sendBtn.innerHTML = hasPayload ? icons.paperAirplane() : icons.microphone();
     sendBtn.dataset.mode = hasPayload ? 'send' : 'voice';
     sendBtn.title = hasPayload ? 'Отправить' : 'Удерживайте для голосового';
+  };
+
+  const mergeMentionUsers = (list: MentionUser[], messages: ChatMessage[]) => {
+    const byId = new Map<number, MentionUser>();
+    for (const u of list) {
+      if (!u?.id || !u?.name) continue;
+      byId.set(u.id, {
+        id: u.id,
+        name: u.name,
+        aliases: Array.from(new Set([...(u.aliases || []), u.name].filter(Boolean))),
+      });
+    }
+    const me = getUser()?.id;
+    for (const m of messages) {
+      const a = m.author;
+      if (!a?.id || a.id === me || !a.name) continue;
+      if (!byId.has(a.id)) {
+        byId.set(a.id, { id: a.id, name: a.name, aliases: [a.name] });
+      }
+    }
+    return [...byId.values()];
   };
 
   const updateSelection = () => {
@@ -555,23 +580,30 @@ async function renderChat(id: number, title: string) {
   };
 
   const getMentionQuery = (): string | null => {
-    const pos = input.selectionStart ?? 0;
+    const pos = input.selectionStart ?? input.value.length;
     const before = input.value.slice(0, pos);
-    const m = before.match(/(^|[\s([{])@([^\s@]*)$/);
+    // Поддержка @ в начале и после пробела/знаков; пустой запрос после @ — показать всех
+    const m = before.match(/(^|[\s([{«"'])@([^\s@]*)$/u);
     if (!m) return null;
     mentionStart = before.length - m[2].length - 1;
     return m[2].toLowerCase();
   };
 
   const updateMentionMenu = () => {
-    if (!mentionUsers.length) return;
     const q = getMentionQuery();
     if (q === null) {
       hideMentionMenu();
       return;
     }
+    if (!mentionUsers.length) {
+      hideMentionMenu();
+      return;
+    }
     const filtered = mentionUsers
-      .filter((u) => (u.aliases || [u.name]).join(' ').toLowerCase().includes(q))
+      .filter((u) => {
+        const hay = (u.aliases?.length ? u.aliases : [u.name]).join(' ').toLowerCase();
+        return q === '' || hay.includes(q);
+      })
       .slice(0, 8);
     if (!filtered.length) {
       hideMentionMenu();
@@ -590,22 +622,31 @@ async function renderChat(id: number, title: string) {
   };
 
   const insertMention = (name: string) => {
-    if (mentionStart < 0) return;
-    const pos = input.selectionStart ?? 0;
-    const before = input.value.slice(0, mentionStart);
-    const after = input.value.slice(pos);
-    input.value = `${before}@${name} ${after}`;
-    const caret = before.length + name.length + 2;
-    input.focus();
-    input.setSelectionRange(caret, caret);
+    if (mentionStart < 0) {
+      const pos = input.selectionStart ?? input.value.length;
+      input.value = `${input.value.slice(0, pos)}@${name} ${input.value.slice(pos)}`;
+      const caret = pos + name.length + 2;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    } else {
+      const pos = input.selectionStart ?? 0;
+      const before = input.value.slice(0, mentionStart);
+      const after = input.value.slice(pos);
+      input.value = `${before}@${name} ${after}`;
+      const caret = before.length + name.length + 2;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    }
     hideMentionMenu();
     syncSendBtn();
+    input.dispatchEvent(new Event('input'));
   };
 
-  mentionMenu.addEventListener('mousedown', (e) => {
+  mentionMenu.addEventListener('pointerdown', (e) => {
     const btn = (e.target as HTMLElement).closest?.('[data-mention-name]');
     if (!btn) return;
     e.preventDefault();
+    e.stopPropagation();
     insertMention((btn as HTMLElement).dataset.mentionName || '');
   });
 
@@ -648,9 +689,10 @@ async function renderChat(id: number, title: string) {
   };
 
   const sendVoiceBlob = async (blob: Blob, duration: number) => {
+    const ext = (blob.type || '').includes('mp4') || (blob.type || '').includes('aac') ? 'm4a' : 'webm';
     try {
       const fd = new FormData();
-      fd.append('message_voice', blob, 'voice.webm');
+      fd.append('message_voice', blob, `voice.${ext}`);
       fd.append('message[voice_duration]', String(duration));
       if (replyTo) fd.append('message[parent_id]', String(replyTo.id));
       const res = await api<{ message: ChatMessage }>(`/chats/${id}/messages`, {
@@ -807,7 +849,7 @@ async function renderChat(id: number, title: string) {
 
   try {
     const data = await api<{ messages: ChatMessage[]; mention_users?: MentionUser[] }>(`/chats/${id}`);
-    mentionUsers = data.mention_users || [];
+    mentionUsers = mergeMentionUsers(data.mention_users || [], data.messages || []);
     sinceId = data.messages.reduce((max, m) => Math.max(max, m.id), 0);
     main.innerHTML = `<div class="chat-feed" id="feed">${data.messages.map(messageHtml).join('')}</div>`;
     const feed = app.querySelector('#feed') as HTMLElement;
@@ -817,13 +859,16 @@ async function renderChat(id: number, title: string) {
     bindLongPress(feed);
     main.scrollTop = main.scrollHeight;
 
-    input.addEventListener('input', () => {
+    const onComposerInput = () => {
       input.style.height = 'auto';
       input.style.height = Math.min(120, Math.max(44, input.scrollHeight)) + 'px';
       syncSendBtn();
       updateMentionMenu();
       void api(`/chats/${id}/typing`, { method: 'POST' }).catch(() => undefined);
-    });
+    };
+    input.addEventListener('input', onComposerInput);
+    input.addEventListener('keyup', () => updateMentionMenu());
+    input.addEventListener('click', () => updateMentionMenu());
     input.addEventListener('keydown', (e) => {
       if (!mentionMenu.classList.contains('hidden')) {
         const items = [...mentionMenu.querySelectorAll('[data-mention-name]')];
@@ -856,6 +901,15 @@ async function renderChat(id: number, title: string) {
       }
     });
 
+    app.querySelector('#btn-mention')?.addEventListener('click', () => {
+      const pos = input.selectionStart ?? input.value.length;
+      input.value = `${input.value.slice(0, pos)}@${input.value.slice(pos)}`;
+      input.focus();
+      input.setSelectionRange(pos + 1, pos + 1);
+      syncSendBtn();
+      updateMentionMenu();
+    });
+
     app.querySelector('#btn-attach')?.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
       const incoming = [...(fileInput.files || [])];
@@ -866,7 +920,7 @@ async function renderChat(id: number, title: string) {
       syncSendBtn();
     });
 
-    // Voice: hold send button (Telegram-style)
+    // Voice: hold send — самолётик в покое, микрофон при удержании
     const recorder = createVoiceRecorder((sec, peak) => {
       const t = app.querySelector('#voice-timer');
       const m = app.querySelector('#voice-meter') as HTMLElement;
@@ -874,88 +928,150 @@ async function renderChat(id: number, title: string) {
       if (m) m.style.width = `${Math.round(peak * 100)}%`;
     });
 
-    let voiceActive = false;
+    type VoicePhase = 'idle' | 'armed' | 'recording';
+    let voicePhase: VoicePhase = 'idle';
+    let voiceToken = 0;
     let voiceStartTimer: number | null = null;
-    let voiceCancelled = false;
+    let suppressSendClick = false;
+    let voiceFinishing = false;
+    let fingerDown = false;
 
-    const endVoiceUi = () => {
+    const resetVoiceUi = () => {
       recUi.classList.add('hidden');
-      composer.classList.remove('hidden');
       sendBtn.classList.remove('is-recording');
-      voiceActive = false;
+      voicePhase = 'idle';
+      voiceFinishing = false;
+      syncSendBtn();
     };
 
-    const startVoiceHold = async () => {
-      if (sendBtn.dataset.mode !== 'voice') return;
-      voiceCancelled = false;
-      try {
-        await recorder.start();
-        if (voiceCancelled) {
-          recorder.cancel();
-          return;
-        }
-        voiceActive = true;
-        composer.classList.add('hidden');
-        recUi.classList.remove('hidden');
-        sendBtn.classList.add('is-recording');
-      } catch {
-        endVoiceUi();
-        alert('Нет доступа к микрофону');
-      }
+    const armVoiceUi = () => {
+      sendBtn.innerHTML = icons.microphone();
+      sendBtn.classList.add('is-recording');
+      recUi.classList.remove('hidden');
     };
 
-    const finishVoiceHold = async (send: boolean) => {
+    const finishVoice = async (send: boolean) => {
+      if (voiceFinishing || voicePhase === 'idle') return;
+      voiceFinishing = true;
+      const phase = voicePhase;
+      voiceToken += 1;
       if (voiceStartTimer) {
         clearTimeout(voiceStartTimer);
         voiceStartTimer = null;
       }
-      if (!voiceActive) return;
-      if (!send) {
+
+      if (phase === 'armed') {
         recorder.cancel();
-        endVoiceUi();
+        resetVoiceUi();
         return;
       }
+
+      if (!send) {
+        recorder.cancel();
+        resetVoiceUi();
+        return;
+      }
+
       const result = await recorder.stop();
-      endVoiceUi();
+      resetVoiceUi();
       if (result && result.duration >= 1) await sendVoiceBlob(result.blob, result.duration);
     };
 
-    sendBtn.addEventListener('pointerdown', (e) => {
-      if (sendBtn.dataset.mode !== 'voice') return;
-      e.preventDefault();
-      voiceCancelled = false;
-      voiceStartTimer = window.setTimeout(() => void startVoiceHold(), 180);
+    const startVoiceRecording = async (token: number) => {
+      try {
+        await recorder.start();
+        if (token !== voiceToken || voicePhase === 'idle') {
+          recorder.cancel();
+          return;
+        }
+        voicePhase = 'recording';
+        armVoiceUi();
+        // Палец отпустили, пока ждали микрофон — сразу отправляем
+        if (!fingerDown) void finishVoice(true);
+      } catch {
+        if (token === voiceToken) {
+          resetVoiceUi();
+          alert('Нет доступа к микрофону. Разрешите запись в настройках приложения.');
+        }
+      }
+    };
 
-      const onUp = () => {
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onCancel);
-        void finishVoiceHold(true);
-      };
-      const onCancel = () => {
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onCancel);
-        voiceCancelled = true;
-        void finishVoiceHold(false);
-      };
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onCancel);
+    const onVoiceDown = (e: PointerEvent) => {
+      if (sendBtn.dataset.mode !== 'voice') return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.preventDefault();
+      fingerDown = true;
+      suppressSendClick = true;
+      voiceFinishing = false;
+
+      voiceToken += 1;
+      const token = voiceToken;
+      voicePhase = 'armed';
+      armVoiceUi();
+
+      try {
+        sendBtn.setPointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+
+      voiceStartTimer = window.setTimeout(() => {
+        voiceStartTimer = null;
+        if (token !== voiceToken || voicePhase !== 'armed') return;
+        void startVoiceRecording(token);
+      }, 160);
+    };
+
+    const onVoiceUp = (e: PointerEvent) => {
+      fingerDown = false;
+      if (voicePhase === 'idle') return;
+      e.preventDefault();
+      try {
+        sendBtn.releasePointerCapture(e.pointerId);
+      } catch {
+        /* */
+      }
+      // armed → отмена короткого тапа; recording → отправка
+      void finishVoice(voicePhase === 'recording');
+      window.setTimeout(() => {
+        suppressSendClick = false;
+      }, 320);
+    };
+
+    sendBtn.addEventListener('pointerdown', onVoiceDown);
+    sendBtn.addEventListener('pointerup', onVoiceUp);
+    // Android: pointercancel при диалоге микрофона — не сбрасываем запись
+    sendBtn.addEventListener('pointercancel', () => {
+      fingerDown = false;
     });
+
     sendBtn.addEventListener('click', (e) => {
+      if (suppressSendClick || voicePhase !== 'idle') {
+        e.preventDefault();
+        return;
+      }
       if (sendBtn.dataset.mode === 'send') {
         e.preventDefault();
         void sendTextOrFiles();
       }
     });
 
-    app.querySelector('#voice-cancel')?.addEventListener('click', () => {
-      voiceCancelled = true;
-      void finishVoiceHold(false);
+    app.querySelector('#voice-cancel')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fingerDown = false;
+      void finishVoice(false);
+    });
+    app.querySelector('#voice-send')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fingerDown = false;
+      void finishVoice(true);
     });
 
-    // Also allow form Enter on desktop
     composer.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (sendBtn.dataset.mode === 'send') void sendTextOrFiles();
+      if (sendBtn.dataset.mode === 'send' && voicePhase === 'idle') void sendTextOrFiles();
     });
 
     syncSendBtn();

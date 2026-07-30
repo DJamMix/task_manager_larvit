@@ -112,17 +112,30 @@ export function createVoiceRecorder(onTick: (sec: number, peak: number) => void)
   let startedAt = 0;
   let timer: number | null = null;
   let recording = false;
+  let mimeType = '';
+
+  const pickMime = (): string => {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+      'audio/ogg;codecs=opus',
+    ];
+    return candidates.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+  };
 
   const api: VoiceRecorder = {
     isRecording: () => recording,
     async start() {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
-      recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      mimeType = pickMime();
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunks = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size) chunks.push(e.data);
@@ -145,9 +158,13 @@ export function createVoiceRecorder(onTick: (sec: number, peak: number) => void)
       const rec = recorder;
       const blob = await new Promise<Blob>((resolve) => {
         rec.onstop = () => {
-          resolve(new Blob(chunks, { type: rec.mimeType || 'audio/webm' }));
+          resolve(new Blob(chunks, { type: rec.mimeType || mimeType || 'audio/webm' }));
         };
-        rec.stop();
+        try {
+          rec.stop();
+        } catch {
+          resolve(new Blob(chunks, { type: mimeType || 'audio/webm' }));
+        }
       });
       stream?.getTracks().forEach((t) => t.stop());
       stream = null;

@@ -328,6 +328,9 @@ button, input, textarea { font: inherit; }
   border-top: 1px solid var(--line);
   background: var(--surface);
   padding-bottom: var(--safe-bottom);
+  overflow: visible;
+  position: relative;
+  z-index: 6;
 }
 .selection-bar {
   display: flex; flex-direction: column; gap: 0.45rem;
@@ -383,6 +386,7 @@ button, input, textarea { font: inherit; }
   flex: 1 1 auto;
   min-width: 0;
   position: relative;
+  overflow: visible;
 }
 .composer-input textarea {
   display: block;
@@ -398,10 +402,10 @@ button, input, textarea { font: inherit; }
 }
 .mention-menu {
   position: absolute;
-  left: 0; right: 0; bottom: calc(100% + 4px);
+  left: 0; right: 0; bottom: calc(100% + 6px);
   background: #fff; border: 1px solid var(--line); border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-  max-height: 220px; overflow: auto; z-index: 5;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+  max-height: 240px; overflow: auto; z-index: 30;
   padding: 0.25rem;
 }
 .mention-item {
@@ -439,6 +443,9 @@ button, input, textarea { font: inherit; }
 .composer-tools .round-btn.send {
   background: var(--accent);
   color: #fff;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .composer-tools .round-btn.send.is-recording {
   background: #ef4444;
@@ -461,12 +468,14 @@ button, input, textarea { font: inherit; }
 .voice-rec .meter > span {
   display: block; height: 100%; width: 30%; background: #22c55e; border-radius: 99px;
 }
-.voice-cancel-btn {
-  border: 0; background: rgba(255,255,255,.12); color: #fff;
+.voice-cancel-btn, .voice-send-btn {
+  border: 0; color: #fff;
   width: 36px; height: 36px; border-radius: 50%;
   display: grid; place-items: center; padding: 0;
 }
-.voice-cancel-btn .hi { width: 18px; height: 18px; }
+.voice-cancel-btn { background: rgba(255,255,255,.12); }
+.voice-send-btn { background: #22c55e; }
+.voice-cancel-btn .hi, .voice-send-btn .hi { width: 18px; height: 18px; }
 
 .typing { font-size: 0.8rem; color: var(--muted); padding: 0 0.9rem 0.25rem; }
 

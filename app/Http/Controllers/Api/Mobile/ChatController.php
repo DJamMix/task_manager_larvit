@@ -53,12 +53,18 @@ class ChatController extends Controller
             $listed = $chat;
         }
 
-        $chat->loadMissing(['members']);
-        $mentionUsers = $chat->members
+        $chat->load(['members']);
+        $mentionSource = $chat->members;
+        if ($mentionSource->isEmpty() && $listed instanceof Chat) {
+            $listed->loadMissing(['members']);
+            $mentionSource = $listed->members;
+        }
+
+        $mentionUsers = $mentionSource
             ->reject(fn ($u) => (int) $u->id === (int) $user->id)
             ->map(fn ($u) => [
                 'id' => (int) $u->id,
-                'name' => $u->name,
+                'name' => (string) ($u->name ?: $u->displayName()),
                 'aliases' => array_values(array_unique(array_filter([
                     $u->name,
                     $u->displayName(),
