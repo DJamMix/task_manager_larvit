@@ -1117,6 +1117,7 @@
         gearBtn?.setAttribute('aria-expanded', 'false');
     };
     gearBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
         e.stopPropagation();
         const open = gearDrop?.hasAttribute('hidden');
         if (open) {
@@ -1126,9 +1127,17 @@
             closeGear();
         }
     });
+    // На мобилках click по document иногда срабатывает в том же тике — закрываем на следующем кадре.
     document.addEventListener('click', (e) => {
-        if (!e.target.closest?.('#bx-header-menu')) closeGear();
+        if (!gearDrop || gearDrop.hasAttribute('hidden')) return;
+        if (e.target.closest?.('#bx-header-menu') || e.target.closest?.('#bx-header-gear')) return;
+        closeGear();
     });
+    document.addEventListener('touchstart', (e) => {
+        if (!gearDrop || gearDrop.hasAttribute('hidden')) return;
+        if (e.target.closest?.('#bx-header-menu') || e.target.closest?.('#bx-header-gear')) return;
+        closeGear();
+    }, { passive: true });
 
     const csrf = document.querySelector('meta[name="csrf_token"]')?.content
         || document.querySelector('meta[name="csrf-token"]')?.content

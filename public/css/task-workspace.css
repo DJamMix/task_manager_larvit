@@ -3603,6 +3603,9 @@ body.bx-lightbox-open { overflow: hidden; }
         gap: 0.4rem;
         padding: 0.55rem 0.65rem;
         align-items: center;
+        overflow: visible;
+        position: relative;
+        z-index: 60;
     }
     .bx-messenger__header-main {
         min-width: 0;
@@ -3633,8 +3636,22 @@ body.bx-lightbox-open { overflow: hidden; }
         width: auto;
         flex-shrink: 0;
         gap: 0.25rem;
-        overflow-x: auto;
-        max-width: 42%;
+        overflow: visible;
+        max-width: none;
+    }
+    .bx-header-menu {
+        position: static;
+    }
+    .bx-header-menu__drop {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0.55rem;
+        left: auto;
+        z-index: 80;
+        min-width: min(260px, calc(100vw - 1.2rem));
+        max-height: min(70dvh, 420px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
     .bx-notify-vol span:last-child,
     .bx-mute-btn span { display: none; }
