@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Mobile\AttachmentController;
 use App\Http\Controllers\Api\Mobile\AuthController;
 use App\Http\Controllers\Api\Mobile\CallController;
 use App\Http\Controllers\Api\Mobile\ChatController;
+use App\Http\Controllers\Api\Mobile\DeviceController;
 use App\Http\Controllers\Api\Mobile\TaskController;
 use Illuminate\Support\Facades\Route;
 
@@ -18,11 +19,17 @@ Route::prefix('mobile')->group(function () {
 
         Route::get('chats', [ChatController::class, 'index']);
         Route::get('chats/poll', [ChatController::class, 'poll']);
+        Route::get('chats/search', [ChatController::class, 'search']);
+        Route::get('chats/picker', [ChatController::class, 'picker']);
+        Route::get('chats/interlocutors', [ChatController::class, 'interlocutors']);
+        Route::post('chats/direct', [ChatController::class, 'createDirect']);
         Route::get('chats/{chat}', [ChatController::class, 'show']);
         Route::get('chats/{chat}/messages', [ChatController::class, 'history']);
         Route::post('chats/{chat}/messages', [ChatController::class, 'send']);
         Route::post('chats/{chat}/messages/delete', [ChatController::class, 'delete']);
+        Route::post('chats/{chat}/messages/forward', [ChatController::class, 'forward']);
         Route::post('chats/{chat}/typing', [ChatController::class, 'typing']);
+        Route::post('chats/{chat}/pin', [ChatController::class, 'pin']);
 
         Route::post('chats/{chat}/calls/start', [CallController::class, 'start']);
         Route::post('calls/{call}/join', [CallController::class, 'join']);
@@ -32,6 +39,9 @@ Route::prefix('mobile')->group(function () {
         Route::get('tasks', [TaskController::class, 'index']);
         Route::get('tasks/{task}', [TaskController::class, 'show']);
         Route::post('tasks/{task}/comments', [TaskController::class, 'comment']);
+        Route::post('tasks/{task}/status', [TaskController::class, 'changeStatus']);
+
+        Route::post('device/push-token', [DeviceController::class, 'storePushToken']);
 
         Route::get('attachments/{attachment}', [AttachmentController::class, 'show']);
     });

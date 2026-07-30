@@ -10,6 +10,8 @@ export type CallConnection = {
   call_id: number;
   video?: boolean;
   can_end?: boolean;
+  me?: { id: number; name: string; avatar?: string; initials?: string; color?: string };
+  roster?: Array<{ id: number; name: string; avatar?: string; initials?: string; color?: string }>;
 };
 
 export async function startCall(chatId: number, video = true): Promise<CallConnection> {

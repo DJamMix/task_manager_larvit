@@ -89,6 +89,9 @@ final class MobileChatPresenter
             'system' => (bool) $message->is_system,
             'deleted' => $message->trashed(),
             'text' => (string) ($message->plain_text ?? ''),
+            'html' => $message->trashed()
+                ? '<em>Сообщение удалено</em>'
+                : (string) $message->formatted_text,
             'author' => [
                 'id' => (int) ($message->user_id ?? 0),
                 'name' => $message->user?->name ?? 'Система',

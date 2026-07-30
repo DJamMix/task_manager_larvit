@@ -181,6 +181,105 @@ class ChatController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function search(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->assertChats($user);
+
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['chats' => [], 'messages' => [], 'query' => $q]);
+        }
+
+        return response()->json($this->chats->search($user, $q));
+    }
+
+    public function interlocutors(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->assertChats($user);
+
+        $options = $this->chats->directInterlocutorOptions($user);
+        $items = [];
+        foreach ($options as $id => $label) {
+            $u = User::query()->find((int) $id);
+            if (!$u) {
+                continue;
+            }
+            $items[] = [
+                'id' => (int) $u->id,
+                'name' => (string) $u->name,
+                'label' => (string) $label,
+                'initials' => $u->avatarInitials(),
+                'color' => $u->avatarColor(),
+                'avatar_url' => $u->avatarUrl(),
+            ];
+        }
+
+        return response()->json(['users' => $items]);
+    }
+
+    public function createDirect(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->assertChats($user);
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $chat = $this->chats->findOrCreateDirect($user, (int) $data['user_id']);
+        $listed = $this->chats->chatsFor($user)->firstWhere('id', $chat->id) ?? $chat;
+
+        return response()->json([
+            'chat' => $this->presenter->chatSummary($listed, $user),
+        ], 201);
+    }
+
+    public function forward(Request $request, Chat $chat): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->assertChats($user);
+        $this->assertMember($chat, $user);
+
+        $data = $request->validate([
+            'message_ids' => ['required', 'array', 'min:1', 'max:20'],
+            'message_ids.*' => ['integer'],
+            'target_chat_id' => ['required', 'integer', 'exists:chats,id'],
+        ]);
+
+        $target = Chat::query()->findOrFail((int) $data['target_chat_id']);
+        $this->assertMember($target, $user);
+        $this->chats->forwardMessages($chat, $target, $user, $data['message_ids']);
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function pin(Request $request, Chat $chat): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->assertChats($user);
+        $this->assertMember($chat, $user);
+
+        $pinned = $this->chats->togglePin($chat, $user);
+
+        return response()->json(['pinned' => $pinned]);
+    }
+
+    public function picker(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->assertChats($user);
+
+        return response()->json(['chats' => $this->chats->chatPickerPayload($user)]);
+    }
+
     private function assertChats(User $user): void
     {
         if (!$this->chats->canAccessMessenger($user)) {
