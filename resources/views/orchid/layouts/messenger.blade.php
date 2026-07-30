@@ -433,10 +433,17 @@
 
 <div class="bx-sheet" id="bx-forward-sheet" hidden>
     <button type="button" class="bx-sheet__backdrop" id="bx-forward-close-bg" aria-label="Закрыть"></button>
-    <div class="bx-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-forward-title">
+    <div class="bx-sheet__panel bx-forward-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-forward-title">
         <div class="bx-sheet__head">
             <strong id="bx-forward-title">Переслать сообщения</strong>
             <button type="button" class="bx-sheet__close" id="bx-forward-close" aria-label="Закрыть">×</button>
+        </div>
+        <div class="bx-forward-search">
+            <input type="search"
+                   id="bx-forward-search"
+                   class="bx-forward-search__input"
+                   placeholder="Поиск по чатам и пользователям…"
+                   autocomplete="off">
         </div>
         <div id="bx-forward-chats" class="bx-forward-chats">Загрузка чатов…</div>
     </div>
@@ -997,10 +1004,10 @@
         selectionBar?.toggleAttribute('hidden', count === 0);
         if (selectionCount) selectionCount.textContent = 'Выбрано: ' + count;
         if (forwardSelected) forwardSelected.textContent = 'Переслать (' + count + ')';
-        document.querySelectorAll('.bx-msg__select-btn').forEach((button) => {
-            const selected = selectedMessageIds.has(Number(button.getAttribute('data-message-id')));
-            button.setAttribute('aria-pressed', selected ? 'true' : 'false');
-            button.closest('.bx-msg')?.classList.toggle('is-selected', selected);
+        root?.classList.toggle('is-selecting', count > 0);
+        document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
+            const id = Number(String(message.id || '').replace('chat-msg-', ''));
+            message.classList.toggle('is-selected', selectedMessageIds.has(id));
         });
     };
     const toggleMessageSelection = (id) => {
@@ -1009,20 +1016,58 @@
         else if (selectedMessageIds.size < 20) selectedMessageIds.add(id);
         updateSelection();
     };
-    document.addEventListener('click', (e) => {
-        const select = e.target.closest?.('.bx-msg__select-btn');
-        if (select) {
-            e.preventDefault();
-            toggleMessageSelection(Number(select.getAttribute('data-message-id')));
-        }
-    });
+
+    // Удержание ЛКМ / long-press как в Telegram; Ctrl/Cmd+клик — toggle
     document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
-        let timer;
+        let timer = null;
+        let holdFired = false;
+        const msgId = () => Number(String(message.id || '').replace('chat-msg-', ''));
+
         message.addEventListener('pointerdown', (e) => {
-            if (e.pointerType === 'mouse' || e.target.closest('button,a,input')) return;
-            timer = window.setTimeout(() => toggleMessageSelection(Number(message.id.replace('chat-msg-', ''))), 550);
+            if (e.button !== undefined && e.button !== 0) return;
+            if (e.target.closest('button,a,input,textarea,.bx-voice')) return;
+            holdFired = false;
+            message._holdStart = { x: e.clientX || 0, y: e.clientY || 0 };
+            if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) return;
+            timer = window.setTimeout(() => {
+                holdFired = true;
+                message.classList.add('is-hold');
+                toggleMessageSelection(msgId());
+                try { navigator.vibrate?.(20); } catch (err) {}
+            }, 380);
         });
-        ['pointerup', 'pointercancel', 'pointerleave'].forEach((event) => message.addEventListener(event, () => clearTimeout(timer)));
+
+        const clearHold = () => {
+            if (timer) clearTimeout(timer);
+            timer = null;
+            message.classList.remove('is-hold');
+        };
+        ['pointerup', 'pointercancel'].forEach((event) => {
+            message.addEventListener(event, clearHold);
+        });
+        message.addEventListener('pointermove', (e) => {
+            // Срыв удержания только при заметном движении (как в Telegram)
+            if (!timer) return;
+            const start = message._holdStart;
+            if (!start) return;
+            const dx = Math.abs((e.clientX || 0) - start.x);
+            const dy = Math.abs((e.clientY || 0) - start.y);
+            if (dx > 12 || dy > 12) clearHold();
+        });
+
+        message.addEventListener('click', (e) => {
+            if (e.target.closest('button,a,input,textarea,.bx-voice')) return;
+            if (holdFired) {
+                e.preventDefault();
+                e.stopPropagation();
+                holdFired = false;
+                return;
+            }
+            if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) {
+                e.preventDefault();
+                toggleMessageSelection(msgId());
+            }
+        });
     });
     document.getElementById('bx-selection-cancel')?.addEventListener('click', () => {
         selectedMessageIds.clear();
@@ -1031,20 +1076,57 @@
     const closeForward = () => forwardSheet?.setAttribute('hidden', '');
     document.getElementById('bx-forward-close')?.addEventListener('click', closeForward);
     document.getElementById('bx-forward-close-bg')?.addEventListener('click', closeForward);
+
+    let forwardChatCache = [];
+    const renderForwardChats = (query = '') => {
+        if (!forwardChats) return;
+        const q = String(query || '').trim().toLowerCase();
+        const list = forwardChatCache.filter((chat) => {
+            if (!q) return true;
+            return String(chat.title || '').toLowerCase().includes(q)
+                || String(chat.subtitle || '').toLowerCase().includes(q);
+        });
+        if (!list.length) {
+            forwardChats.innerHTML = '<div class="bx-forward-empty">Ничего не найдено</div>';
+            return;
+        }
+        forwardChats.innerHTML = list.map((chat) => {
+            const color = escapeHtml(chat.avatar_color || '#64748b');
+            const initials = escapeHtml(chat.avatar_initials || '?');
+            const img = chat.avatar_url
+                ? `<img class="bx-avatar__img" src="${escapeHtml(chat.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`
+                : '';
+            const shape = chat.type === 'direct' ? 'round' : 'square';
+            return `<button type="button" class="bx-forward-chat" data-target-chat="${chat.id}">
+                <span class="bx-avatar bx-avatar--md bx-avatar--${shape}" style="--bx-avatar-bg:${color}">
+                    <span class="bx-avatar__initials">${initials}</span>${img}
+                </span>
+                <span class="bx-forward-chat__meta">
+                    <span class="bx-forward-chat__title">${escapeHtml(chat.title)}</span>
+                    <span class="bx-forward-chat__sub">${escapeHtml(chat.subtitle || '')}</span>
+                </span>
+            </button>`;
+        }).join('');
+    };
+
+    document.getElementById('bx-forward-search')?.addEventListener('input', (e) => {
+        renderForwardChats(e.target.value || '');
+    });
+
     forwardSelected?.addEventListener('click', async () => {
         const pickerUrl = root?.getAttribute('data-chats-picker-url');
         if (!pickerUrl || !selectedMessageIds.size) return;
         forwardSheet?.removeAttribute('hidden');
+        const searchInput = document.getElementById('bx-forward-search');
+        if (searchInput) searchInput.value = '';
         if (forwardChats) forwardChats.textContent = 'Загрузка чатов…';
         try {
             const response = await fetch(pickerUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Не удалось загрузить чаты');
-            if (forwardChats) {
-                forwardChats.innerHTML = (data.chats || []).map((chat) =>
-                    `<button type="button" class="bx-forward-chat" data-target-chat="${chat.id}">${escapeHtml(chat.title)}</button>`
-                ).join('') || '<div class="text-muted">Нет доступных чатов</div>';
-            }
+            forwardChatCache = data.chats || [];
+            renderForwardChats();
+            searchInput?.focus();
         } catch (error) {
             if (forwardChats) forwardChats.textContent = error.message || 'Не удалось загрузить чаты';
         }

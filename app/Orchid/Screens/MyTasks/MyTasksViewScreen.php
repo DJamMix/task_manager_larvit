@@ -47,6 +47,7 @@ class MyTasksViewScreen extends Screen
             foreach (TaskStatusEnum::executorTransitions((string) $task->status) as $transition) {
                 $btn = Button::make($transition['label'])
                     ->method('changeStatus')
+                    ->novalidate()
                     ->parameters(['status' => $transition['to']])
                     ->class(
                         ($transition['tone'] ?? 'next') === 'back'
@@ -149,6 +150,7 @@ class MyTasksViewScreen extends Screen
         if ($task && auth()->id() == $task->executor_id && $task->status === TaskStatusEnum::NEW->value) {
             $buttons[] = Button::make('Взять в работу')
                 ->method('takeWork')
+                ->novalidate()
                 ->icon('check')
                 ->class('btn btn-primary')
                 ->confirm('Задача перейдёт в статус «В работе»');
@@ -212,7 +214,7 @@ class MyTasksViewScreen extends Screen
         }
 
         $data = $request->validate([
-            'related_task_id' => 'required|integer|exists:tasks,id|different:task_id',
+            'related_task_id' => 'required|integer|exists:tasks,id',
             'relation' => 'required|string|in:' . implode(',', array_keys(TaskLink::relationLabels())),
         ]);
 

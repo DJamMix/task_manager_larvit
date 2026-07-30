@@ -117,6 +117,7 @@ class ClientViewTaskScreen extends Screen
         if ($task->status === TaskStatusEnum::DRAFT->value) {
             $buttons[] = Button::make('Согласовано')
                 ->method('approveTask')
+                ->novalidate()
                 ->icon('check')
                 ->class('btn btn-success')
                 ->confirm('Вы уверены, что хотите согласовать эту задачу?');
@@ -131,6 +132,7 @@ class ClientViewTaskScreen extends Screen
         if ($task->status === TaskStatusEnum::ESTIMATION_REVIEW->value) {
             $buttons[] = Button::make('Принять')
                 ->method('applyTask')
+                ->novalidate()
                 ->icon('check')
                 ->class('btn btn-success')
                 ->confirm('При нажатии "принять", вы соглашаетесь с оценкой и задача переходит исполнителю.');
@@ -153,12 +155,14 @@ class ClientViewTaskScreen extends Screen
         if ($task->status === TaskStatusEnum::DEMO->value) {
             $buttons[] = Button::make('Принять демо')
                 ->method('applyDemoTask')
+                ->novalidate()
                 ->icon('check')
                 ->class('btn btn-success')
                 ->confirm('При нажатии "принять", вы соглашаетесь с выполненой работой и задача считается выполненной.');
 
             $buttons[] = Button::make('Вернуть на доработку')
                 ->method('returnDemoModal')
+                ->novalidate()
                 ->icon('arrow-return-right')
                 ->class('btn btn-warning')
                 ->confirm('При нажатии вы не принимаете задачу, задача возвращается на доработку!');

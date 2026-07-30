@@ -123,49 +123,73 @@
                 </div>
             @endif
 
-            <div class="tw-card mt-3">
-                <div class="fw-semibold mb-2">Связанные задачи</div>
-                <ul class="tw-related-list">
+            <div class="tw-card mt-3 tw-related-card">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <div class="fw-semibold">Связанные задачи</div>
+                        <div class="small text-muted">Необязательно — можно работать без связей</div>
+                    </div>
+                    <span class="badge text-bg-light border">{{ $relatedLinks->count() }}</span>
+                </div>
+                <div class="tw-related-list">
                     @forelse($relatedLinks as $link)
-                        @php $related = $link->relatedTask; @endphp
+                        @php
+                            $related = $link->relatedTask;
+                            $relStatus = $related ? \App\CoreLayer\Enums\TaskStatusEnum::tryFrom($related->status) : null;
+                        @endphp
                         @if($related)
-                            <li class="tw-related-item">
-                                <div>
-                                    <div class="tw-related-item__rel">{{ $link->label() }}</div>
-                                    <a href="{{ route('platform.systems.my_tasks.view', $related) }}" class="tw-related-item__link">
-                                        {{ $related->displayKey() }} · {{ \Illuminate\Support\Str::limit($related->name, 42) }}
+                            <div class="tw-related-item">
+                                <div class="tw-related-item__main">
+                                    <div class="tw-related-item__top">
+                                        <span class="tw-related-item__key">{{ $related->displayKey() }}</span>
+                                        <span class="tw-related-item__rel">{{ $link->label() }}</span>
+                                    </div>
+                                    <a href="{{ route('platform.systems.my_tasks.view', $related) }}" class="tw-related-item__name">
+                                        {{ \Illuminate\Support\Str::limit($related->name, 48) }}
                                     </a>
+                                    @if($relStatus)
+                                        <span class="tw-related-item__status" style="--st:{{ $relStatus->color() }}">{{ $relStatus->label() }}</span>
+                                    @endif
                                 </div>
                                 @if($canManageLinks)
-                                    <form method="post" action="{{ url()->current() }}/removeLink">
-                                        @csrf
-                                        <input type="hidden" name="link_id" value="{{ $link->id }}">
-                                        <button type="submit" class="btn btn-sm btn-link text-danger px-0" title="Убрать">×</button>
-                                    </form>
+                                    <button type="button"
+                                            class="tw-related-item__rm"
+                                            data-remove-url="{{ url()->current() }}/removeLink"
+                                            data-link-id="{{ $link->id }}"
+                                            data-csrf="{{ csrf_token() }}"
+                                            title="Убрать связь">×</button>
                                 @endif
-                            </li>
+                            </div>
                         @endif
                     @empty
-                        <li class="text-muted small">Пока нет связей</li>
+                        <div class="tw-related-empty">Связей пока нет — это необязательно</div>
                     @endforelse
-                </ul>
+                </div>
 
                 @if($canManageLinks)
-                    <form method="post" action="{{ url()->current() }}/addLink" class="tw-related-form mt-2">
-                        @csrf
-                        <select name="related_task_id" class="form-select form-select-sm" required>
-                            <option value="">Задача…</option>
+                    <div class="tw-related-add"
+                         data-add-url="{{ url()->current() }}/addLink"
+                         data-csrf="{{ csrf_token() }}">
+                        <input type="search"
+                               class="form-control form-control-sm tw-related-add__search"
+                               id="tw-link-search"
+                               placeholder="Поиск задачи…"
+                               autocomplete="off">
+                        <select id="tw-link-task" class="form-select form-select-sm">
+                            <option value="">Выберите задачу</option>
                             @foreach($linkOptions as $id => $label)
-                                <option value="{{ $id }}">{{ $label }}</option>
+                                <option value="{{ $id }}" data-label="{{ mb_strtolower($label) }}">{{ $label }}</option>
                             @endforeach
                         </select>
-                        <select name="relation" class="form-select form-select-sm" required>
+                        <select id="tw-link-relation" class="form-select form-select-sm">
                             @foreach($relationLabels as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
-                        <button type="submit" class="btn btn-sm btn-outline-primary">Связать</button>
-                    </form>
+                        <button type="button" class="btn btn-sm btn-outline-primary w-100" id="tw-link-submit">
+                            Добавить связь
+                        </button>
+                    </div>
                 @endif
             </div>
 
@@ -226,9 +250,30 @@
                             @if($comment->attachment->isNotEmpty())
                                 <div class="tw-msg__files">
                                     @foreach($comment->attachment as $file)
-                                        <a href="{{ route('platform.task.attachment.download', $file) }}" class="badge text-bg-light border text-decoration-none">
-                                            {{ $file->original_name }}
-                                        </a>
+                                        @php
+                                            $fileMime = strtolower((string) ($file->mime ?? ''));
+                                            $fileExt = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
+                                            $isImage = str_starts_with($fileMime, 'image/')
+                                                || in_array($fileExt, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+                                            $fileUrl = route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]);
+                                            $downloadUrl = route('platform.task.attachment.download', $file);
+                                        @endphp
+                                        @if($isImage)
+                                            <a href="{{ $fileUrl }}"
+                                               class="tw-msg__image"
+                                               data-bx-lightbox="{{ $fileUrl }}"
+                                               title="{{ $file->original_name }}">
+                                                <img src="{{ $fileUrl }}"
+                                                     alt="{{ $file->original_name }}"
+                                                     loading="lazy"
+                                                     decoding="async">
+                                            </a>
+                                        @else
+                                            <a href="{{ $downloadUrl }}" class="tw-msg__file-badge">
+                                                <span class="tw-msg__file-ext">{{ $fileExt ?: 'file' }}</span>
+                                                <span class="tw-msg__file-name">{{ $file->original_name }}</span>
+                                            </a>
+                                        @endif
                                     @endforeach
                                 </div>
                             @endif
@@ -250,27 +295,48 @@
                 </div>
 
                 @if($canDiscuss)
-                    <form class="tw-composer" id="tw-composer" method="post" action="{{ url()->current() }}/addComment" enctype="multipart/form-data">
-                        @csrf
-                        <input type="hidden" name="comment[parent_id]" id="comment-parent-id" value="">
+                    <div class="tw-composer" id="tw-composer">
+                        <input type="hidden" id="comment-parent-id" value="">
                         <div id="tw-reply-banner" class="tw-composer__reply d-none">
                             <div>Ответ для <strong id="tw-reply-author"></strong></div>
                             <button type="button" class="btn btn-sm btn-link" id="tw-reply-cancel">Отмена</button>
                         </div>
-                        <textarea name="comment[text]"
-                                  id="tw-composer-input"
-                                  class="tw-composer__input"
-                                  rows="2"
-                                  placeholder="Написать сообщение… Enter — отправить, Shift+Enter — новая строка"></textarea>
+                        <div class="tw-composer__editor-wrap">
+                            <div id="tw-quill-toolbar">
+                                <span class="ql-formats">
+                                    <button type="button" class="ql-bold"></button>
+                                    <button type="button" class="ql-italic"></button>
+                                    <button type="button" class="ql-underline"></button>
+                                    <button type="button" class="ql-strike"></button>
+                                </span>
+                                <span class="ql-formats">
+                                    <button type="button" class="ql-list" value="ordered"></button>
+                                    <button type="button" class="ql-list" value="bullet"></button>
+                                    <button type="button" class="ql-blockquote"></button>
+                                    <button type="button" class="ql-code-block"></button>
+                                </span>
+                                <span class="ql-formats">
+                                    <button type="button" class="ql-link"></button>
+                                    <button type="button" class="ql-clean"></button>
+                                </span>
+                            </div>
+                            <div id="tw-quill-editor"></div>
+                        </div>
                         <div class="tw-composer__bar">
                             <label class="tw-composer__attach" title="Файлы">
-                                <input type="file" name="comment_files[]" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt">
+                                <input type="file" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt">
                                 <span>Файлы</span>
                             </label>
                             <span class="tw-composer__files-label text-muted small d-none" id="tw-files-label"></span>
-                            <button type="submit" class="btn btn-primary btn-sm tw-composer__send">Отправить</button>
+                            <button type="button"
+                                    class="btn btn-primary btn-sm tw-composer__send"
+                                    id="tw-composer-send"
+                                    data-url="{{ url()->current() }}/addComment"
+                                    data-csrf="{{ csrf_token() }}">
+                                Отправить
+                            </button>
                         </div>
-                    </form>
+                    </div>
                 @else
                     <div class="alert alert-warning mb-0 mt-2">Нет прав писать в обсуждении</div>
                 @endif
@@ -319,7 +385,9 @@
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <script>
 (() => {
     if (window.hljs) {
@@ -340,28 +408,140 @@
         });
     });
 
-    const input = document.getElementById('tw-composer-input');
     const parentInput = document.getElementById('comment-parent-id');
     const replyBanner = document.getElementById('tw-reply-banner');
     const replyAuthor = document.getElementById('tw-reply-author');
     const filesInput = document.getElementById('tw-composer-files');
     const filesLabel = document.getElementById('tw-files-label');
-    const MAX_H = 180;
+    const editorEl = document.getElementById('tw-quill-editor');
+    const sendBtn = document.getElementById('tw-composer-send');
+    let quill = null;
 
-    const autosize = () => {
-        if (!input) return;
-        input.style.height = 'auto';
-        input.style.height = Math.min(input.scrollHeight, MAX_H) + 'px';
-        input.style.overflowY = input.scrollHeight > MAX_H ? 'auto' : 'hidden';
-    };
-    input?.addEventListener('input', autosize);
-    autosize();
-
-    input?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            document.getElementById('tw-composer')?.requestSubmit();
+    if (editorEl && window.Quill && !editorEl.classList.contains('ql-container')) {
+        quill = new Quill('#tw-quill-editor', {
+            theme: 'snow',
+            placeholder: 'Написать сообщение…',
+            modules: {
+                toolbar: '#tw-quill-toolbar',
+            },
+            bounds: '#tw-composer',
+        });
+        const qlEditor = editorEl.querySelector('.ql-editor') || document.querySelector('#tw-quill-editor .ql-editor');
+        if (qlEditor) {
+            qlEditor.style.minHeight = '72px';
+            qlEditor.style.maxHeight = '180px';
+            qlEditor.style.overflowY = 'auto';
         }
+    } else if (window.Quill && editorEl) {
+        quill = Quill.find(editorEl);
+    }
+
+    sendBtn?.addEventListener('click', async () => {
+        const url = sendBtn.getAttribute('data-url');
+        const token = sendBtn.getAttribute('data-csrf');
+        if (!url) return;
+
+        const plain = quill ? (quill.getText() || '').trim() : '';
+        const hasFiles = (filesInput?.files?.length || 0) > 0;
+        if (!plain && !hasFiles) {
+            alert('Напишите сообщение или прикрепите файл');
+            return;
+        }
+
+        const fd = new FormData();
+        if (token) fd.append('_token', token);
+        if (plain && quill) {
+            fd.append('comment[text]', JSON.stringify(quill.getContents()));
+        } else {
+            fd.append('comment[text]', '');
+        }
+        if (parentInput?.value) {
+            fd.append('comment[parent_id]', parentInput.value);
+        }
+        if (filesInput?.files) {
+            [...filesInput.files].forEach((file) => fd.append('comment_files[]', file));
+        }
+
+        sendBtn.disabled = true;
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
+            });
+            if (!res.ok) {
+                alert('Не удалось отправить сообщение');
+                sendBtn.disabled = false;
+                return;
+            }
+            window.location.reload();
+        } catch (e) {
+            alert('Не удалось отправить сообщение');
+            sendBtn.disabled = false;
+        }
+    });
+
+    document.getElementById('tw-link-submit')?.addEventListener('click', async () => {
+        const wrap = document.querySelector('.tw-related-add');
+        const sel = document.getElementById('tw-link-task');
+        const rel = document.getElementById('tw-link-relation');
+        if (!sel?.value) {
+            alert('Выберите задачу для связи');
+            return;
+        }
+        const url = wrap?.getAttribute('data-add-url');
+        const token = wrap?.getAttribute('data-csrf');
+        if (!url) return;
+        const fd = new FormData();
+        fd.append('related_task_id', sel.value);
+        fd.append('relation', rel?.value || 'relates');
+        if (token) fd.append('_token', token);
+        try {
+            const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!res.ok) {
+                const t = await res.text();
+                alert('Не удалось добавить связь');
+                console.warn(t);
+                return;
+            }
+            window.location.reload();
+        } catch (e) {
+            alert('Не удалось добавить связь');
+        }
+    });
+
+    document.querySelectorAll('.tw-related-item__rm').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const url = btn.getAttribute('data-remove-url');
+            const token = btn.getAttribute('data-csrf');
+            const linkId = btn.getAttribute('data-link-id');
+            if (!url || !linkId) return;
+            const fd = new FormData();
+            fd.append('link_id', linkId);
+            if (token) fd.append('_token', token);
+            try {
+                const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) {
+                    alert('Не удалось удалить связь');
+                    return;
+                }
+                window.location.reload();
+            } catch (e) {
+                alert('Не удалось удалить связь');
+            }
+        });
+    });
+
+    const linkSearch = document.getElementById('tw-link-search');
+    const linkTask = document.getElementById('tw-link-task');
+    linkSearch?.addEventListener('input', () => {
+        const q = (linkSearch.value || '').trim().toLowerCase();
+        [...(linkTask?.options || [])].forEach((opt, idx) => {
+            if (idx === 0) return;
+            const label = opt.getAttribute('data-label') || opt.textContent.toLowerCase();
+            opt.hidden = q !== '' && !label.includes(q);
+        });
     });
 
     filesInput?.addEventListener('change', () => {
@@ -380,7 +560,7 @@
             if (parentInput) parentInput.value = btn.getAttribute('data-parent-id') || '';
             if (replyAuthor) replyAuthor.textContent = btn.getAttribute('data-author') || '';
             replyBanner?.classList.remove('d-none');
-            input?.focus();
+            quill?.focus();
         });
     });
     document.getElementById('tw-reply-cancel')?.addEventListener('click', () => {
@@ -390,5 +570,21 @@
 
     const feed = document.getElementById('task-discussion-feed');
     if (feed) feed.scrollTop = feed.scrollHeight;
+
+    // Простой lightbox для картинок в обсуждении
+    document.querySelectorAll('[data-bx-lightbox]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            const url = el.getAttribute('data-bx-lightbox');
+            if (!url) return;
+            const overlay = document.createElement('div');
+            overlay.className = 'tw-lightbox';
+            overlay.innerHTML = '<button type="button" class="tw-lightbox__bg"></button><img src="' + url + '" alt="">';
+            const close = () => overlay.remove();
+            overlay.querySelector('.tw-lightbox__bg')?.addEventListener('click', close);
+            overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+            document.body.appendChild(overlay);
+        });
+    });
 })();
 </script>

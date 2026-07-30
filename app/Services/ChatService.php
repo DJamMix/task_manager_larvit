@@ -255,17 +255,36 @@ class ChatService
     }
 
     /**
-     * Короткий список чатов для выбора назначения при пересылке.
+     * Список чатов для пересылки: с аватарами и типом.
      *
-     * @return list<array{id: int, title: string}>
+     * @return list<array{id: int, title: string, subtitle: string, type: string, avatar_url: string, avatar_initials: string, avatar_color: string}>
      */
     public function chatPickerPayload(User $user): array
     {
         return $this->chatsFor($user)
-            ->map(fn (Chat $chat) => [
-                'id' => (int) $chat->id,
-                'title' => $chat->displayTitle($user->id),
-            ])
+            ->map(function (Chat $chat) use ($user) {
+                $isDirect = $chat->type === 'direct';
+                $peer = $isDirect ? $chat->otherMember($user->id) : null;
+                $count = $chat->members->count();
+
+                return [
+                    'id' => (int) $chat->id,
+                    'title' => $chat->displayTitle($user->id),
+                    'subtitle' => $isDirect
+                        ? 'Личный чат'
+                        : ($count . ' ' . ($count === 1 ? 'участник' : (($count % 10 >= 2 && $count % 10 <= 4 && !in_array($count % 100, [12, 13, 14], true)) ? 'участника' : 'участников'))),
+                    'type' => (string) $chat->type,
+                    'avatar_url' => $isDirect
+                        ? (string) ($peer?->avatarUrl() ?? '')
+                        : (string) $chat->avatarUrl($user->id),
+                    'avatar_initials' => $isDirect
+                        ? (string) ($peer?->avatarInitials() ?? '?')
+                        : (string) $chat->avatarInitials($user->id),
+                    'avatar_color' => $isDirect
+                        ? (string) ($peer?->avatarColor() ?? '#64748b')
+                        : (string) $chat->avatarColor($user->id),
+                ];
+            })
             ->values()
             ->all();
     }

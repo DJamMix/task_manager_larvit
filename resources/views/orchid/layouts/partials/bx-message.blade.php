@@ -171,12 +171,6 @@
                         data-author="{{ $message->user?->displayName() ?? 'участник' }}">
                     Ответить
                 </button>
-                <button type="button"
-                        class="bx-msg__select-btn"
-                        data-message-id="{{ $message->id }}"
-                        aria-pressed="false">
-                    Выбрать
-                </button>
             @endunless
 
             @if($mine && $readStatus)
