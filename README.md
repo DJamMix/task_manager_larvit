@@ -513,6 +513,16 @@ scripts/generate-vapid.mjs
 
 ---
 
+## Мобильное приложение (Android)
+
+В каталоге [`mobile/`](./mobile) — Capacitor-приложение (чаты, звонки, мои задачи).
+
+См. инструкцию: [`mobile/README.md`](./mobile/README.md).
+
+API бэкенда: `/api/mobile/*` (Sanctum Bearer token).
+
+---
+
 ## Ссылки
 
 - Репозиторий: [https://github.com/DJamMix/task_manager_larvit](https://github.com/DJamMix/task_manager_larvit)

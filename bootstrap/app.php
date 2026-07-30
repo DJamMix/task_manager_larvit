@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(base_path('routes/mobile.php'));
+
             Route::middleware('client')
                 ->prefix('client')
                 ->group(base_path('app/ClientLayer/routes/client.php'));

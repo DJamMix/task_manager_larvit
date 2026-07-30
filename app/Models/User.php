@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\RoleCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
 use Orchid\Attachment\Attachable;
 use Orchid\Filters\Types\Like;
 use Orchid\Filters\Types\Where;
@@ -14,7 +15,7 @@ use Orchid\Screen\AsSource;
 
 class User extends Authenticatable
 {
-    use HasFactory, AsSource, Attachable;
+    use HasApiTokens, HasFactory, AsSource, Attachable;
 
     protected $fillable = [
         'name',
