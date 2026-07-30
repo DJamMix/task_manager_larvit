@@ -663,7 +663,7 @@
         if (!root) return;
         const top = root.getBoundingClientRect().top;
         const mobile = window.matchMedia('(max-width: 900px)').matches;
-        const bottomPad = mobile ? 4 : 8;
+        const bottomPad = mobile ? 0 : 0;
         const available = Math.max(mobile ? 260 : 320, window.innerHeight - top - bottomPad);
         root.style.height = available + 'px';
         root.style.maxHeight = available + 'px';

@@ -9,10 +9,18 @@
 
     const VAPID_LS_KEY = 'tml_vapid_public';
 
-    const csrf = document.querySelector('meta[name="csrf_token"]')?.content
-        || document.querySelector('meta[name="csrf-token"]')?.content
+    const readCookie = (name) => {
+        const match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : '';
+    };
+
+    // Читаем на каждый запрос — Orchid/Turbo может обновить токен без перезагрузки скрипта.
+    const csrfToken = () =>
+        messenger.getAttribute('data-csrf')
+        || document.querySelector('#post-form input[name="_token"]')?.value
         || document.querySelector('input[name="_token"]')?.value
-        || messenger.getAttribute('data-csrf')
+        || document.querySelector('meta[name="csrf_token"]')?.content
+        || document.querySelector('meta[name="csrf-token"]')?.content
         || '';
 
     const configured = () => messenger.getAttribute('data-push-configured') === '1';
@@ -27,16 +35,22 @@
         return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
     };
 
-    const request = (url, options = {}) => fetch(url, {
-        credentials: 'same-origin',
-        headers: {
+    const request = (url, options = {}) => {
+        const token = csrfToken();
+        const xsrf = readCookie('XSRF-TOKEN');
+        const headers = {
             Accept: 'application/json',
-            'X-CSRF-TOKEN': csrf,
             'X-Requested-With': 'XMLHttpRequest',
+            ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+            ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
             ...(options.headers || {}),
-        },
-        ...options,
-    });
+        };
+        return fetch(url, {
+            credentials: 'same-origin',
+            ...options,
+            headers,
+        });
+    };
 
     const supported = () =>
         typeof window !== 'undefined'
@@ -131,10 +145,13 @@
             });
         }
 
+        const payload = subscription.toJSON();
+        payload._token = csrfToken();
+
         const res = await request(subscribeUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription.toJSON()),
+            body: JSON.stringify(payload),
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
@@ -159,7 +176,7 @@
             await request(url, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ endpoint }),
+                body: JSON.stringify({ endpoint, _token: csrfToken() }),
             });
         }
         localStorage.removeItem(VAPID_LS_KEY);

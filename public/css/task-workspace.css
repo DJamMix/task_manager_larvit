@@ -1438,18 +1438,35 @@ body.bx-messenger-page main .container-fluid,
 body.bx-messenger-page .layout .wrapper > .content,
 body.bx-messenger-page .workspace,
 body.bx-messenger-page .aside ~ .workspace,
-body.bx-messenger-page #post-form > .container-fluid {
-    padding-top: 0.35rem !important;
+body.bx-messenger-page #post-form,
+body.bx-messenger-page #post-form > .container-fluid,
+body.bx-messenger-page .container-fluid,
+body.bx-messenger-page .container-xxl,
+body.bx-messenger-page .row > [class*="col"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    padding-top: 0 !important;
     padding-bottom: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
     margin-bottom: 0 !important;
     max-width: none !important;
+    width: 100% !important;
+}
+body.bx-messenger-page .row {
+    --bs-gutter-x: 0;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
 }
 body.bx-messenger-page .bx-messenger {
-    height: calc(100dvh - 52px);
-    max-height: calc(100dvh - 52px);
+    height: calc(100dvh - 0px);
+    max-height: 100dvh;
     min-height: 280px;
-    border-radius: 12px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
     margin-bottom: 0;
+    width: 100%;
 }
 
 /* ?? Messenger (Bitrix-like) ?? */
