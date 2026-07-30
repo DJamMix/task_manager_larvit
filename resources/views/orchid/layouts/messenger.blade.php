@@ -1744,7 +1744,7 @@
 
     const focusComposer = () => {
         if (!input || input.disabled) return;
-        if (document.activeElement?.closest?.('.modal, .bx-chat-info, #bx-forward-sheet, #bx-chat-search')) return;
+        if (!root?.classList.contains('is-chat-open')) return;
         try {
             input.focus({ preventScroll: true });
         } catch (e) {
@@ -1752,10 +1752,67 @@
         }
     };
 
-    // При открытии чата сразу можно печатать
-    if (root?.classList.contains('is-chat-open')) {
+    const composerFocusBlocked = () => {
+        if (!root?.classList.contains('is-chat-open') || !input || input.disabled || sending) return true;
+        const ae = document.activeElement;
+        if (!ae || ae === input) return false;
+        if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden])')) return true;
+        if (ae.id === 'bx-chat-search' || ae.closest?.('#bx-chat-search, .bx-forward-search, .bx-task-search')) return true;
+        if (ae.matches?.('input:not([type="hidden"]):not([type="file"]):not(#bx-composer-input), textarea:not(#bx-composer-input), select, [contenteditable="true"]')) return true;
+        const gearDrop = document.getElementById('bx-header-menu-drop');
+        if (gearDrop && !gearDrop.hasAttribute('hidden')) return true;
+        return false;
+    };
+
+    const keepComposerFocused = () => {
+        if (composerFocusBlocked()) return;
+        focusComposer();
+    };
+
+    // Как в VK: поле всегда активно, пока открыт чат
+    if (root?.classList.contains('is-chat-open') && input) {
         setTimeout(focusComposer, 50);
         setTimeout(focusComposer, 300);
+
+        input.addEventListener('blur', () => {
+            setTimeout(keepComposerFocused, 0);
+        });
+
+        const mainPane = root.querySelector('.bx-messenger__main');
+        mainPane?.addEventListener('pointerup', (e) => {
+            if (composerFocusBlocked()) return;
+            if (e.target.closest?.('a, button, label, input, textarea, select, audio, video, .bx-composer__tool, .bx-msg__receipt, .bx-header-menu, .bx-lightbox, .bx-selection-bar')) {
+                // После клика по кнопке композера/отправке — вернуть фокус
+                if (e.target.closest?.('#bx-composer, .bx-messenger__feed, .bx-messenger__header')) {
+                    setTimeout(keepComposerFocused, 0);
+                }
+                return;
+            }
+            keepComposerFocused();
+        });
+
+        // Печать сразу, даже если фокус «уехал» на ленту
+        root.addEventListener('keydown', (e) => {
+            if (composerFocusBlocked()) return;
+            if (e.target === input) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Tab' || e.key === 'Escape') return;
+
+            if (e.key.length === 1) {
+                e.preventDefault();
+                focusComposer();
+                const start = input.selectionStart ?? input.value.length;
+                const end = input.selectionEnd ?? input.value.length;
+                input.value = input.value.slice(0, start) + e.key + input.value.slice(end);
+                const caret = start + e.key.length;
+                input.setSelectionRange(caret, caret);
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
+            }
+            if (e.key === 'Backspace' || e.key === 'Enter') {
+                focusComposer();
+            }
+        }, true);
     }
 
     let sending = false;

@@ -3286,9 +3286,16 @@ body.bx-lightbox-open { overflow: hidden; }
 }
 
 .bx-composer__box:focus-within {
-    border-color: #93c5fd;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    background: #fff;
+    border-color: #e2e8f0;
+    box-shadow: none;
+    background: #f8fafc;
+}
+
+.bx-composer__input:focus,
+.bx-composer__input:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
 }
 
 .bx-composer__toolbar {
