@@ -3117,10 +3117,36 @@ body.bx-lightbox-open { overflow: hidden; }
     transform: scale(0.98);
     transition: transform .12s ease;
 }
+/* Long-press на тач-устройствах: без callout/выделения текста и без увода в scroll */
+.bx-messenger__feed .bx-msg:not(.bx-msg--system) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y;
+}
+.bx-messenger__feed.is-press-hold {
+    touch-action: none;
+    overflow: hidden;
+}
+.bx-messenger__feed.is-press-hold .bx-msg:not(.bx-msg--system) {
+    touch-action: none;
+}
 .bx-messenger.is-selecting .bx-msg:not(.bx-msg--system) {
     cursor: pointer;
     position: relative;
     padding-left: 1.35rem;
+}
+@media (pointer: coarse) {
+    .bx-selection-bar {
+        position: sticky;
+        bottom: 0;
+        z-index: 5;
+        padding: 0.65rem 0.8rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
+    }
+    .bx-selection-bar .btn {
+        min-height: 44px;
+    }
 }
 .bx-messenger.is-selecting .bx-msg:not(.bx-msg--system)::before {
     content: '';

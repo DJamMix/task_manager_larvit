@@ -1176,58 +1176,165 @@
         updateSelection();
     };
 
-    // Удержание ЛКМ / long-press как в Telegram; Ctrl/Cmd+клик — toggle
-    document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
+    // Удержание / long-press как в Telegram; Ctrl/Cmd+клик и tap в режиме выбора — toggle.
+    // Делегирование на ленту: новые сообщения тоже работают; на мобиле блокируем scroll во время удержания.
+    (() => {
+        const feedEl = document.getElementById('chat-feed');
+        if (!feedEl) return;
+
         let timer = null;
         let holdFired = false;
-        const msgId = () => Number(String(message.id || '').replace('chat-msg-', ''));
+        let suppressClickUntil = 0;
+        let activeMsg = null;
+        let holdStart = null;
+        let holding = false;
 
-        message.addEventListener('pointerdown', (e) => {
-            if (e.button !== undefined && e.button !== 0) return;
-            if (e.target.closest('button,a,input,textarea,.bx-voice')) return;
-            holdFired = false;
-            message._holdStart = { x: e.clientX || 0, y: e.clientY || 0 };
-            if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) return;
-            timer = window.setTimeout(() => {
-                holdFired = true;
-                message.classList.add('is-hold');
-                toggleMessageSelection(msgId());
-                try { navigator.vibrate?.(20); } catch (err) {}
-            }, 380);
-        });
+        const isCoarse = () => window.matchMedia('(pointer: coarse)').matches
+            || ('ontouchstart' in window);
+        const moveTol = () => (isCoarse() ? 28 : 12);
+        const holdMs = () => (isCoarse() ? 450 : 380);
+        const msgIdOf = (el) => Number(String(el?.id || '').replace('chat-msg-', ''));
+        const msgFromTarget = (t) => t?.closest?.('.bx-msg:not(.bx-msg--system)');
+        const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox');
 
-        const clearHold = () => {
+        const clearHoldTimer = () => {
             if (timer) clearTimeout(timer);
             timer = null;
-            message.classList.remove('is-hold');
         };
-        ['pointerup', 'pointercancel'].forEach((event) => {
-            message.addEventListener(event, clearHold);
-        });
-        message.addEventListener('pointermove', (e) => {
-            // Срыв удержания только при заметном движении (как в Telegram)
-            if (!timer) return;
-            const start = message._holdStart;
-            if (!start) return;
-            const dx = Math.abs((e.clientX || 0) - start.x);
-            const dy = Math.abs((e.clientY || 0) - start.y);
-            if (dx > 12 || dy > 12) clearHold();
-        });
+        const endHoldVisual = () => {
+            activeMsg?.classList.remove('is-hold');
+            feedEl.classList.remove('is-press-hold');
+            holding = false;
+            activeMsg = null;
+            holdStart = null;
+        };
+        const clearHold = () => {
+            clearHoldTimer();
+            endHoldVisual();
+        };
 
-        message.addEventListener('click', (e) => {
-            if (e.target.closest('button,a,input,textarea,.bx-voice')) return;
-            if (holdFired) {
-                e.preventDefault();
-                e.stopPropagation();
+        const startHold = (message, x, y) => {
+            clearHold();
+            holdFired = false;
+            holding = true;
+            activeMsg = message;
+            holdStart = { x, y };
+            feedEl.classList.add('is-press-hold');
+            timer = window.setTimeout(() => {
+                timer = null;
+                if (!activeMsg) return;
+                holdFired = true;
+                suppressClickUntil = Date.now() + 600;
+                activeMsg.classList.add('is-hold');
+                // Разрешить скролл сразу после выбора — не ждать pointerup
+                feedEl.classList.remove('is-press-hold');
+                toggleMessageSelection(msgIdOf(activeMsg));
+                try { navigator.vibrate?.(25); } catch (err) {}
+                try { input?.blur(); } catch (err) {}
+            }, holdMs());
+        };
+
+        const movedTooFar = (x, y) => {
+            if (!holdStart) return false;
+            return Math.abs(x - holdStart.x) > moveTol() || Math.abs(y - holdStart.y) > moveTol();
+        };
+
+        const finishPointer = (e, { toggleIfSelecting = false } = {}) => {
+            const message = activeMsg || msgFromTarget(e?.target);
+            const wasHold = holdFired;
+            const inSelectMode = selectedMessageIds.size > 0;
+            clearHoldTimer();
+            endHoldVisual();
+
+            if (wasHold) {
                 holdFired = false;
+                suppressClickUntil = Date.now() + 600;
+                e?.preventDefault?.();
                 return;
             }
+            if (Date.now() < suppressClickUntil) return;
+            if (!toggleIfSelecting || !message || isInteractive(e?.target)) return;
+            if (!inSelectMode) return;
+            // pointerup + touchend на одном жесте — один toggle
+            suppressClickUntil = Date.now() + 350;
+            toggleMessageSelection(msgIdOf(message));
+        };
+
+        feedEl.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            const message = msgFromTarget(e.target);
+            if (!message || isInteractive(e.target)) return;
+
+            // Уже режим выбора — переключаем на pointerup/touchend
             if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) {
+                holding = false;
+                return;
+            }
+            startHold(message, e.clientX || 0, e.clientY || 0);
+        });
+
+        // Критично для мобилок: не давать браузеру увести жест в scroll/cancel
+        feedEl.addEventListener('touchmove', (e) => {
+            if (!holding || !holdStart) return;
+            const t = e.touches?.[0];
+            if (!t) return;
+            if (holdFired || !movedTooFar(t.clientX, t.clientY)) {
                 e.preventDefault();
-                toggleMessageSelection(msgId());
+                return;
+            }
+            clearHold();
+        }, { passive: false });
+
+        feedEl.addEventListener('pointermove', (e) => {
+            if (!holding || !timer) return;
+            if (movedTooFar(e.clientX || 0, e.clientY || 0)) clearHold();
+        });
+
+        feedEl.addEventListener('pointerup', (e) => {
+            // На touch завершение обрабатывает touchend (иначе двойной toggle)
+            if (e.pointerType === 'touch') {
+                if (holding || holdFired) finishPointer(e, { toggleIfSelecting: false });
+                return;
+            }
+            finishPointer(e, { toggleIfSelecting: true });
+        });
+        feedEl.addEventListener('touchend', (e) => {
+            finishPointer(e, { toggleIfSelecting: true });
+        });
+        // На iOS/Android pointercancel часто срывает long-press при малейшем jitter —
+        // не сбрасываем таймер, если палец почти не сдвинулся (touchmove уже решает).
+        feedEl.addEventListener('pointercancel', (e) => {
+            if (holdFired) {
+                finishPointer(e);
+                return;
+            }
+            if (holding && timer && holdStart && !movedTooFar(e.clientX || holdStart.x, e.clientY || holdStart.y)) {
+                return;
+            }
+            clearHold();
+        });
+
+        feedEl.addEventListener('click', (e) => {
+            if (Date.now() < suppressClickUntil) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            const message = msgFromTarget(e.target);
+            if (!message || isInteractive(e.target)) return;
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                toggleMessageSelection(msgIdOf(message));
+            }
+        }, true);
+
+        // Блок нативного меню «Копировать» при long-press
+        feedEl.addEventListener('contextmenu', (e) => {
+            if (msgFromTarget(e.target) && (holding || holdFired || selectedMessageIds.size > 0 || isCoarse())) {
+                e.preventDefault();
             }
         });
-    });
+    })();
     document.getElementById('bx-selection-cancel')?.addEventListener('click', () => {
         selectedMessageIds.clear();
         updateSelection();
@@ -1826,10 +1933,13 @@
 
     const composerFocusBlocked = () => {
         if (!root?.classList.contains('is-chat-open') || !input || input.disabled || sending) return true;
+        // Не тянуть фокус в композер во время выбора сообщений (особенно на мобиле)
+        if (root.classList.contains('is-selecting')) return true;
+        if (document.getElementById('chat-feed')?.classList.contains('is-press-hold')) return true;
         const ae = document.activeElement;
         if (!ae || ae === input) return false;
-        if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden])')) return true;
-        if (ae.id === 'bx-chat-search' || ae.closest?.('#bx-chat-search, .bx-forward-search, .bx-task-search')) return true;
+        if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden]), .ui-choice-overlay, .ui-toast-root')) return true;
+        if (ae.id === 'bx-chat-search' || ae.closest?.('#bx-chat-search, .bx-forward-search, .bx-task-search, .bx-selection-bar')) return true;
         if (ae.matches?.('input:not([type="hidden"]):not([type="file"]):not(#bx-composer-input), textarea:not(#bx-composer-input), select, [contenteditable="true"]')) return true;
         const gearDrop = document.getElementById('bx-header-menu-drop');
         if (gearDrop && !gearDrop.hasAttribute('hidden')) return true;
