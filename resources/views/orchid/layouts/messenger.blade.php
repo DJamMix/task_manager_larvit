@@ -317,19 +317,18 @@
                 </div>
 
                 <div class="bx-composer__box">
-                    <textarea id="bx-composer-input"
-                              class="bx-composer__input"
-                              name="bx_chat_draft"
-                              rows="1"
-                              placeholder="Написать сообщение… @имя — упомянуть, Enter — отправить"
-                              autocomplete="off"
-                              autocorrect="off"
-                              autocapitalize="off"
-                              spellcheck="true"
-                              data-lpignore="true"
-                              data-1p-ignore="true"
-                              data-bwignore="true"
-                              data-form-type="other"></textarea>
+                    <div id="bx-composer-input"
+                         class="bx-composer__input"
+                         contenteditable="true"
+                         role="textbox"
+                         aria-multiline="true"
+                         data-placeholder="Написать сообщение… @имя — упомянуть, Enter — отправить"
+                         spellcheck="true"
+                         autocomplete="none"
+                         data-lpignore="true"
+                         data-1p-ignore="true"
+                         data-bwignore="true"
+                         data-form-type="other"></div>
 
                     <div id="bx-mention-menu" class="bx-mention-menu d-none" role="listbox"></div>
 
@@ -712,16 +711,89 @@
     const FILES_MAX = 10;
     let pendingFiles = [];
 
-    // Анти-автозаполнение браузера: кратко readonly при фокусе
+    // contenteditable вместо textarea — Яндекс.Браузер не показывает автозаполнение контактов
+    const getComposerText = () => {
+        if (!input) return '';
+        return (input.innerText || '').replace(/\u00a0/g, ' ').replace(/\n$/, '');
+    };
+    const setComposerText = (text) => {
+        if (!input) return;
+        input.textContent = text || '';
+    };
+    const getCaretOffset = () => {
+        const sel = window.getSelection();
+        if (!input || !sel || !sel.rangeCount) return getComposerText().length;
+        const range = sel.getRangeAt(0);
+        if (!input.contains(range.startContainer)) return getComposerText().length;
+        const pre = range.cloneRange();
+        pre.selectNodeContents(input);
+        pre.setEnd(range.startContainer, range.startOffset);
+        return pre.toString().length;
+    };
+    const getCaretEndOffset = () => {
+        const sel = window.getSelection();
+        if (!input || !sel || !sel.rangeCount) return getCaretOffset();
+        const range = sel.getRangeAt(0);
+        if (!input.contains(range.endContainer)) return getCaretOffset();
+        const pre = range.cloneRange();
+        pre.selectNodeContents(input);
+        pre.setEnd(range.endContainer, range.endOffset);
+        return pre.toString().length;
+    };
+    const setCaretOffset = (pos) => {
+        if (!input) return;
+        const walk = document.createTreeWalker(input, NodeFilter.SHOW_TEXT, null);
+        let node; let left = Math.max(0, pos);
+        let target = input; let targetOffset = 0;
+        while ((node = walk.nextNode())) {
+            const len = node.nodeValue?.length || 0;
+            if (left <= len) {
+                target = node;
+                targetOffset = left;
+                break;
+            }
+            left -= len;
+            target = node;
+            targetOffset = len;
+        }
+        const range = document.createRange();
+        try {
+            range.setStart(target, Math.min(targetOffset, target.nodeType === 3 ? target.nodeValue.length : 0));
+            range.collapse(true);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+        } catch (err) {}
+    };
+    // Совместимость со старым API textarea
     if (input) {
-        input.setAttribute('readonly', 'readonly');
-        const unlockAutofill = () => {
-            input.removeAttribute('readonly');
-        };
-        input.addEventListener('focus', () => {
-            setTimeout(unlockAutofill, 30);
-        }, { passive: true });
-        input.addEventListener('pointerdown', unlockAutofill, { passive: true });
+        Object.defineProperty(input, 'value', {
+            configurable: true,
+            get() { return getComposerText(); },
+            set(v) { setComposerText(v); },
+        });
+        Object.defineProperty(input, 'selectionStart', {
+            configurable: true,
+            get() { return getCaretOffset(); },
+            set(v) { setCaretOffset(Number(v) || 0); },
+        });
+        Object.defineProperty(input, 'selectionEnd', {
+            configurable: true,
+            get() { return getCaretEndOffset(); },
+            set(v) { setCaretOffset(Number(v) || 0); },
+        });
+        input.setSelectionRange = (start) => setCaretOffset(Number(start) || 0);
+        Object.defineProperty(input, 'disabled', {
+            configurable: true,
+            get() { return input.getAttribute('contenteditable') === 'false'; },
+            set(v) { input.setAttribute('contenteditable', v ? 'false' : 'true'); },
+        });
+        // Вставка только plain text — без HTML и без автозаполнения
+        input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData)?.getData('text/plain') || '';
+            document.execCommand('insertText', false, text);
+        });
     }
 
     const toast = (msg, type = 'info') => {
@@ -808,11 +880,15 @@
         if (!input) return;
         input.style.height = 'auto';
         input.style.height = Math.min(input.scrollHeight, 160) + 'px';
+        const empty = getComposerText().trim() === '';
+        input.classList.toggle('is-empty', empty);
+        if (empty && input.innerHTML === '<br>') input.innerHTML = '';
     };
     input?.addEventListener('input', () => {
         autosize();
         updateMentionMenu();
     });
+    autosize();
     input?.addEventListener('keydown', (e) => {
         if (mentionMenu && !mentionMenu.classList.contains('d-none')) {
             const items = [...mentionMenu.querySelectorAll('[data-mention-name]')];
@@ -1965,7 +2041,7 @@
         if (!ae || ae === input) return false;
         if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden]), .ui-choice-overlay, .ui-toast-root')) return true;
         if (ae.id === 'bx-chat-search' || ae.closest?.('#bx-chat-search, .bx-forward-search, .bx-task-search, .bx-selection-bar')) return true;
-        if (ae.matches?.('input:not([type="hidden"]):not([type="file"]):not(#bx-composer-input), textarea:not(#bx-composer-input), select, [contenteditable="true"]')) return true;
+        if (ae.matches?.('input:not([type="hidden"]):not([type="file"]):not(#bx-composer-input), textarea:not(#bx-composer-input), select, [contenteditable="true"]:not(#bx-composer-input)')) return true;
         const gearDrop = document.getElementById('bx-header-menu-drop');
         if (gearDrop && !gearDrop.hasAttribute('hidden')) return true;
         return false;

@@ -173,7 +173,7 @@ return [
 
     'template' => [
         'header' => '',
-        'footer' => 'brand.footer',
+        'footer' => '',
     ],
 
     /*
