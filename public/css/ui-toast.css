@@ -1,0 +1,195 @@
+.ui-toast-root {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10050;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    width: min(360px, calc(100vw - 1.5rem));
+    pointer-events: none;
+}
+
+.ui-toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: 14px;
+    background: #0f172a;
+    color: #f8fafc;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    opacity: 0;
+    transform: translateX(12px);
+    transition: opacity .2s ease, transform .2s ease;
+}
+.ui-toast.is-in {
+    opacity: 1;
+    transform: translateX(0);
+}
+.ui-toast.is-leaving {
+    opacity: 0;
+    transform: translateX(12px);
+}
+.ui-toast__icon {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+}
+.ui-toast__icon svg { width: 20px; height: 20px; display: block; }
+.ui-toast__body {
+    flex: 1 1 auto;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.ui-toast__close {
+    border: 0;
+    background: transparent;
+    color: rgba(248, 250, 252, 0.7);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.15rem;
+}
+.ui-toast--success { background: #14532d; }
+.ui-toast--error { background: #7f1d1d; }
+.ui-toast--warning { background: #78350f; }
+.ui-toast--info { background: #0f172a; }
+
+.ui-dialog-root {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.ui-dialog-root[hidden] { display: none !important; }
+.ui-dialog__backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: rgba(15, 23, 42, 0.45);
+    cursor: pointer;
+}
+.ui-dialog__panel {
+    position: relative;
+    z-index: 1;
+    width: min(420px, 100%);
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+    padding: 1.15rem 1.2rem 1rem;
+}
+.ui-dialog__title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.45rem;
+}
+.ui-dialog__text {
+    font-size: 0.9rem;
+    color: #475569;
+    line-height: 1.45;
+    margin-bottom: 0.85rem;
+}
+.ui-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+.ui-dialog__btn {
+    border: 0;
+    border-radius: 10px;
+    padding: 0.55rem 0.95rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.ui-dialog__btn--ghost {
+    background: #f1f5f9;
+    color: #334155;
+}
+.ui-dialog__btn--primary {
+    background: #2563eb;
+    color: #fff;
+}
+.ui-dialog__btn--danger {
+    background: #dc2626;
+    color: #fff;
+}
+
+.ui-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.ui-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    background: #fff;
+}
+.ui-choice:has(input:checked) {
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+.ui-choice input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.ui-choice__mark {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    border-radius: 999px;
+    border: 2px solid #94a3b8;
+    flex: 0 0 auto;
+    position: relative;
+}
+.ui-choice:has(input:checked) .ui-choice__mark {
+    border-color: #2563eb;
+}
+.ui-choice:has(input:checked) .ui-choice__mark::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 999px;
+    background: #2563eb;
+}
+.ui-choice__text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+.ui-choice__text strong {
+    font-size: 0.92rem;
+    color: #0f172a;
+}
+.ui-choice__text small {
+    font-size: 0.78rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+    .ui-toast-root {
+        top: 0.65rem;
+        right: 0.65rem;
+        left: 0.65rem;
+        width: auto;
+    }
+}

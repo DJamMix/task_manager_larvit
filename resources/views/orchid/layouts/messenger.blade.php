@@ -23,6 +23,7 @@
      data-calls-start-url="{{ $calls_start_url ?? '' }}"
      data-call-join-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.calls.join', ['call' => 999999])) }}"
      data-forward-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.forward', $active_chat_id) : '' }}"
+     data-delete-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.messages.delete', $active_chat_id) : '' }}"
      data-chats-picker-url="{{ $chats_picker_url ?? route('platform.systems.chats.picker') }}"
      data-media-url="{{ $chats_media_url ?? '' }}"
      data-vapid-key-url="{{ route('platform.web-push.vapid-key') }}"
@@ -296,6 +297,7 @@
                 <span id="bx-selection-count">Выбрано: 0</span>
                 <div>
                     <button type="button" class="btn btn-sm btn-primary" id="bx-forward-selected">Переслать (0)</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="bx-delete-selected">Удалить</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" id="bx-selection-cancel">Отмена</button>
                 </div>
             </div>
@@ -697,6 +699,11 @@
     const FILES_MAX = 10;
     let pendingFiles = [];
 
+    const toast = (msg, type = 'info') => {
+        if (typeof window.uiToast === 'function') window.uiToast(msg, type);
+        else console.warn(msg);
+    };
+
     const syncFilesInput = () => {
         if (!filesInput) return;
         const dt = new DataTransfer();
@@ -744,13 +751,13 @@
         if (!incoming.length) return;
         const room = FILES_MAX - pendingFiles.length;
         if (room <= 0) {
-            alert('Можно прикрепить не больше ' + FILES_MAX + ' файлов за раз');
+            toast('Можно прикрепить не больше ' + FILES_MAX + ' файлов за раз', 'info');
             syncFilesInput();
             return;
         }
         const add = incoming.slice(0, room);
         if (incoming.length > room) {
-            alert('Добавлено ' + add.length + ' из ' + incoming.length + ' (лимит ' + FILES_MAX + ')');
+            toast('Добавлено ' + add.length + ' из ' + incoming.length + ' (лимит ' + FILES_MAX + ')', 'info');
         }
         pendingFiles = pendingFiles.concat(add);
         syncFilesInput();
@@ -1225,6 +1232,71 @@
         selectedMessageIds.clear();
         updateSelection();
     });
+
+    const removeMessagesFromDom = (ids) => {
+        (ids || []).forEach((id) => {
+            document.getElementById('chat-msg-' + id)?.remove();
+            selectedMessageIds.delete(Number(id));
+        });
+        updateSelection();
+    };
+
+    document.getElementById('bx-delete-selected')?.addEventListener('click', async () => {
+        const deleteUrl = root?.getAttribute('data-delete-url');
+        if (!deleteUrl || !selectedMessageIds.size) return;
+
+        const ids = [...selectedMessageIds];
+        const allMine = ids.every((id) => {
+            const el = document.getElementById('chat-msg-' + id);
+            return el?.classList.contains('bx-msg--mine');
+        });
+
+        const options = [
+            {
+                value: 'me',
+                label: 'Удалить у себя',
+                hint: 'Сообщение исчезнет только у вас',
+            },
+        ];
+        if (allMine) {
+            options.unshift({
+                value: 'everyone',
+                label: 'Удалить у всех',
+                hint: 'Как в Telegram — пропадёт у всех участников',
+            });
+        }
+
+        const scope = typeof window.uiChoice === 'function'
+            ? await window.uiChoice({
+                title: ids.length > 1 ? 'Удалить сообщения?' : 'Удалить сообщение?',
+                message: allMine
+                    ? 'По умолчанию — удалить у всех. Чужие сообщения можно убрать только у себя.'
+                    : 'Чужие сообщения удаляются только у вас.',
+                options,
+                defaultValue: allMine ? 'everyone' : 'me',
+                confirmText: 'Удалить',
+                danger: true,
+            })
+            : null;
+
+        if (!scope) return;
+
+        try {
+            const response = await fetch(deleteUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                body: JSON.stringify({ message_ids: ids, scope }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.message || 'Не удалось удалить');
+            removeMessagesFromDom(data.deleted_ids || ids);
+            toast(scope === 'everyone' ? 'Удалено у всех' : 'Удалено у вас', 'success');
+        } catch (error) {
+            toast(error.message || 'Не удалось удалить сообщения', 'error');
+        }
+    });
+
     const closeForward = () => forwardSheet?.setAttribute('hidden', '');
     document.getElementById('bx-forward-close')?.addEventListener('click', closeForward);
     document.getElementById('bx-forward-close-bg')?.addEventListener('click', closeForward);
@@ -1302,7 +1374,7 @@
             closeForward();
         } catch (error) {
             target.disabled = false;
-            alert(error.message || 'Не удалось переслать сообщения');
+            toast(error.message || 'Не удалось переслать сообщения', 'error');
         }
     });
 
@@ -1540,7 +1612,7 @@
                 pauseOtherVoices(wrap);
                 const ok = await ensureVoiceBlobSrc(wrap, audio, src);
                 if (!ok) {
-                    alert('Не удалось загрузить голосовое сообщение');
+                    toast('Не удалось загрузить голосовое сообщение', 'error');
                     return;
                 }
                 try {
@@ -1555,7 +1627,7 @@
                             return;
                         } catch (e2) {}
                     }
-                    alert('Браузер не может воспроизвести это голосовое. Попросите отправителя записать ещё раз (нужен формат WAV — после обновления чатов).');
+                    toast('Браузер не может воспроизвести это голосовое. Попросите отправителя записать ещё раз (нужен формат WAV — после обновления чатов).', 'info');
                     wrap.classList.add('is-error');
                 }
             });
@@ -1867,7 +1939,7 @@
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                alert(err.message || 'Не удалось отправить сообщение');
+                toast(err.message || 'Не удалось отправить сообщение', 'error');
                 return;
             }
             const data = await res.json();
@@ -1885,7 +1957,7 @@
             }
             resetComposer();
         } catch (e) {
-            alert('Не удалось отправить сообщение');
+            toast('Не удалось отправить сообщение', 'error');
         } finally {
             sending = false;
             setSendingUi(false);
@@ -1904,7 +1976,7 @@
         if (!incoming.length) return false;
         const room = FILES_MAX - pendingFiles.length;
         if (room <= 0) {
-            alert('Можно прикрепить не больше ' + FILES_MAX + ' файлов за раз');
+            toast('Можно прикрепить не больше ' + FILES_MAX + ' файлов за раз', 'info');
             return true;
         }
         pendingFiles = pendingFiles.concat(incoming.slice(0, room).map((f, i) => {
@@ -2034,7 +2106,7 @@
             }
             // Если идёт запись — перезапуск на новом устройстве сложно; подсказка
             if (voiceRecording) {
-                alert('Смена микрофона применится со следующей записи. Завершите текущую или отмените.');
+                toast('Смена микрофона применится со следующей записи. Завершите текущую или отмените.', 'info');
             }
         });
     });
@@ -2180,7 +2252,7 @@
             blob = encodeWavPcm(mono, targetRate);
         }
         if (blob.size > MAX_SAFE) {
-            alert('Голосовое слишком большое. Запишите короче (до ~1.5 мин) или поднимите upload_max_filesize в PHP до 16M.');
+            toast('Голосовое слишком большое. Запишите короче (до ~1.5 мин) или поднимите upload_max_filesize в PHP до 16M.', 'error');
             return;
         }
 
@@ -2196,7 +2268,7 @@
     const startVoiceCapture = async (stream) => {
         const Ctx = window.AudioContext || window.webkitAudioContext;
         if (!Ctx) {
-            alert('Браузер не поддерживает запись голоса');
+            toast('Браузер не поддерживает запись голоса', 'error');
             return false;
         }
         mediaStream = stream;
@@ -2600,6 +2672,9 @@
                 localStorage.setItem(storageKey, String(since));
             }
             applyChatsFromPoll(data.chats || []);
+            if (Array.isArray(data.removed_ids) && data.removed_ids.length) {
+                removeMessagesFromDom(data.removed_ids);
+            }
 
             (data.receipts || []).forEach((r) => {
                 const article = document.getElementById('chat-msg-' + r.id);
@@ -2668,7 +2743,7 @@
                 target.click();
                 return;
             }
-            alert('Не удалось открыть форму. Обновите страницу.');
+            toast('Не удалось открыть форму. Обновите страницу.', 'error');
         });
     });
 
@@ -2886,5 +2961,5 @@
 })();
 </script>
 @if(!empty($calls_enabled))
-<script src="{{ asset('js/chat-calls.js') }}?v=20260725o"></script>
+<script src="{{ asset('js/chat-calls.js') }}?v=20260730a"></script>
 @endif

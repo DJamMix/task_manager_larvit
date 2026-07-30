@@ -49,8 +49,12 @@
     <div class="bx-msg__bubble">
         @if($message->parent)
             <div class="bx-msg__reply">
-                Ответ на {{ $message->parent->user?->displayName() }}:
-                {{ \Illuminate\Support\Str::limit(strip_tags($message->parent->plain_text ?? ''), 70) }}
+                @if($message->parent->trashed())
+                    Ответ на удалённое сообщение
+                @else
+                    Ответ на {{ $message->parent->user?->displayName() }}:
+                    {{ \Illuminate\Support\Str::limit(strip_tags($message->parent->plain_text ?? ''), 70) }}
+                @endif
             </div>
         @endif
 

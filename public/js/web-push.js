@@ -333,11 +333,11 @@
             event.stopPropagation();
 
             if (!supported()) {
-                alert('Браузер не поддерживает push-уведомления.');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Браузер не поддерживает push-уведомления.', 'error');
                 return;
             }
             if (!isSecure()) {
-                alert('Разрешение на уведомления доступно только по HTTPS (или на localhost).');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Разрешение на уведомления доступно только по HTTPS (или на localhost).', 'info');
                 return;
             }
 
@@ -348,14 +348,14 @@
                 try {
                     if (button.dataset.enabled === '1') {
                         await unsubscribe();
-                        alert('Push-уведомления отключены на этом устройстве.');
+                        (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Push-уведомления отключены на этом устройстве.', 'info');
                         return;
                     }
 
                     const permission = await permissionPromise;
                     if (permission === 'denied') {
                         setUi('Запрещено', 'Открыть подсказку');
-                        alert('Разрешение отклонено. Включите уведомления в настройках сайта браузера и повторите.');
+                        (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Разрешение отклонено. Включите уведомления в настройках сайта браузера и повторите.', 'error');
                         return;
                     }
                     if (permission !== 'granted') {
@@ -365,13 +365,13 @@
                     await syncSubscription({ force: true });
                     await showTestNotification();
                     if (isEdge()) {
-                        alert('Push включены в Edge. Если уведомления не видны: Параметры Windows → Система → Уведомления → Microsoft Edge = Вкл. Затем «Проверить push».');
+                        (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Push включены в Edge. Если уведомления не видны: Параметры Windows → Система → Уведомления → Microsoft Edge = Вкл. Затем «Проверить push».', 'success');
                     } else {
-                        alert('Push включены. Можно нажать «Проверить push». Свои сообщения себе не приходят.');
+                        (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Push включены. Можно нажать «Проверить push». Свои сообщения себе не приходят.', 'success');
                     }
                 } catch (error) {
                     console.warn('Web Push:', error);
-                    alert(error?.message || 'Не удалось включить push-уведомления');
+                    (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})(error?.message || 'Не удалось включить push-уведомления', 'error');
                     setUi('Ошибка', 'Повторить');
                 } finally {
                     button.disabled = false;
@@ -395,10 +395,10 @@
                         const res = await request(testUrl, { method: 'POST' });
                         const payload = await res.json().catch(() => ({}));
                         if (!res.ok) throw new Error(payload.message || 'Сервер не смог отправить push');
-                        alert('Тестовый push отправлен (' + (payload.subscriptions || 1) + ' подписка).');
+                        (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Тестовый push отправлен (' + (payload.subscriptions || 1) + ' подписка).', 'success');
                     } catch (error) {
                         console.warn('Web Push test:', error);
-                        alert(error?.message || 'Не удалось проверить push');
+                        (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})(error?.message || 'Не удалось проверить push', 'error');
                     } finally {
                         testButton.disabled = false;
                         await refreshUi();

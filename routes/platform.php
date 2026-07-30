@@ -481,6 +481,26 @@ Route::post('chats/{chat}/forward', function (
     return response()->json(['ok' => true]);
 })->name('platform.systems.chats.forward');
 
+Route::post('chats/{chat}/messages/delete', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $data = $request->validate([
+        'message_ids' => 'required|array|min:1|max:20',
+        'message_ids.*' => 'integer',
+        'scope' => 'required|in:me,everyone',
+    ]);
+
+    return response()->json($chats->deleteMessages(
+        $chat,
+        $request->user(),
+        $data['message_ids'],
+        $data['scope']
+    ));
+})->name('platform.systems.chats.messages.delete');
+
 Route::get('chats/{chat}/media', function (
     \Illuminate\Http\Request $request,
     \App\Models\Chat $chat,

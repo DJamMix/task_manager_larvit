@@ -731,7 +731,7 @@
                 await room.localParticipant.setMicrophoneEnabled(micOn, { deviceId });
             }
         } catch (e) {
-            alert('Не удалось переключить микрофон');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось переключить микрофон', 'error');
         }
     };
 
@@ -746,7 +746,7 @@
                 await room.localParticipant.setCameraEnabled(true, camOptions());
             }
         } catch (e) {
-            alert('Не удалось переключить камеру');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось переключить камеру', 'error');
         }
     };
 
@@ -764,7 +764,7 @@
             screenOn = false;
             screenBtn?.classList.remove('is-on');
             if (e?.name !== 'NotAllowedError') {
-                alert('Не удалось показать экран. Разрешите доступ в браузере.');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось показать экран. Разрешите доступ в браузере.', 'error');
             }
         }
     };
@@ -932,19 +932,19 @@
                 await room.localParticipant.setCameraEnabled(camOn, camOptions());
                 camBtn?.classList.toggle('is-off', !camOn);
             } catch (e) {
-                alert(e.message || 'Не удалось переключить камеру');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})(e.message || 'Не удалось переключить камеру', 'error');
             }
             return;
         }
         if (!startUrl) {
-            alert('Звонки недоступны в этом чате');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Звонки недоступны в этом чате', 'error');
             return;
         }
         try {
             const data = await postJson(startUrl, { video: !!video });
             await connectRoom(data);
         } catch (e) {
-            alert(e.message || 'Не удалось начать звонок');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})(e.message || 'Не удалось начать звонок', 'error');
         }
     };
 
@@ -957,7 +957,7 @@
             joinableCallId = null;
             await connectRoom(data);
         } catch (e) {
-            alert(e.message || 'Не удалось подключиться');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})(e.message || 'Не удалось подключиться', 'error');
         }
     };
 
@@ -1006,7 +1006,7 @@
                 setTimeout(() => { guestCreateBtn.textContent = 'Создать / обновить'; }, 1600);
             }
         } catch (e) {
-            alert(e.message || 'Не удалось создать ссылку');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})(e.message || 'Не удалось создать ссылку', 'error');
         }
     });
     guestCopyBtn?.addEventListener('click', async () => {
@@ -1037,7 +1037,7 @@
             guestUrl = '';
             syncGuestUi();
         } catch (e) {
-            alert('Не удалось отключить ссылку');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось отключить ссылку', 'error');
         }
     });
     micSelect?.addEventListener('change', () => switchMic(micSelect.value));
@@ -1053,7 +1053,7 @@
             await room.localParticipant.setMicrophoneEnabled(micOn, micOptions());
             micBtn.classList.toggle('is-off', !micOn);
         } catch (e) {
-            alert('Микрофон недоступен');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Микрофон недоступен', 'error');
         }
     });
     camBtn?.addEventListener('click', async () => {
@@ -1071,7 +1071,7 @@
         } catch (e) {
             camOn = false;
             camBtn.classList.add('is-off');
-            alert('Камера недоступна. Разрешите доступ в браузере.');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Камера недоступна. Разрешите доступ в браузере.', 'error');
         }
     });
     document.getElementById('bx-incoming-accept')?.addEventListener('click', () => {

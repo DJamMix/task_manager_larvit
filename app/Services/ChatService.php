@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Chat;
 use App\Models\ChatMessage;
+use App\Models\ChatMessageHide;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\RoleCatalog;
@@ -251,6 +252,12 @@ class ChatService
                 $pivot = $chat->members->firstWhere('id', $user->id)?->pivot;
                 $chat->setAttribute('is_muted', (bool) ($pivot?->is_muted ?? false));
                 $chat->setAttribute('is_pinned', (bool) ($pivot?->is_pinned ?? false));
+                $latest = ChatMessage::query()
+                    ->where('chat_id', $chat->id)
+                    ->visibleTo($user)
+                    ->orderByDesc('id')
+                    ->first();
+                $chat->setRelation('latestMessage', $latest);
             });
     }
 
@@ -505,6 +512,7 @@ class ChatService
                 ];
             })->values()->all(),
             'messages' => $this->messagesPayload($user, $activeChatId, $sinceMessageId),
+            'removed_ids' => $this->removedMessageIds($user, $activeChatId),
             'receipts' => $this->receiptsPayload($user, $activeChatId),
             'calls' => app(CallService::class)->openCallsPayload($user),
             'presence' => $this->presenceMap($memberIds),
@@ -676,6 +684,7 @@ class ChatService
         $like = '%' . addcslashes($q, '%_\\') . '%';
         $messages = ChatMessage::query()
             ->whereIn('chat_id', $chatIds)
+            ->visibleTo($user)
             ->where('is_system', false)
             ->whereNotNull('plain_text')
             ->where('plain_text', 'like', $like)
@@ -744,8 +753,9 @@ class ChatService
 
         $messages = ChatMessage::query()
             ->where('chat_id', $chat->id)
+            ->visibleTo($user)
             ->where('id', '>', $sinceMessageId)
-            ->with(['user', 'parent.user', 'task', 'attachment'])
+            ->with(['user', 'parent.user' => fn ($q) => $q->withTrashed(), 'task', 'attachment'])
             ->orderBy('id')
             ->limit(50)
             ->get();
@@ -768,18 +778,20 @@ class ChatService
             abort(403);
         }
 
-        $with = ['user', 'parent.user', 'task', 'attachment'];
+        $with = ['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment'];
         $limit = max(10, min(100, $limit));
 
         if ($focusMessageId) {
             $focus = ChatMessage::query()
                 ->where('chat_id', $chat->id)
+                ->visibleTo($viewer)
                 ->whereKey($focusMessageId)
                 ->first();
 
             if ($focus) {
                 $before = ChatMessage::query()
                     ->where('chat_id', $chat->id)
+                    ->visibleTo($viewer)
                     ->where('id', '<=', $focus->id)
                     ->with($with)
                     ->orderByDesc('id')
@@ -790,6 +802,7 @@ class ChatService
 
                 $after = ChatMessage::query()
                     ->where('chat_id', $chat->id)
+                    ->visibleTo($viewer)
                     ->where('id', '>', $focus->id)
                     ->with($with)
                     ->orderBy('id')
@@ -799,7 +812,7 @@ class ChatService
                 $messages = $before->concat($after)->unique('id')->sortBy('id')->values();
                 $oldestId = $messages->first()?->id ? (int) $messages->first()->id : null;
                 $hasMore = $oldestId
-                    ? ChatMessage::query()->where('chat_id', $chat->id)->where('id', '<', $oldestId)->exists()
+                    ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($viewer)->where('id', '<', $oldestId)->exists()
                     : false;
 
                 return [
@@ -812,6 +825,7 @@ class ChatService
 
         $messages = ChatMessage::query()
             ->where('chat_id', $chat->id)
+            ->visibleTo($viewer)
             ->with($with)
             ->orderByDesc('id')
             ->limit($limit)
@@ -821,7 +835,7 @@ class ChatService
 
         $oldestId = $messages->first()?->id ? (int) $messages->first()->id : null;
         $hasMore = $oldestId
-            ? ChatMessage::query()->where('chat_id', $chat->id)->where('id', '<', $oldestId)->exists()
+            ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($viewer)->where('id', '<', $oldestId)->exists()
             : false;
 
         return [
@@ -846,8 +860,9 @@ class ChatService
         $limit = max(10, min(100, $limit));
         $batch = ChatMessage::query()
             ->where('chat_id', $chat->id)
+            ->visibleTo($user)
             ->where('id', '<', $beforeId)
-            ->with(['user', 'parent.user', 'task', 'attachment'])
+            ->with(['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment'])
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
@@ -856,7 +871,7 @@ class ChatService
 
         $oldestId = $batch->first()?->id ? (int) $batch->first()->id : null;
         $hasMore = $oldestId
-            ? ChatMessage::query()->where('chat_id', $chat->id)->where('id', '<', $oldestId)->exists()
+            ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($user)->where('id', '<', $oldestId)->exists()
             : false;
 
         return [
@@ -1371,6 +1386,88 @@ class ChatService
         foreach ($recipients as $user) {
             $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO);
         }
+    }
+
+    /**
+     * Удаление сообщений как в Telegram/VK.
+     * scope=me — скрыть у себя; scope=everyone — soft-delete (только свои сообщения).
+     *
+     * @param  list<int>  $messageIds
+     * @return array{deleted_ids: list<int>, scope: string}
+     */
+    public function deleteMessages(Chat $chat, User $actor, array $messageIds, string $scope): array
+    {
+        if (!$chat->isMember($actor->id)) {
+            abort(403);
+        }
+
+        $scope = $scope === 'everyone' ? 'everyone' : 'me';
+        $ids = collect($messageIds)->map(fn ($id) => (int) $id)->filter()->unique()->take(20)->values();
+        if ($ids->isEmpty()) {
+            return ['deleted_ids' => [], 'scope' => $scope];
+        }
+
+        $messages = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->whereIn('id', $ids)
+            ->where('is_system', false)
+            ->get();
+
+        $deletedIds = [];
+
+        foreach ($messages as $message) {
+            if ($scope === 'everyone') {
+                if ((int) $message->user_id !== (int) $actor->id) {
+                    continue;
+                }
+                $message->deleted_by = $actor->id;
+                $message->save();
+                $message->delete();
+                $deletedIds[] = (int) $message->id;
+                continue;
+            }
+
+            ChatMessageHide::query()->firstOrCreate([
+                'chat_message_id' => $message->id,
+                'user_id' => $actor->id,
+            ]);
+            $deletedIds[] = (int) $message->id;
+        }
+
+        if ($deletedIds !== []) {
+            $chat->touch();
+        }
+
+        return ['deleted_ids' => $deletedIds, 'scope' => $scope];
+    }
+
+    /**
+     * ID сообщений, которые нужно убрать из UI у пользователя (удалены у всех / скрыты у себя).
+     *
+     * @return list<int>
+     */
+    public function removedMessageIds(User $user, ?int $chatId, ?\Carbon\CarbonInterface $since = null): array
+    {
+        if (!$chatId) {
+            return [];
+        }
+
+        $since = $since ?: now()->subMinutes(3);
+
+        $trashed = ChatMessage::onlyTrashed()
+            ->where('chat_id', $chatId)
+            ->where('deleted_at', '>=', $since)
+            ->pluck('id')
+            ->all();
+
+        $hidden = ChatMessageHide::query()
+            ->where('user_id', $user->id)
+            ->where('created_at', '>=', $since)
+            ->whereHas('message', fn ($q) => $q->withTrashed()->where('chat_id', $chatId))
+            ->pluck('chat_message_id')
+            ->all();
+
+        return array_values(array_unique(array_map('intval', array_merge($trashed, $hidden))));
     }
 
     private function isChatMemberUserId(int $userId): bool

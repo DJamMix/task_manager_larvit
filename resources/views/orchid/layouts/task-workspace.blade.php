@@ -539,7 +539,7 @@
         const plain = quill ? (quill.getText() || '').trim() : '';
         const hasFiles = pendingFiles.length > 0;
         if (!plain && !hasFiles) {
-            alert('Напишите сообщение или прикрепите файл');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Напишите сообщение или прикрепите файл', 'info');
             return;
         }
 
@@ -564,13 +564,13 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
             });
             if (!res.ok) {
-                alert('Не удалось отправить сообщение');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось отправить сообщение', 'error');
                 setTwSending(false);
                 return;
             }
             window.location.reload();
         } catch (e) {
-            alert('Не удалось отправить сообщение');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось отправить сообщение', 'error');
             setTwSending(false);
         }
     });
@@ -733,13 +733,13 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
             });
             if (!res.ok) {
-                alert('Не удалось добавить связь');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось добавить связь', 'error');
                 linkSubmit.disabled = false;
                 return;
             }
             window.location.reload();
         } catch (e) {
-            alert('Не удалось добавить связь');
+            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось добавить связь', 'error');
             linkSubmit.disabled = false;
         }
     });
@@ -756,12 +756,12 @@
             try {
                 const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!res.ok) {
-                    alert('Не удалось удалить связь');
+                    (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось удалить связь', 'error');
                     return;
                 }
                 window.location.reload();
             } catch (e) {
-                alert('Не удалось удалить связь');
+                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось удалить связь', 'error');
             }
         });
     });
