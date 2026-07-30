@@ -398,8 +398,17 @@ class ChatService
             foreach ($message->attachment as $file) {
                 $mime = strtolower((string) ($file->mime ?? ''));
                 $extension = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
+                $group = strtolower((string) ($file->group ?? ''));
+                $isVoice = $group === 'voice'
+                    || str_starts_with($mime, 'audio/')
+                    || in_array($extension, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true)
+                    || str_starts_with(strtolower((string) $file->original_name), 'voice.');
                 $isImage = str_starts_with($mime, 'image/')
                     || in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+
+                if ($isVoice) {
+                    continue;
+                }
 
                 if (($tab === 'media') !== $isImage) {
                     continue;

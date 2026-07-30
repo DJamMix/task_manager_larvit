@@ -115,97 +115,108 @@
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
                     </a>
                     @php $headerPeer = $active->type === 'direct' ? $active->otherMember() : null; @endphp
-                    @if($active->type === 'direct')
-                        @include('orchid.layouts.partials.bx-avatar', [
-                            'avatarUser' => $headerPeer,
-                            'avatarChat' => null,
-                            'size' => 'lg',
-                            'shape' => 'round',
-                            'showOnline' => true,
-                            'isOnline' => $presenceOnline($headerPeer?->id),
-                        ])
-                    @else
-                        @include('orchid.layouts.partials.bx-avatar', [
-                            'avatarChat' => $active,
-                            'avatarUser' => null,
-                            'size' => 'lg',
-                            'shape' => 'square',
-                        ])
-                    @endif
-                    <div>
-                        <h2 class="h5 mb-0">{{ $active->displayTitle() }}</h2>
-                        @php
-                            $memberCount = $active->members->count();
-                            $memberWord = $memberCount === 1 ? 'участник' : (
-                                ($memberCount % 10 >= 2 && $memberCount % 10 <= 4 && !in_array($memberCount % 100, [12, 13, 14], true))
-                                    ? 'участника'
-                                    : 'участников'
-                            );
-                            $defaultSubtitle = $active->type === 'direct'
-                                ? ($presenceOnline($headerPeer?->id) ? 'в сети' : 'не в сети')
-                                : ($memberCount . ' ' . $memberWord);
-                        @endphp
-                        <button type="button"
-                                class="bx-chat-subtitle"
-                                id="bx-open-members"
-                                data-default-subtitle="{{ $defaultSubtitle }}"
-                                data-member-count="{{ $memberCount }}"
-                                data-peer-id="{{ $headerPeer?->id ?? '' }}">
-                            {{ $defaultSubtitle }}
-                        </button>
-                    </div>
+                    <button type="button" class="bx-chat-identity" id="bx-open-chat-info" title="Информация о чате">
+                        @if($active->type === 'direct')
+                            @include('orchid.layouts.partials.bx-avatar', [
+                                'avatarUser' => $headerPeer,
+                                'avatarChat' => null,
+                                'size' => 'lg',
+                                'shape' => 'round',
+                                'showOnline' => true,
+                                'isOnline' => $presenceOnline($headerPeer?->id),
+                            ])
+                        @else
+                            @include('orchid.layouts.partials.bx-avatar', [
+                                'avatarChat' => $active,
+                                'avatarUser' => null,
+                                'size' => 'lg',
+                                'shape' => 'square',
+                            ])
+                        @endif
+                        <div class="bx-chat-identity__text">
+                            <h2 class="h5 mb-0 bx-chat-identity__title">{{ $active->displayTitle() }}</h2>
+                            @php
+                                $memberCount = $active->members->count();
+                                $memberWord = $memberCount === 1 ? 'участник' : (
+                                    ($memberCount % 10 >= 2 && $memberCount % 10 <= 4 && !in_array($memberCount % 100, [12, 13, 14], true))
+                                        ? 'участника'
+                                        : 'участников'
+                                );
+                                $defaultSubtitle = $active->type === 'direct'
+                                    ? ($presenceOnline($headerPeer?->id) ? 'в сети' : 'не в сети')
+                                    : ($memberCount . ' ' . $memberWord);
+                            @endphp
+                            <span class="bx-chat-subtitle"
+                                  id="bx-open-members"
+                                  data-default-subtitle="{{ $defaultSubtitle }}"
+                                  data-member-count="{{ $memberCount }}"
+                                  data-peer-id="{{ $headerPeer?->id ?? '' }}">
+                                {{ $defaultSubtitle }}
+                            </span>
+                        </div>
+                    </button>
                 </div>
                 <div class="bx-messenger__header-actions">
-                    <button type="button" class="bx-mute-btn" id="bx-open-media">
-                        <span>Медиа</span>
-                    </button>
-                    <button type="button" class="bx-mute-btn" id="bx-enable-push" hidden>
-                        <span>Включить push</span>
-                    </button>
                     @if(!empty($calls_enabled) && !empty($calls_start_url))
                         <button type="button"
-                                class="bx-mute-btn bx-call-btn"
+                                class="bx-icon-btn bx-call-btn"
                                 id="bx-call-audio"
                                 title="Аудиозвонок"
+                                aria-label="Аудиозвонок"
                                 data-video="0">
                             <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
-                            <span>Звонок</span>
                         </button>
                         <button type="button"
-                                class="bx-mute-btn bx-call-btn"
+                                class="bx-icon-btn bx-call-btn"
                                 id="bx-call-video"
                                 title="Видеозвонок"
+                                aria-label="Видеозвонок"
                                 data-video="1">
                             <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                            <span>Видео</span>
                         </button>
                     @endif
-                    <label class="bx-notify-vol" title="Громкость звука новых сообщений">
-                        <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
-                        <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="75">
-                        <span id="bx-notify-volume-label">75%</span>
-                    </label>
-                    <button type="submit"
-                            class="bx-mute-btn {{ $isPinned ? 'is-active' : '' }}"
-                            formaction="{{ url()->current() }}/togglePin"
-                            form="post-form"
-                            title="{{ $isPinned ? 'Открепить' : 'Закрепить' }}">
-                        <svg class="bx-icon" viewBox="0 0 24 24" fill="{{ $isPinned ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
-                        <span>{{ $isPinned ? 'Закреплён' : 'Закрепить' }}</span>
-                    </button>
-                    <button type="submit"
-                            class="bx-mute-btn {{ $isMuted ? 'is-muted' : '' }}"
-                            formaction="{{ url()->current() }}/toggleMute"
-                            form="post-form"
-                            title="{{ $isMuted ? 'Включить звук' : 'Выключить звук' }}">
-                        @if($isMuted)
-                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                            <span>Без звука</span>
-                        @else
-                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
-                            <span>Звук</span>
-                        @endif
-                    </button>
+                    <div class="bx-header-menu" id="bx-header-menu">
+                        <button type="button"
+                                class="bx-icon-btn"
+                                id="bx-header-gear"
+                                title="Настройки чата"
+                                aria-label="Настройки"
+                                aria-expanded="false"
+                                aria-controls="bx-header-menu-drop">
+                            <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                        </button>
+                        <div class="bx-header-menu__drop" id="bx-header-menu-drop" hidden>
+                            <button type="submit"
+                                    class="bx-header-menu__item {{ $isPinned ? 'is-active' : '' }}"
+                                    formaction="{{ url()->current() }}/togglePin"
+                                    form="post-form">
+                                <svg class="bx-icon" viewBox="0 0 24 24" fill="{{ $isPinned ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                                <span>{{ $isPinned ? 'Открепить' : 'Закрепить' }}</span>
+                            </button>
+                            <button type="submit"
+                                    class="bx-header-menu__item {{ $isMuted ? 'is-muted' : '' }}"
+                                    formaction="{{ url()->current() }}/toggleMute"
+                                    form="post-form">
+                                @if($isMuted)
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                                    <span>Включить звук</span>
+                                @else
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+                                    <span>Без звука</span>
+                                @endif
+                            </button>
+                            <div class="bx-header-menu__item bx-header-menu__item--static">
+                                <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
+                                <span>Громкость</span>
+                                <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="75" class="bx-header-menu__range">
+                                <span id="bx-notify-volume-label" class="bx-header-menu__pct">75%</span>
+                            </div>
+                            <button type="button" class="bx-header-menu__item" id="bx-enable-push" hidden>
+                                <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                                <span>Включить push</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -389,43 +400,57 @@
     </div>
 
     @if($active)
-        <div class="bx-members-modal" id="bx-members-sheet" hidden>
-            <button type="button" class="bx-members-modal__backdrop" id="bx-members-close-bg" aria-label="Закрыть"></button>
-            <div class="bx-members-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="bx-members-title">
-                <div class="bx-members-modal__head">
-                    <strong id="bx-members-title">Участники · {{ $active->members->count() }}</strong>
-                    <button type="button" class="bx-members-modal__close" id="bx-members-close" aria-label="Закрыть">×</button>
+        <div class="bx-sheet" id="bx-chat-info" hidden>
+            <button type="button" class="bx-sheet__backdrop" id="bx-chat-info-close-bg" aria-label="Закрыть"></button>
+            <div class="bx-sheet__panel bx-chat-info__panel" role="dialog" aria-modal="true" aria-labelledby="bx-chat-info-title">
+                <div class="bx-sheet__head">
+                    <strong id="bx-chat-info-title">{{ $active->displayTitle() }}</strong>
+                    <button type="button" class="bx-sheet__close" id="bx-chat-info-close" aria-label="Закрыть">×</button>
                 </div>
-                <ul class="bx-members-modal__list">
-                    @foreach($active->members->sortBy(fn ($u) => mb_strtolower($u->displayName())) as $member)
-                        <li class="bx-members-modal__item" data-user-id="{{ $member->id }}">
-                            @include('orchid.layouts.partials.bx-avatar', [
-                                'avatarUser' => $member,
-                                'avatarChat' => null,
-                                'size' => 'md',
-                                'shape' => 'round',
-                                'showOnline' => true,
-                                'isOnline' => $presenceOnline($member->id),
-                            ])
-                            <div class="bx-members-modal__meta">
-                                <div class="bx-members-modal__name">{{ $member->displayName() }}</div>
-                                <div class="bx-members-modal__status {{ $presenceOnline($member->id) ? 'is-online' : '' }}"
-                                     data-online-label="в сети"
-                                     data-offline-label="{{ $member->pivot?->role === 'owner' ? 'владелец' : ($member->position ?: 'не в сети') }}">
-                                    @if($presenceOnline($member->id))
-                                        в сети
-                                    @elseif($member->pivot?->role === 'owner')
-                                        владелец
-                                    @elseif($member->position)
-                                        {{ $member->position }}
-                                    @else
-                                        не в сети
-                                    @endif
-                                </div>
-                            </div>
-                        </li>
-                    @endforeach
-                </ul>
+                <div class="bx-chat-info__tabs" role="tablist">
+                    <button type="button" class="is-active" data-info-tab="members">Участники</button>
+                    <button type="button" data-info-tab="media">Медиа</button>
+                    <button type="button" data-info-tab="files">Файлы</button>
+                    <button type="button" data-info-tab="links">Ссылки</button>
+                </div>
+                <div class="bx-chat-info__body">
+                    <div class="bx-chat-info__pane is-active" data-info-pane="members">
+                        <ul class="bx-members-modal__list" id="bx-members-list">
+                            @foreach($active->members->sortBy(fn ($u) => mb_strtolower($u->displayName())) as $member)
+                                <li class="bx-members-modal__item" data-user-id="{{ $member->id }}">
+                                    @include('orchid.layouts.partials.bx-avatar', [
+                                        'avatarUser' => $member,
+                                        'avatarChat' => null,
+                                        'size' => 'md',
+                                        'shape' => 'round',
+                                        'showOnline' => true,
+                                        'isOnline' => $presenceOnline($member->id),
+                                    ])
+                                    <div class="bx-members-modal__meta">
+                                        <div class="bx-members-modal__name">{{ $member->displayName() }}</div>
+                                        <div class="bx-members-modal__status {{ $presenceOnline($member->id) ? 'is-online' : '' }}"
+                                             data-online-label="в сети"
+                                             data-offline-label="{{ $member->pivot?->role === 'owner' ? 'владелец' : ($member->position ?: 'не в сети') }}">
+                                            @if($presenceOnline($member->id))
+                                                в сети
+                                            @elseif($member->pivot?->role === 'owner')
+                                                владелец
+                                            @elseif($member->position)
+                                                {{ $member->position }}
+                                            @else
+                                                не в сети
+                                            @endif
+                                        </div>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <div class="bx-chat-info__pane" data-info-pane="gallery" hidden>
+                        <div id="bx-media-content" class="bx-media-content">Загрузка…</div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary d-none mt-2" id="bx-media-more">Загрузить ещё</button>
+                    </div>
+                </div>
             </div>
         </div>
     @endif
@@ -446,23 +471,6 @@
                    autocomplete="off">
         </div>
         <div id="bx-forward-chats" class="bx-forward-chats">Загрузка чатов…</div>
-    </div>
-</div>
-
-<div class="bx-sheet" id="bx-media-sheet" hidden>
-    <button type="button" class="bx-sheet__backdrop" id="bx-media-close-bg" aria-label="Закрыть"></button>
-    <div class="bx-sheet__panel bx-media-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-media-title">
-        <div class="bx-sheet__head">
-            <strong id="bx-media-title">Медиа чата</strong>
-            <button type="button" class="bx-sheet__close" id="bx-media-close" aria-label="Закрыть">×</button>
-        </div>
-        <div class="bx-media-tabs" role="tablist">
-            <button type="button" class="is-active" data-media-tab="media">Медиа</button>
-            <button type="button" data-media-tab="files">Файлы</button>
-            <button type="button" data-media-tab="links">Ссылки</button>
-        </div>
-        <div id="bx-media-content" class="bx-media-content">Загрузка…</div>
-        <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="bx-media-more">Загрузить ещё</button>
     </div>
 </div>
 
@@ -974,17 +982,98 @@
 
     autosize();
 
-    /* Members modal */
-    const membersSheet = document.getElementById('bx-members-sheet');
-    const openMembers = () => membersSheet?.removeAttribute('hidden');
-    const closeMembers = () => membersSheet?.setAttribute('hidden', '');
-    document.getElementById('bx-open-members')?.addEventListener('click', openMembers);
-    document.getElementById('bx-members-close')?.addEventListener('click', closeMembers);
-    document.getElementById('bx-members-close-bg')?.addEventListener('click', closeMembers);
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && membersSheet && !membersSheet.hasAttribute('hidden')) {
-            closeMembers();
+    /* Галерея чата (внутри окна информации) */
+    const mediaContent = document.getElementById('bx-media-content');
+    const mediaMore = document.getElementById('bx-media-more');
+    let mediaTab = 'media';
+    let mediaPage = 1;
+    const loadMedia = async (replace) => {
+        const mediaUrl = root?.getAttribute('data-media-url');
+        if (!mediaUrl || !mediaContent) return;
+        if (replace) mediaContent.textContent = 'Загрузка…';
+        mediaContent.classList.toggle('bx-media-content--list', mediaTab !== 'media');
+        try {
+            const response = await fetch(`${mediaUrl}?tab=${encodeURIComponent(mediaTab)}&page=${mediaPage}`, {
+                credentials: 'same-origin', headers: { Accept: 'application/json' },
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Не удалось загрузить материалы');
+            const html = (data.items || []).map((item) => {
+                if (mediaTab === 'media') {
+                    return `<a class="bx-media-image" href="${escapeHtml(item.url)}" data-bx-lightbox="${escapeHtml(item.url)}" title="${escapeHtml(item.name)}"><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)}" loading="lazy"></a>`;
+                }
+                if (mediaTab === 'files') {
+                    return `<a class="bx-media-file" href="${escapeHtml(item.download_url)}">${escapeHtml(item.name)}</a>`;
+                }
+                return `<a class="bx-media-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a>`;
+            }).join('') || (replace ? '<div class="text-muted">Пока ничего нет</div>' : '');
+            if (replace) mediaContent.innerHTML = html;
+            else mediaContent.insertAdjacentHTML('beforeend', html);
+            mediaMore?.classList.toggle('d-none', !data.has_more);
+        } catch (error) {
+            if (replace) mediaContent.textContent = error.message || 'Не удалось загрузить материалы';
         }
+    };
+
+    /* Chat info (участники + медиа) */
+    const chatInfo = document.getElementById('bx-chat-info');
+    const switchInfoTab = (tab) => {
+        const isGallery = tab === 'media' || tab === 'files' || tab === 'links';
+        document.querySelectorAll('[data-info-tab]').forEach((btn) => {
+            btn.classList.toggle('is-active', btn.getAttribute('data-info-tab') === tab);
+        });
+        document.querySelectorAll('[data-info-pane]').forEach((pane) => {
+            const name = pane.getAttribute('data-info-pane');
+            const on = name === 'members' ? tab === 'members' : (name === 'gallery' && isGallery);
+            pane.classList.toggle('is-active', on);
+            pane.toggleAttribute('hidden', !on);
+        });
+        if (isGallery) {
+            mediaTab = tab;
+            mediaPage = 1;
+            loadMedia(true);
+        }
+    };
+    const openChatInfo = (tab = 'members') => {
+        chatInfo?.removeAttribute('hidden');
+        switchInfoTab(tab);
+    };
+    const closeChatInfo = () => chatInfo?.setAttribute('hidden', '');
+    document.getElementById('bx-open-chat-info')?.addEventListener('click', () => openChatInfo('members'));
+    document.getElementById('bx-chat-info-close')?.addEventListener('click', closeChatInfo);
+    document.getElementById('bx-chat-info-close-bg')?.addEventListener('click', closeChatInfo);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && chatInfo && !chatInfo.hasAttribute('hidden')) {
+            closeChatInfo();
+        }
+    });
+    document.querySelectorAll('[data-info-tab]').forEach((btn) => {
+        btn.addEventListener('click', () => switchInfoTab(btn.getAttribute('data-info-tab') || 'members'));
+    });
+    mediaMore?.addEventListener('click', () => {
+        mediaPage++;
+        loadMedia(false);
+    });
+
+    /* Меню настроек (шестерёнка) */
+    const gearBtn = document.getElementById('bx-header-gear');
+    const gearDrop = document.getElementById('bx-header-menu-drop');
+    const closeGear = () => {
+        gearDrop?.setAttribute('hidden', '');
+        gearBtn?.setAttribute('aria-expanded', 'false');
+    };
+    gearBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = gearDrop?.hasAttribute('hidden');
+        if (open) {
+            gearDrop.removeAttribute('hidden');
+            gearBtn.setAttribute('aria-expanded', 'true');
+        } else {
+            closeGear();
+        }
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest?.('#bx-header-menu')) closeGear();
     });
 
     const csrf = document.querySelector('meta[name="csrf_token"]')?.content
@@ -1152,57 +1241,6 @@
             target.disabled = false;
             alert(error.message || 'Не удалось переслать сообщения');
         }
-    });
-
-    /* Галерея чата */
-    const mediaSheet = document.getElementById('bx-media-sheet');
-    const mediaContent = document.getElementById('bx-media-content');
-    const mediaMore = document.getElementById('bx-media-more');
-    let mediaTab = 'media';
-    let mediaPage = 1;
-    const closeMedia = () => mediaSheet?.setAttribute('hidden', '');
-    document.getElementById('bx-open-media')?.addEventListener('click', () => {
-        mediaSheet?.removeAttribute('hidden');
-        mediaPage = 1;
-        loadMedia(true);
-    });
-    document.getElementById('bx-media-close')?.addEventListener('click', closeMedia);
-    document.getElementById('bx-media-close-bg')?.addEventListener('click', closeMedia);
-    const loadMedia = async (replace) => {
-        const mediaUrl = root?.getAttribute('data-media-url');
-        if (!mediaUrl || !mediaContent) return;
-        if (replace) mediaContent.textContent = 'Загрузка…';
-        try {
-            const response = await fetch(`${mediaUrl}?tab=${encodeURIComponent(mediaTab)}&page=${mediaPage}`, {
-                credentials: 'same-origin', headers: { Accept: 'application/json' },
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Не удалось загрузить материалы');
-            const html = (data.items || []).map((item) => {
-                if (mediaTab === 'media') {
-                    return `<a class="bx-media-image" href="${escapeHtml(item.url)}" data-bx-lightbox="${escapeHtml(item.url)}" title="${escapeHtml(item.name)}"><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)}" loading="lazy"></a>`;
-                }
-                if (mediaTab === 'files') {
-                    return `<a class="bx-media-file" href="${escapeHtml(item.download_url)}">${escapeHtml(item.name)}</a>`;
-                }
-                return `<a class="bx-media-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a>`;
-            }).join('') || (replace ? '<div class="text-muted">Пока ничего нет</div>' : '');
-            if (replace) mediaContent.innerHTML = html;
-            else mediaContent.insertAdjacentHTML('beforeend', html);
-            mediaMore?.classList.toggle('d-none', !data.has_more);
-        } catch (error) {
-            if (replace) mediaContent.textContent = error.message || 'Не удалось загрузить материалы';
-        }
-    };
-    document.querySelectorAll('[data-media-tab]').forEach((button) => button.addEventListener('click', () => {
-        mediaTab = button.getAttribute('data-media-tab') || 'media';
-        mediaPage = 1;
-        document.querySelectorAll('[data-media-tab]').forEach((tab) => tab.classList.toggle('is-active', tab === button));
-        loadMedia(true);
-    }));
-    mediaMore?.addEventListener('click', () => {
-        mediaPage++;
-        loadMedia(false);
     });
 
     const sendUrl = root?.getAttribute('data-send-url')
@@ -1584,6 +1622,24 @@
     };
 
     let sending = false;
+    const setSendingUi = (on) => {
+        composer?.classList.toggle('is-sending', on);
+        if (input) input.disabled = on;
+        if (filesInput) filesInput.disabled = on;
+        const btn = document.getElementById('bx-composer-send');
+        if (btn) {
+            btn.disabled = on;
+            btn.classList.toggle('is-loading', on);
+            btn.innerHTML = on
+                ? '<span class="bx-send-spinner" aria-hidden="true"></span><span>Отправка…</span>'
+                : 'Отправить';
+        }
+        document.querySelectorAll('.bx-composer__tool, .bx-composer__tools label').forEach((el) => {
+            if (on) el.setAttribute('aria-disabled', 'true');
+            else el.removeAttribute('aria-disabled');
+            if ('disabled' in el) el.disabled = on;
+        });
+    };
     const sendMessageAjax = async (extraFormData = null) => {
         if (!sendUrl || sending) return;
         const text = (input?.value || '').trim();
@@ -1593,8 +1649,7 @@
         if (!text && !hasFiles && !hasTask && !hasVoice) return;
 
         sending = true;
-        const btn = document.getElementById('bx-composer-send');
-        if (btn) btn.disabled = true;
+        setSendingUi(true);
 
         try {
             const fd = extraFormData || new FormData();
@@ -1639,13 +1694,62 @@
             alert('Не удалось отправить сообщение');
         } finally {
             sending = false;
-            if (btn) btn.disabled = false;
+            setSendingUi(false);
         }
     };
 
     document.getElementById('bx-composer-send')?.addEventListener('click', (e) => {
         e.preventDefault();
         sendMessageAjax();
+    });
+
+    /* Вставка картинок из буфера (Ctrl+V) */
+    const addClipboardFiles = (fileList) => {
+        const incoming = [...fileList].filter((f) => f && (f.type || '').startsWith('image/'));
+        if (!incoming.length) return false;
+        const room = FILES_MAX - pendingFiles.length;
+        if (room <= 0) {
+            alert('Можно прикрепить не больше ' + FILES_MAX + ' файлов за раз');
+            return true;
+        }
+        pendingFiles = pendingFiles.concat(incoming.slice(0, room).map((f, i) => {
+            if (f.name && f.name !== 'image.png') return f;
+            const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+            return new File([f], `paste-${Date.now()}-${i}.${ext}`, { type: f.type });
+        }));
+        syncFilesInput();
+        return true;
+    };
+    input?.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        const files = [];
+        for (const item of items) {
+            if (item.kind === 'file' && (item.type || '').startsWith('image/')) {
+                const f = item.getAsFile();
+                if (f) files.push(f);
+            }
+        }
+        if (files.length && addClipboardFiles(files)) {
+            e.preventDefault();
+        }
+    });
+    composer?.addEventListener('dragover', (e) => {
+        if ([...e.dataTransfer?.types || []].includes('Files')) {
+            e.preventDefault();
+            composer.classList.add('is-drop');
+        }
+    });
+    composer?.addEventListener('dragleave', () => composer.classList.remove('is-drop'));
+    composer?.addEventListener('drop', (e) => {
+        composer.classList.remove('is-drop');
+        const files = [...(e.dataTransfer?.files || [])];
+        if (!files.length) return;
+        e.preventDefault();
+        const room = FILES_MAX - pendingFiles.length;
+        if (room <= 0) return;
+        pendingFiles = pendingFiles.concat(files.slice(0, room));
+        syncFilesInput();
     });
 
     /* Voice: PCM → WAV + проверка тишины + выбор микрофона */

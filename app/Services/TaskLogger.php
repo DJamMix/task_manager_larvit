@@ -5,8 +5,8 @@ namespace App\Services;
 use App\CoreLayer\Enums\TaskPriorityEnum;
 use App\CoreLayer\Enums\TaskStatusEnum;
 use App\Models\Task;
+use App\Models\TaskLink;
 use App\Models\User;
-use Illuminate\Support\Str;
 use Orchid\Support\Color;
 
 class TaskLogger
@@ -19,39 +19,109 @@ class TaskLogger
         Task $task,
         User $user,
         string $toStatus,
-        ?string $additionalMessage = null
+        ?string $additionalMessage = null,
+        ?string $fromStatus = null
     ): void {
-        $toStatusLabel = TaskStatusEnum::tryFrom($toStatus)?->label() ?? $toStatus;
+        $fromLabel = $fromStatus !== null
+            ? (TaskStatusEnum::tryFrom($fromStatus)?->label() ?? $fromStatus)
+            : null;
+        $toLabel = TaskStatusEnum::tryFrom($toStatus)?->label() ?? $toStatus;
 
-        $plainText = sprintf(
-            "🔄 Пользователь %s изменил статус задачи на '%s'",
-            $user->name,
-            $toStatusLabel
-        );
-
+        $plainText = 'изменён статус';
+        if ($fromLabel) {
+            $plainText .= "\nСтатус: {$fromLabel} → {$toLabel}";
+        } else {
+            $plainText .= "\nСтатус: {$toLabel}";
+        }
         if ($additionalMessage) {
-            $plainText .= "\n📝 Примечание: " . $additionalMessage;
+            $plainText .= "\nПримечание: " . $additionalMessage;
         }
 
-        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $html = $this->eventHtml(
+            'изменён статус',
+            $fromLabel
+                ? [['label' => 'Статус', 'value' => "{$fromLabel} → {$toLabel}"]]
+                : [['label' => 'Статус', 'value' => $toLabel]],
+            $additionalMessage
+        );
+
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
         $this->notifyParticipants(
             $task,
             $user,
             'Статус задачи изменён',
-            "{$user->displayName()} → {$toStatusLabel} · «{$task->name}»",
+            ($fromLabel ? "{$fromLabel} → {$toLabel}" : $toLabel) . " · «{$task->name}»",
             Color::INFO
         );
     }
 
+    public function logLinkCreated(Task $task, User $user, Task $related, string $relation): void
+    {
+        $relLabel = TaskLink::relationLabels()[$relation] ?? $relation;
+        $left = $task->displayKey();
+        $right = $related->displayKey();
+        $plainText = "создана связь\nСвязи: {$left} {$relLabel} {$right}";
+        $html = $this->eventHtml('создана связь', [
+            ['label' => 'Связи', 'value' => "{$left} {$relLabel} {$right}"],
+        ]);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
+    }
+
+    public function logLinkRemoved(Task $task, User $user, ?Task $related, string $relation): void
+    {
+        $relLabel = TaskLink::relationLabels()[$relation] ?? $relation;
+        $left = $task->displayKey();
+        $right = $related?->displayKey() ?? '—';
+        $plainText = "удалена связь\nСвязи: {$left} {$relLabel} {$right}";
+        $html = $this->eventHtml('удалена связь', [
+            ['label' => 'Связи', 'value' => "{$left} {$relLabel} {$right}"],
+        ]);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
+    }
+
+    public function logTimeLogged(Task $task, User $user, float $hours, string $workDate): void
+    {
+        $plainText = "учтено время\nВремя: {$hours} ч · {$workDate}";
+        $html = $this->eventHtml('учтено время', [
+            ['label' => 'Время', 'value' => "{$hours} ч"],
+            ['label' => 'Дата', 'value' => $workDate],
+        ]);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
+    }
+
+    public function logEstimationSubmitted(Task $task, User $user, float $hours): void
+    {
+        $plainText = "отправлена оценка\nОценка: {$hours} ч";
+        $html = $this->eventHtml('отправлена оценка', [
+            ['label' => 'Оценка', 'value' => "{$hours} ч"],
+        ]);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
+        $this->notifyParticipants(
+            $task,
+            $user,
+            'Оценка отправлена',
+            "{$user->displayName()}: {$hours} ч · «{$task->name}»",
+            Color::WARNING
+        );
+    }
+
+    public function logObserversChanged(Task $task, User $user, array $names): void
+    {
+        $list = $names === [] ? 'нет' : implode(', ', $names);
+        $plainText = "изменены наблюдатели\nНаблюдатели: {$list}";
+        $html = $this->eventHtml('изменены наблюдатели', [
+            ['label' => 'Наблюдатели', 'value' => $list],
+        ]);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
+    }
+
     public function logTaskCreation(Task $task, User $user): void
     {
-        $plainText = sprintf(
-            "🆕 Пользователь %s создал новую задачу: %s",
-            $user->name,
-            $task->name
-        );
-
-        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $plainText = "создана задача\nНазвание: {$task->name}";
+        $html = $this->eventHtml('создана задача', [
+            ['label' => 'Название', 'value' => $task->name],
+        ]);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
         $this->notifyParticipants(
             $task,
             $user,
@@ -66,17 +136,16 @@ class TaskLogger
         User $user,
         ?string $reason = null
     ): void {
-        $plainText = sprintf(
-            "❌ Пользователь %s отменил задачу: %s",
-            $user->name,
-            $task->name
-        );
-
+        $fields = [['label' => 'Задача', 'value' => $task->name]];
         if ($reason) {
-            $plainText .= "\n📌 Причина: " . $reason;
+            $fields[] = ['label' => 'Причина', 'value' => $reason];
         }
-
-        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $plainText = "задача отменена\nЗадача: {$task->name}";
+        if ($reason) {
+            $plainText .= "\nПричина: {$reason}";
+        }
+        $html = $this->eventHtml('задача отменена', $fields);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
         $this->notifyParticipants(
             $task,
             $user,
@@ -91,17 +160,16 @@ class TaskLogger
         User $user,
         ?string $reason = null
     ): void {
-        $plainText = sprintf(
-            "↩️ Пользователь %s вернул задачу на оценку: %s",
-            $user->name,
-            $task->name
-        );
-
+        $fields = [];
         if ($reason) {
-            $plainText .= "\n📌 Причина: " . $reason;
+            $fields[] = ['label' => 'Причина', 'value' => $reason];
         }
-
-        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $plainText = 'возврат на оценку';
+        if ($reason) {
+            $plainText .= "\nПричина: {$reason}";
+        }
+        $html = $this->eventHtml('возврат на оценку', $fields, null);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
         $this->notifyParticipants(
             $task,
             $user,
@@ -116,17 +184,16 @@ class TaskLogger
         User $user,
         ?string $reason = null
     ): void {
-        $plainText = sprintf(
-            "↩️ Пользователь %s вернул задачу в работу после результатов ДЕМО: %s",
-            $user->name,
-            $task->name
-        );
-
+        $fields = [];
         if ($reason) {
-            $plainText .= "\n📌 Причина: " . $reason;
+            $fields[] = ['label' => 'Причина', 'value' => $reason];
         }
-
-        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $plainText = 'возврат после демо';
+        if ($reason) {
+            $plainText .= "\nПричина: {$reason}";
+        }
+        $html = $this->eventHtml('возврат после демо', $fields);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
         $this->notifyParticipants(
             $task,
             $user,
@@ -142,17 +209,12 @@ class TaskLogger
         string $action,
         ?string $details = null
     ): void {
-        $plainText = sprintf(
-            "⚡ Пользователь %s выполнил действие: %s",
-            $user->name,
-            $action
-        );
-
+        $plainText = $action;
         if ($details) {
-            $plainText .= "\n🔍 Детали: " . $details;
+            $plainText .= "\n" . $details;
         }
-
-        $this->createComment($task, $user, $this->formatForQuill($plainText), $plainText);
+        $html = $this->eventHtml($action, $details ? [['label' => 'Детали', 'value' => $details]] : []);
+        $this->createComment($task, $user, $this->opsFromPlain($plainText), $plainText, $html);
         $this->notifyParticipants(
             $task,
             $user,
@@ -166,8 +228,13 @@ class TaskLogger
         Task $task,
         User $user,
         array $quillContent,
-        string $plainText
+        string $plainText,
+        ?string $html = null
     ): void {
+        if ($html !== null) {
+            $quillContent['html'] = $html;
+        }
+
         $task->comments()->create([
             'user_id' => $user->id,
             'text' => $quillContent,
@@ -209,77 +276,35 @@ class TaskLogger
         }
     }
 
-    protected function formatForQuill(string $text): array
+    /**
+     * @param list<array{label: string, value: string}> $fields
+     */
+    protected function eventHtml(string $action, array $fields = [], ?string $note = null): string
+    {
+        $html = '<p><strong>' . e($action) . '</strong></p>';
+        foreach ($fields as $field) {
+            $html .= '<p><span>' . e($field['label']) . ': </span><strong>'
+                . e($field['value']) . '</strong></p>';
+        }
+        if ($note) {
+            $html .= '<p><em>' . e($note) . '</em></p>';
+        }
+
+        return $html;
+    }
+
+    protected function opsFromPlain(string $text): array
     {
         $lines = explode("\n", $text);
         $delta = [];
-
         foreach ($lines as $line) {
             if (!empty($delta)) {
                 $delta[] = ['insert' => "\n"];
             }
-
-            $attributes = $this->determineQuillAttributes($line);
-            $delta[] = ['insert' => trim($line), 'attributes' => $attributes];
+            $delta[] = ['insert' => trim($line)];
         }
 
-        return [
-            'ops' => $delta,
-            'html' => $this->convertToHtml($delta),
-        ];
-    }
-
-    protected function determineQuillAttributes(string $line): array
-    {
-        $attributes = [];
-
-        if (Str::startsWith($line, '🔄')) {
-            $attributes['bold'] = true;
-            $attributes['color'] = '#2b6cb0';
-        } elseif (Str::startsWith($line, '❌')) {
-            $attributes['bold'] = true;
-            $attributes['color'] = '#e53e3e';
-        } elseif (Str::startsWith($line, '🆕')) {
-            $attributes['bold'] = true;
-            $attributes['color'] = '#38a169';
-        } elseif (Str::startsWith($line, '📌') || Str::startsWith($line, '📝')) {
-            $attributes['italic'] = true;
-        }
-
-        return $attributes;
-    }
-
-    protected function convertToHtml(array $delta): string
-    {
-        $html = '';
-        foreach ($delta as $op) {
-            if ($op['insert'] === "\n") {
-                $html .= '<br>';
-                continue;
-            }
-
-            $text = htmlspecialchars($op['insert']);
-            $attrs = $op['attributes'] ?? [];
-
-            if (!empty($attrs)) {
-                $style = '';
-                if (isset($attrs['bold'])) {
-                    $style .= 'font-weight:bold;';
-                }
-                if (isset($attrs['italic'])) {
-                    $style .= 'font-style:italic;';
-                }
-                if (isset($attrs['color'])) {
-                    $style .= 'color:' . $attrs['color'] . ';';
-                }
-
-                $html .= sprintf('<span style="%s">%s</span>', $style, $text);
-            } else {
-                $html .= $text;
-            }
-        }
-
-        return $html;
+        return ['ops' => $delta];
     }
 
     public function createTaskPushNotifPM(Task $task): void

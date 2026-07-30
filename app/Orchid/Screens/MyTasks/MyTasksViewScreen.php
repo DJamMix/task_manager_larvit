@@ -10,6 +10,7 @@ use App\Orchid\Layouts\MyTasks\HoursSpentTask;
 use App\Orchid\Layouts\MyTasks\TaskEvaluationLayout;
 use App\Orchid\Layouts\Task\TaskObserversLayout;
 use App\Services\CommentService;
+use App\Services\TaskLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
@@ -223,13 +224,20 @@ class MyTasksViewScreen extends Screen
             return back();
         }
 
-        TaskLink::query()->firstOrCreate([
+        $link = TaskLink::query()->firstOrCreate([
             'task_id' => $task->id,
             'related_task_id' => (int) $data['related_task_id'],
             'relation' => $data['relation'],
         ], [
             'created_by' => $request->user()->id,
         ]);
+
+        if ($link->wasRecentlyCreated) {
+            $related = Task::query()->find((int) $data['related_task_id']);
+            if ($related) {
+                app(TaskLogger::class)->logLinkCreated($task, $request->user(), $related, $data['relation']);
+            }
+        }
 
         Toast::success('Связь добавлена');
 
@@ -244,10 +252,17 @@ class MyTasksViewScreen extends Screen
         }
 
         $linkId = (int) $request->input('link_id');
-        TaskLink::query()
+        $link = TaskLink::query()
             ->where('task_id', $task->id)
             ->whereKey($linkId)
-            ->delete();
+            ->first();
+
+        if ($link) {
+            $related = $link->relatedTask;
+            $relation = (string) $link->relation;
+            $link->delete();
+            app(TaskLogger::class)->logLinkRemoved($task, $request->user(), $related, $relation);
+        }
 
         Toast::info('Связь удалена');
 
@@ -270,6 +285,12 @@ class MyTasksViewScreen extends Screen
         $task->observers_ids = $ids;
         $task->save();
 
+        $names = \App\Models\User::query()->whereIn('id', $ids)->get()
+            ->map(fn ($u) => $u->displayName())
+            ->values()
+            ->all();
+        app(TaskLogger::class)->logObserversChanged($task, $request->user(), $names);
+
         Toast::success('Наблюдатели обновлены');
 
         return back();
@@ -284,8 +305,17 @@ class MyTasksViewScreen extends Screen
             return back();
         }
 
+        $from = (string) $task->status;
         $task->status = TaskStatusEnum::IN_PROGRESS->value;
         $task->save();
+
+        app(TaskLogger::class)->logStatusChange(
+            $task,
+            auth()->user(),
+            TaskStatusEnum::IN_PROGRESS->value,
+            null,
+            $from
+        );
 
         Toast::success('Задача в работе');
 
@@ -318,6 +348,13 @@ class MyTasksViewScreen extends Screen
 
         $task->increment('hours_spent', $request->input('tracking.hours_spent'));
 
+        app(TaskLogger::class)->logTimeLogged(
+            $task,
+            $request->user(),
+            (float) $request->input('tracking.hours_spent'),
+            (string) $request->input('tracking.work_date')
+        );
+
         Toast::success('Время учтено. Оценка не изменилась.');
     }
 
@@ -329,9 +366,20 @@ class MyTasksViewScreen extends Screen
             'task.estimation_hours' => 'required|numeric|max:1000|min:0',
         ]);
 
-        $task->estimation_hours = $request->input('task.estimation_hours');
+        $from = (string) $task->status;
+        $hours = (float) $request->input('task.estimation_hours');
+        $task->estimation_hours = $hours;
         $task->status = TaskStatusEnum::ESTIMATION_REVIEW->value;
         $task->save();
+
+        app(TaskLogger::class)->logEstimationSubmitted($task, $request->user(), $hours);
+        app(TaskLogger::class)->logStatusChange(
+            $task,
+            $request->user(),
+            TaskStatusEnum::ESTIMATION_REVIEW->value,
+            null,
+            $from
+        );
 
         Toast::success('Оценка отправлена на согласование');
     }
@@ -364,8 +412,11 @@ class MyTasksViewScreen extends Screen
             $newStatus = TaskStatusEnum::COMPLETED->value;
         }
 
+        $from = (string) $task->status;
         $task->status = $newStatus;
         $task->save();
+
+        app(TaskLogger::class)->logStatusChange($task, $request->user(), $newStatus, null, $from);
 
         Toast::success('Статус обновлён');
 

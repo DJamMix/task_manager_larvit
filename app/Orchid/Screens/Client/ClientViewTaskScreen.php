@@ -209,13 +209,16 @@ class ClientViewTaskScreen extends Screen
 
     public function applyDemoTask(Task $task)
     {
+        $from = (string) $task->status;
         $task->status = TaskStatusEnum::UNPAID->value;
         $task->save();
 
         app(TaskLogger::class)->logStatusChange(
-            $task, 
+            $task,
             auth()->user(),
-            $task->status
+            $task->status,
+            null,
+            $from
         );
 
         Toast::success('Вы приняли задачу и она считается выполненной!');
@@ -378,13 +381,20 @@ class ClientViewTaskScreen extends Screen
             return back();
         }
 
-        TaskLink::query()->firstOrCreate([
+        $link = TaskLink::query()->firstOrCreate([
             'task_id' => $task->id,
             'related_task_id' => (int) $data['related_task_id'],
             'relation' => $data['relation'],
         ], [
             'created_by' => $request->user()->id,
         ]);
+
+        if ($link->wasRecentlyCreated) {
+            $related = Task::query()->find((int) $data['related_task_id']);
+            if ($related) {
+                app(TaskLogger::class)->logLinkCreated($task, $request->user(), $related, $data['relation']);
+            }
+        }
 
         Toast::success('Связь добавлена');
 
@@ -393,10 +403,17 @@ class ClientViewTaskScreen extends Screen
 
     public function removeLink(Request $request, Task $task)
     {
-        TaskLink::query()
+        $link = TaskLink::query()
             ->where('task_id', $task->id)
             ->whereKey((int) $request->input('link_id'))
-            ->delete();
+            ->first();
+
+        if ($link) {
+            $related = $link->relatedTask;
+            $relation = (string) $link->relation;
+            $link->delete();
+            app(TaskLogger::class)->logLinkRemoved($task, $request->user(), $related, $relation);
+        }
 
         Toast::info('Связь удалена');
 

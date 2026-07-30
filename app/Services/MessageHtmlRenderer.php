@@ -254,7 +254,7 @@ final class MessageHtmlRenderer
 
     private function sanitizeHtml(string $html): string
     {
-        $allowed = '<p><br><br/><b><strong><i><em><u><s><ul><ol><li><a><span><h1><h2><h3><blockquote><code><pre>';
+        $allowed = '<p><br><br/><b><strong><i><em><u><s><ul><ol><li><a><span><h1><h2><h3><blockquote><code><pre><div>';
         $clean = strip_tags($html, $allowed);
         $clean = preg_replace('/\son\w+="[^"]*"/i', '', $clean) ?? $clean;
         $clean = preg_replace("/\son\w+='[^']*'/i", '', $clean) ?? $clean;

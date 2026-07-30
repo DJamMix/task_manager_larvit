@@ -312,20 +312,19 @@
                                 <span class="ql-formats">
                                     <button type="button" class="ql-list" value="ordered"></button>
                                     <button type="button" class="ql-list" value="bullet"></button>
-                                    <button type="button" class="ql-blockquote"></button>
                                     <button type="button" class="ql-code-block"></button>
-                                </span>
-                                <span class="ql-formats">
                                     <button type="button" class="ql-link"></button>
-                                    <button type="button" class="ql-clean"></button>
                                 </span>
                             </div>
-                            <div id="tw-quill-editor"></div>
+                            <div id="tw-quill-editor" class="tw-quill-host"></div>
                         </div>
+                        <div class="tw-composer__preview d-none" id="tw-files-preview"></div>
                         <div class="tw-composer__bar">
-                            <label class="tw-composer__attach" title="Файлы">
+                            <label class="tw-composer__clip" title="Прикрепить файл" for="tw-composer-files">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                                </svg>
                                 <input type="file" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.doc,.docx,.xls,.xlsx,.txt">
-                                <span>Файлы</span>
                             </label>
                             <span class="tw-composer__files-label text-muted small d-none" id="tw-files-label"></span>
                             <button type="button"
@@ -358,16 +357,20 @@
 
         <div class="tw-tab-panel" data-tw-panel="history" hidden>
             <div class="tw-feed tw-feed--history">
+                <div class="tw-history-head">
+                    <div class="fw-semibold">События</div>
+                    <div class="small text-muted">История изменений задачи</div>
+                </div>
                 @forelse($history as $comment)
-                    <article class="tw-msg tw-msg--system">
-                        <div class="tw-msg__head">
-                            <strong>{{ $comment->user?->displayName() ?? 'Система' }}</strong>
-                            <span class="text-muted">{{ $comment->created_at?->format('d.m.Y H:i') }}</span>
+                    <article class="tw-event">
+                        <div class="tw-event__meta">
+                            <strong class="tw-event__user">{{ $comment->user?->displayName() ?? 'Система' }}</strong>
+                            <time class="tw-event__time">{{ $comment->created_at?->locale('ru')->translatedFormat('j F, H:i') }}</time>
                         </div>
-                        <div class="tw-msg__body">{!! $comment->formatted_text !!}</div>
+                        <div class="tw-event__body">{!! $comment->formatted_text !!}</div>
                     </article>
                 @empty
-                    <div class="text-muted text-center py-4">История пока пуста</div>
+                    <div class="text-muted text-center py-4">История пока пуста — события появятся при смене статуса, связях и других действиях</div>
                 @endforelse
             </div>
         </div>
@@ -413,36 +416,85 @@
     const replyAuthor = document.getElementById('tw-reply-author');
     const filesInput = document.getElementById('tw-composer-files');
     const filesLabel = document.getElementById('tw-files-label');
+    const filesPreview = document.getElementById('tw-files-preview');
+    const composerEl = document.getElementById('tw-composer');
     const editorEl = document.getElementById('tw-quill-editor');
     const sendBtn = document.getElementById('tw-composer-send');
     let quill = null;
+    let pendingFiles = [];
+    const FILES_MAX = 10;
+    let sending = false;
+
+    const renderTwFiles = () => {
+        if (!filesPreview || !filesLabel) return;
+        if (!pendingFiles.length) {
+            filesPreview.classList.add('d-none');
+            filesPreview.innerHTML = '';
+            filesLabel.classList.add('d-none');
+            filesLabel.textContent = '';
+            return;
+        }
+        filesLabel.textContent = pendingFiles.length + ' файл(ов)';
+        filesLabel.classList.remove('d-none');
+        filesPreview.classList.remove('d-none');
+        filesPreview.innerHTML = pendingFiles.map((f, idx) => {
+            const isImg = /^image\//.test(f.type || '');
+            const url = isImg ? URL.createObjectURL(f) : '';
+            const name = (f.name || 'файл').replace(/[<>&"]/g, '');
+            return `<div class="tw-file-chip" data-idx="${idx}">
+                ${isImg ? `<img src="${url}" alt="">` : `<span>${name}</span>`}
+                <button type="button" data-rm="${idx}" aria-label="Убрать">×</button>
+            </div>`;
+        }).join('');
+    };
+
+    filesPreview?.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-rm]');
+        if (!btn) return;
+        pendingFiles.splice(parseInt(btn.getAttribute('data-rm'), 10), 1);
+        renderTwFiles();
+    });
+
+    const addTwFiles = (list) => {
+        const room = FILES_MAX - pendingFiles.length;
+        if (room <= 0) return;
+        pendingFiles = pendingFiles.concat([...list].slice(0, room));
+        renderTwFiles();
+    };
 
     if (editorEl && window.Quill && !editorEl.classList.contains('ql-container')) {
-        quill = new Quill('#tw-quill-editor', {
+        quill = new Quill(editorEl, {
             theme: 'snow',
-            placeholder: 'Написать сообщение…',
+            placeholder: 'Написать сообщение… (Ctrl+V — вставить картинку)',
             modules: {
                 toolbar: '#tw-quill-toolbar',
             },
-            bounds: '#tw-composer',
         });
-        const qlEditor = editorEl.querySelector('.ql-editor') || document.querySelector('#tw-quill-editor .ql-editor');
-        if (qlEditor) {
-            qlEditor.style.minHeight = '72px';
-            qlEditor.style.maxHeight = '180px';
-            qlEditor.style.overflowY = 'auto';
-        }
     } else if (window.Quill && editorEl) {
         quill = Quill.find(editorEl);
     }
 
+    const setTwSending = (on) => {
+        sending = on;
+        composerEl?.classList.toggle('is-sending', on);
+        if (sendBtn) {
+            sendBtn.disabled = on;
+            sendBtn.innerHTML = on
+                ? '<span class="bx-send-spinner"></span> Отправка…'
+                : 'Отправить';
+        }
+        if (quill) quill.enable(!on);
+        if (filesInput) filesInput.disabled = on;
+    };
+
     sendBtn?.addEventListener('click', async () => {
+        if (sending) return;
         const url = sendBtn.getAttribute('data-url');
         const token = sendBtn.getAttribute('data-csrf');
         if (!url) return;
 
         const plain = quill ? (quill.getText() || '').trim() : '';
-        const hasFiles = (filesInput?.files?.length || 0) > 0;
+        const hasFiles = pendingFiles.length > 0;
         if (!plain && !hasFiles) {
             alert('Напишите сообщение или прикрепите файл');
             return;
@@ -458,11 +510,9 @@
         if (parentInput?.value) {
             fd.append('comment[parent_id]', parentInput.value);
         }
-        if (filesInput?.files) {
-            [...filesInput.files].forEach((file) => fd.append('comment_files[]', file));
-        }
+        pendingFiles.forEach((file) => fd.append('comment_files[]', file));
 
-        sendBtn.disabled = true;
+        setTwSending(true);
         try {
             const res = await fetch(url, {
                 method: 'POST',
@@ -472,15 +522,36 @@
             });
             if (!res.ok) {
                 alert('Не удалось отправить сообщение');
-                sendBtn.disabled = false;
+                setTwSending(false);
                 return;
             }
             window.location.reload();
         } catch (e) {
             alert('Не удалось отправить сообщение');
-            sendBtn.disabled = false;
+            setTwSending(false);
         }
     });
+
+    const onPasteImages = (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        const files = [];
+        for (const item of items) {
+            if (item.kind === 'file' && (item.type || '').startsWith('image/')) {
+                const f = item.getAsFile();
+                if (f) {
+                    const ext = (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                    files.push(new File([f], `paste-${Date.now()}.${ext}`, { type: f.type }));
+                }
+            }
+        }
+        if (files.length) {
+            e.preventDefault();
+            addTwFiles(files);
+        }
+    };
+    composerEl?.addEventListener('paste', onPasteImages);
+    quill?.root?.addEventListener('paste', onPasteImages);
 
     document.getElementById('tw-link-submit')?.addEventListener('click', async () => {
         const wrap = document.querySelector('.tw-related-add');
@@ -546,12 +617,9 @@
 
     filesInput?.addEventListener('change', () => {
         const n = filesInput.files?.length || 0;
-        if (!filesLabel) return;
         if (n > 0) {
-            filesLabel.textContent = n + ' файл(ов)';
-            filesLabel.classList.remove('d-none');
-        } else {
-            filesLabel.classList.add('d-none');
+            addTwFiles(filesInput.files);
+            filesInput.value = '';
         }
     });
 
