@@ -150,12 +150,12 @@ class MessengerScreen extends Screen
 
     public function name(): ?string
     {
-        return 'Чаты';
+        return null;
     }
 
     public function description(): ?string
     {
-        return 'Корпоративный мессенджер команды';
+        return null;
     }
 
     public function permission(): ?iterable
@@ -165,21 +165,21 @@ class MessengerScreen extends Screen
 
     public function commandBar(): iterable
     {
+        // Кнопки спрятаны CSS на странице мессенджера, но нужны в DOM для открытия модалок из сайдбара.
         $buttons = [];
 
-        // Личные чаты — всем с доступом к мессенджеру
         $buttons[] = ModalToggle::make('Личный')
             ->modal('createDirectModal')
             ->method('createDirect')
-            ->icon('bs.person');
+            ->icon('bs.person')
+            ->class('d-none bx-orchid-modal-toggle');
 
-        // Группы — только с правом создания
         if ($this->can_create) {
             $buttons[] = ModalToggle::make('Групповой чат')
                 ->modal('createChatModal')
                 ->method('createGroup')
                 ->icon('bs.plus-lg')
-                ->class('btn btn-primary');
+                ->class('d-none bx-orchid-modal-toggle');
         }
 
         if ($this->chat?->exists && $this->chat->type !== 'direct'
@@ -187,18 +187,21 @@ class MessengerScreen extends Screen
             $buttons[] = ModalToggle::make('Изменить')
                 ->modal('editChatModal')
                 ->method('saveChat')
-                ->icon('bs.pencil');
+                ->icon('bs.pencil')
+                ->class('d-none bx-orchid-modal-toggle');
 
             $buttons[] = ModalToggle::make('Участники')
                 ->modal('membersModal')
                 ->method('saveMembers')
-                ->icon('bs.people');
+                ->icon('bs.people')
+                ->class('d-none bx-orchid-modal-toggle');
 
             $buttons[] = Button::make('Удалить чат')
                 ->icon('bs.trash')
                 ->method('removeChat')
                 ->confirm('Удалить групповой чат безвозвратно? Сообщения, файлы и история звонков будут удалены.')
-                ->type(Color::DANGER);
+                ->type(Color::DANGER)
+                ->class('d-none bx-orchid-modal-toggle');
         }
 
         return $buttons;

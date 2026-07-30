@@ -138,7 +138,10 @@
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || 'Не удалось сохранить подписку на сервере');
+            const fromErrors = err.errors
+                ? Object.values(err.errors).flat().filter(Boolean).join(' ')
+                : '';
+            throw new Error(err.message || fromErrors || 'Не удалось сохранить подписку на сервере');
         }
 
         localStorage.setItem(VAPID_LS_KEY, publicKey);

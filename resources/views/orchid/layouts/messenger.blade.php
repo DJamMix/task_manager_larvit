@@ -1,3 +1,8 @@
+<script>
+    document.documentElement.classList.add('bx-messenger-page');
+    if (document.body) document.body.classList.add('bx-messenger-page');
+    else document.addEventListener('DOMContentLoaded', () => document.body.classList.add('bx-messenger-page'));
+</script>
 <div class="bx-messenger {{ ($active_chat_id ?? null) ? 'is-chat-open' : 'is-list-open' }}"
      data-poll-url="{{ $chats_poll_url ?? route('platform.systems.chats.poll') }}"
      data-active-chat="{{ $active_chat_id ?? '' }}"
@@ -658,10 +663,12 @@
         if (!root) return;
         const top = root.getBoundingClientRect().top;
         const mobile = window.matchMedia('(max-width: 900px)').matches;
-        const bottomPad = mobile ? 6 : 24;
+        const bottomPad = mobile ? 4 : 8;
         const available = Math.max(mobile ? 260 : 320, window.innerHeight - top - bottomPad);
         root.style.height = available + 'px';
         root.style.maxHeight = available + 'px';
+        document.body.classList.add('bx-messenger-page');
+        document.documentElement.classList.add('bx-messenger-page');
         document.body.classList.toggle('bx-messenger-mobile', mobile);
     };
     document.body.classList.add('bx-messenger-page');

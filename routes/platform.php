@@ -360,10 +360,7 @@ Route::screen('inbox', InboxScreen::class)
         ->push('Входящие', route('platform.systems.inbox')));
 
 Route::screen('chats', \App\Orchid\Screens\Chat\MessengerScreen::class)
-    ->name('platform.systems.chats')
-    ->breadcrumbs(fn (Trail $trail) => $trail
-        ->parent('platform.index')
-        ->push('Чаты', route('platform.systems.chats')));
+    ->name('platform.systems.chats');
 
 Route::get('chats-poll', function (\Illuminate\Http\Request $request, \App\Services\ChatService $chats) {
     abort_unless($chats->canAccessMessenger($request->user()), 403);
@@ -508,21 +505,35 @@ Route::get('web-push/vapid-key', function (\App\Services\WebPushService $push) {
 })->name('platform.web-push.vapid-key');
 
 Route::post('web-push/subscribe', function (\Illuminate\Http\Request $request) {
+    if (!\Illuminate\Support\Facades\Schema::hasTable('push_subscriptions')) {
+        return response()->json([
+            'message' => 'Таблица push_subscriptions не создана. На сервере выполните: php artisan migrate',
+        ], 503);
+    }
+
     $data = $request->validate([
         'endpoint' => 'required|string',
         'keys.p256dh' => 'required|string',
         'keys.auth' => 'required|string',
     ]);
 
-    \App\Models\PushSubscription::query()->updateOrCreate(
-        ['endpoint' => $data['endpoint']],
-        [
-            'user_id' => $request->user()->id,
-            'public_key' => $data['keys']['p256dh'],
-            'auth_token' => $data['keys']['auth'],
-            'user_agent' => substr((string) $request->userAgent(), 0, 65535),
-        ]
-    );
+    try {
+        \App\Models\PushSubscription::query()->updateOrCreate(
+            ['endpoint' => $data['endpoint']],
+            [
+                'user_id' => $request->user()->id,
+                'public_key' => $data['keys']['p256dh'],
+                'auth_token' => $data['keys']['auth'],
+                'user_agent' => substr((string) $request->userAgent(), 0, 65535),
+            ]
+        );
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::warning('WebPush subscribe failed: '.$e->getMessage());
+
+        return response()->json([
+            'message' => 'Не удалось сохранить подписку: '.$e->getMessage(),
+        ], 500);
+    }
 
     return response()->json(['ok' => true]);
 })->name('platform.web-push.subscribe');
@@ -651,15 +662,4 @@ Route::delete('chats/calls/{call}/guest-link', function (
 })->name('platform.systems.chats.calls.guest.revoke');
 
 Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
-    ->name('platform.systems.chats.view')
-    ->breadcrumbs(function (Trail $trail, $chat) {
-        $model = $chat instanceof \App\Models\Chat
-            ? $chat
-            : \App\Models\Chat::query()->find($chat);
-
-        $title = $model?->displayTitle() ?? ('Чат #' . (string) $chat);
-
-        return $trail
-            ->parent('platform.systems.chats')
-            ->push($title, route('platform.systems.chats.view', $chat));
-    });
+    ->name('platform.systems.chats.view');
