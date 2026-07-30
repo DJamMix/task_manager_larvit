@@ -585,6 +585,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 (() => {
+    // Единая функция экранирования (не дублировать const escapeHtml — ломает Turbo morph)
+    const escapeHtml = (s) => String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
     if (window.hljs) {
         document.querySelectorAll('.tw-codeblock code').forEach((el) => {
             try { window.hljs.highlightElement(el); } catch (e) {}
@@ -694,12 +702,6 @@
     try {
         initialTasks = JSON.parse(taskResults?.getAttribute('data-tasks') || '[]');
     } catch (e) { initialTasks = []; }
-
-    const escapeHtml = (s) => String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
 
     const autosize = () => {
         if (!input) return;
@@ -990,9 +992,6 @@
     const forwardSelected = document.getElementById('bx-forward-selected');
     const forwardSheet = document.getElementById('bx-forward-sheet');
     const forwardChats = document.getElementById('bx-forward-chats');
-    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
-    }[char]));
     const updateSelection = () => {
         const count = selectedMessageIds.size;
         selectionBar?.toggleAttribute('hidden', count === 0);
@@ -2261,8 +2260,7 @@
     let searchTimer = null;
     let searchSeq = 0;
 
-    const escapeHtmlSearch = (s) => String(s || '')
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const escapeHtmlSearch = escapeHtml;
 
     const showSearchMode = (on) => {
         if (!searchPanel || !chatListEl) return;
