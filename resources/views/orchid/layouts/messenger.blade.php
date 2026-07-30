@@ -16,6 +16,8 @@
      data-media-url="{{ $chats_media_url ?? '' }}"
      data-vapid-key-url="{{ route('platform.web-push.vapid-key') }}"
      data-push-subscribe-url="{{ route('platform.web-push.subscribe') }}"
+     data-push-unsubscribe-url="{{ route('platform.web-push.unsubscribe') }}"
+     data-push-configured="{{ app(\App\Services\WebPushService::class)->isConfigured() ? '1' : '0' }}"
      data-csrf="{{ csrf_token() }}">
     @php
         $chatList = $chats ?? collect();
@@ -33,8 +35,28 @@
 
     <aside class="bx-messenger__sidebar">
         <div class="bx-messenger__sidebar-head">
-            <strong>Чаты</strong>
-            <span class="badge text-bg-light border">{{ $chatList->count() }}</span>
+            <div class="bx-messenger__sidebar-title">
+                <strong>Чаты</strong>
+                <span class="badge text-bg-light border">{{ $chatList->count() }}</span>
+            </div>
+            <div class="bx-messenger__sidebar-actions">
+                <button type="button"
+                        class="bx-sidebar-action"
+                        data-bx-open-modal="createDirectModal"
+                        title="Начать личный чат">
+                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Личный</span>
+                </button>
+                @if(!empty($can_create))
+                    <button type="button"
+                            class="bx-sidebar-action bx-sidebar-action--primary"
+                            data-bx-open-modal="createChatModal"
+                            title="Создать групповой чат">
+                        <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+                        <span>Группа</span>
+                    </button>
+                @endif
+            </div>
         </div>
         <div class="bx-messenger__search">
             <input type="search"
@@ -211,10 +233,19 @@
                                 <input type="range" id="bx-notify-volume" min="0" max="100" step="5" value="75" class="bx-header-menu__range">
                                 <span id="bx-notify-volume-label" class="bx-header-menu__pct">75%</span>
                             </div>
-                            <button type="button" class="bx-header-menu__item" id="bx-enable-push" hidden>
-                                <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-                                <span>Включить push</span>
-                            </button>
+                            <div class="bx-header-menu__sep"></div>
+                            <div class="bx-push-settings" id="bx-push-settings">
+                                <div class="bx-header-menu__item bx-header-menu__item--static">
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                                    <span>Push-уведомления</span>
+                                    <span class="bx-push-status" id="bx-push-status">…</span>
+                                </div>
+                                <button type="button" class="bx-header-menu__item" id="bx-enable-push">
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                                    <span id="bx-push-action-label">Включить push</span>
+                                </button>
+                                <div class="bx-push-hint" id="bx-push-hint">Работают в Chrome/Firefox/Edge при HTTPS. На Linux разрешите уведомления в браузере и системе.</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2259,6 +2290,7 @@
     localStorage.setItem(storageKey, String(since));
 
     if (window.__bxMessengerPollTimer) {
+        clearTimeout(window.__bxMessengerPollTimer);
         clearInterval(window.__bxMessengerPollTimer);
         window.__bxMessengerPollTimer = null;
     }
@@ -2430,9 +2462,42 @@
     };
 
     if (pollUrl) {
-        poll();
-        window.__bxMessengerPollTimer = setInterval(poll, 2000);
+        let pollDelay = 2500;
+        let idleTicks = 0;
+        const schedulePoll = () => {
+            if (window.__bxMessengerPollTimer) clearTimeout(window.__bxMessengerPollTimer);
+            window.__bxMessengerPollTimer = setTimeout(async () => {
+                const hidden = document.visibilityState === 'hidden';
+                pollDelay = hidden ? 10000 : (idleTicks > 8 ? 5000 : 2500);
+                await poll();
+                idleTicks++;
+                schedulePoll();
+            }, pollDelay);
+        };
+        const bumpActivity = () => { idleTicks = 0; };
+        ['pointerdown', 'keydown', 'visibilitychange'].forEach((ev) => {
+            document.addEventListener(ev, bumpActivity, { passive: true });
+        });
+        root?.addEventListener('input', bumpActivity, { passive: true });
+        poll().finally(schedulePoll);
     }
+
+    /* Кнопки «Личный / Группа» в сайдбаре → Orchid-модалки */
+    document.querySelectorAll('[data-bx-open-modal]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const name = btn.getAttribute('data-bx-open-modal');
+            if (!name) return;
+            const target =
+                document.querySelector(`[data-modal-toggle-key-value="${name}"]`)
+                || document.querySelector(`.command-bar [data-modal="${name}"]`)
+                || document.querySelector(`[data-modal="${name}"]`);
+            if (target && typeof target.click === 'function') {
+                target.click();
+                return;
+            }
+            alert('Не удалось открыть форму. Обновите страницу.');
+        });
+    });
 
     /* Поиск по чатам и сообщениям */
     const searchInput = document.getElementById('bx-chat-search');

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\PushSubscription;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 
@@ -24,6 +25,11 @@ class WebPushService
             return;
         }
 
+        $subscriptions = PushSubscription::query()->where('user_id', $user->id)->get();
+        if ($subscriptions->isEmpty()) {
+            return;
+        }
+
         try {
             $webPush = new WebPush([
                 'VAPID' => [
@@ -32,34 +38,42 @@ class WebPushService
                     'privateKey' => config('webpush.private_key'),
                 ],
             ]);
+            $webPush->setReuseVAPIDHeaders(true);
+
             $payload = json_encode([
                 'title' => $title,
                 'body' => $message,
                 'url' => $url,
                 'icon' => config('webpush.icon'),
+                'tag' => 'tml-' . md5($url),
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-            foreach (PushSubscription::query()->where('user_id', $user->id)->cursor() as $subscription) {
+            foreach ($subscriptions as $subscription) {
                 $webPush->queueNotification(
                     Subscription::create([
                         'endpoint' => $subscription->endpoint,
                         'publicKey' => $subscription->public_key,
                         'authToken' => $subscription->auth_token,
-                        'contentEncoding' => 'aes128gcm',
                     ]),
                     $payload
                 );
             }
 
             foreach ($webPush->flush() as $report) {
+                if (!$report->isSuccess()) {
+                    Log::debug('WebPush fail', [
+                        'user_id' => $user->id,
+                        'reason' => $report->getReason(),
+                    ]);
+                }
                 if ($report->isSubscriptionExpired()) {
                     PushSubscription::query()
                         ->where('endpoint', $report->getRequest()->getUri()->__toString())
                         ->delete();
                 }
             }
-        } catch (\Throwable) {
-            // Web Push не должен прерывать бизнес-действие или уведомление Orchid.
+        } catch (\Throwable $e) {
+            Log::warning('WebPush exception: ' . $e->getMessage());
         }
     }
 }

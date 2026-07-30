@@ -1,9 +1,26 @@
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', (event) => {
-    const payload = event.data ? event.data.json() : {};
+    let payload = {};
+    try {
+        payload = event.data ? event.data.json() : {};
+    } catch (e) {
+        payload = { body: event.data ? event.data.text() : '' };
+    }
+
     event.waitUntil(self.registration.showNotification(payload.title || 'TaskManagerLarVit', {
         body: payload.body || '',
         icon: payload.icon || '/favicon.ico',
+        badge: payload.icon || '/favicon.ico',
         data: { url: payload.url || '/' },
+        tag: payload.tag || 'tml-chat',
+        renotify: true,
     }));
 });
 
@@ -12,7 +29,15 @@ self.addEventListener('notificationclick', (event) => {
     const url = event.notification.data?.url || '/';
 
     event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-        const existing = windows.find((client) => client.url === url);
-        return existing ? existing.focus() : clients.openWindow(url);
+        for (const client of windows) {
+            if ('focus' in client) {
+                if (client.url.includes(url) || client.url.includes('/chats')) {
+                    return client.focus().then(() => {
+                        if ('navigate' in client) return client.navigate(url);
+                    });
+                }
+            }
+        }
+        if (clients.openWindow) return clients.openWindow(url);
     }));
 });

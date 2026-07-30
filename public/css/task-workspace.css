@@ -124,18 +124,58 @@
 .tw-composer__editor-wrap {
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    overflow: hidden;
+    overflow: visible;
     background: #fff;
     position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.tw-composer__editor-wrap .ql-toolbar.ql-snow {
+    border: 0;
+    border-bottom: 1px solid #eef2f7;
+    padding: 0.35rem 0.5rem;
+    background: #f8fafc;
+    border-radius: 12px 12px 0 0;
+}
+
+.tw-composer__editor-wrap .ql-container.ql-snow {
+    border: 0;
+    font-size: 0.92rem;
+    flex: 1 1 auto;
+    min-height: 96px;
+    height: auto !important;
+}
+
+.tw-composer__editor-wrap .ql-editor {
+    min-height: 96px;
+    max-height: none !important;
+    height: auto;
+    overflow-y: auto;
+    resize: none;
+}
+
+.tw-composer__editor-wrap .ql-editor.ql-blank::before {
+    color: #94a3b8;
+    font-style: normal;
 }
 
 .tw-composer__resize {
-    height: 10px;
+    height: 14px;
     cursor: ns-resize;
-    background: linear-gradient(to bottom, transparent, #f1f5f9);
-    border-top: 1px dashed #e2e8f0;
+    touch-action: none;
+    flex-shrink: 0;
+    background:
+        linear-gradient(#cbd5e1, #cbd5e1) center 5px / 36px 2px no-repeat,
+        linear-gradient(#cbd5e1, #cbd5e1) center 9px / 24px 2px no-repeat,
+        #f8fafc;
+    border-top: 1px solid #eef2f7;
+    border-radius: 0 0 12px 12px;
 }
-.tw-composer__resize:hover { background: #e2e8f0; }
+.tw-composer__resize:hover,
+.tw-composer__resize.is-dragging {
+    background-color: #e2e8f0;
+}
 
 .tw-files-grid {
     display: grid;
@@ -356,8 +396,8 @@
 }
 
 .tw-composer__editor-wrap .ql-editor {
-    min-height: 88px;
-    max-height: 200px;
+    min-height: 96px;
+    max-height: none !important;
     overflow-y: auto;
 }
 
@@ -1399,9 +1439,74 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.85rem 1rem;
+    gap: 0.5rem;
+    padding: 0.75rem 0.85rem;
     border-bottom: 1px solid #e6eaf0;
     flex-shrink: 0;
+}
+.bx-messenger__sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+}
+.bx-messenger__sidebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+.bx-sidebar-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #334155;
+    border-radius: 9px;
+    padding: 0.32rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.bx-sidebar-action .bx-icon { width: 14px; height: 14px; }
+.bx-sidebar-action:hover { background: #f8fafc; }
+.bx-sidebar-action--primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
+}
+.bx-sidebar-action--primary:hover { background: #1d4ed8; }
+
+.bx-header-menu__sep {
+    height: 1px;
+    background: #eef2f7;
+    margin: 0.25rem 0.35rem;
+}
+.bx-push-status {
+    margin-left: auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    background: #f1f5f9;
+    border-radius: 999px;
+    padding: 0.12rem 0.45rem;
+}
+.bx-push-status[data-state="Включены"] {
+    color: #166534;
+    background: #dcfce7;
+}
+.bx-push-status[data-state="Ошибка"],
+.bx-push-status[data-state="Запрещено"] {
+    color: #991b1b;
+    background: #fee2e2;
+}
+.bx-push-hint {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    padding: 0.15rem 0.65rem 0.45rem;
+    line-height: 1.35;
 }
 
 .bx-messenger__search {
@@ -1849,11 +1954,11 @@
 .tw-composer.is-sending { opacity: 0.7; pointer-events: none; }
 .tw-quill-host,
 .tw-composer__editor-wrap .ql-container.ql-snow {
-    min-height: 96px !important;
+    min-height: 96px;
 }
 .tw-composer__editor-wrap .ql-editor {
-    min-height: 88px !important;
-    max-height: 200px;
+    min-height: 96px !important;
+    max-height: none !important;
     overflow-y: auto;
 }
 .tw-composer__clip {
@@ -3320,11 +3425,16 @@ body.bx-lightbox-open { overflow: hidden; }
     overflow: auto;
 }
 
+@media (max-width: 520px) {
+    .bx-sidebar-action span { display: none; }
+    .bx-sidebar-action { padding: 0.4rem; }
+    .bx-sidebar-action .bx-icon { width: 16px; height: 16px; }
+}
+
 @media (max-width: 900px) {
-    body.bx-messenger-mobile .header,
-    body.bx-messenger-mobile .aside,
-    body.bx-messenger-mobile .command-bar-wrapper {
-        /* оставляем нативную шапку Orchid — мессенджер занимает остаток высоты */
+    body.bx-messenger-mobile .command-bar-wrapper,
+    body.bx-messenger-mobile .command-bar {
+        display: none !important;
     }
     body.bx-messenger-mobile main .container-fluid,
     body.bx-messenger-mobile .layout .wrapper > .content,

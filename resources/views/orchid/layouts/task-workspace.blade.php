@@ -600,22 +600,35 @@
     const resizeHandle = document.getElementById('tw-composer-resize');
     const editorWrap = document.getElementById('tw-composer-editor-wrap');
     resizeHandle?.addEventListener('pointerdown', (e) => {
+        if (e.button !== undefined && e.button !== 0) return;
         e.preventDefault();
         const ql = editorWrap?.querySelector('.ql-editor');
+        const container = editorWrap?.querySelector('.ql-container');
         if (!ql) return;
         const startY = e.clientY;
         const startH = ql.getBoundingClientRect().height;
+        resizeHandle.classList.add('is-dragging');
+        resizeHandle.setPointerCapture?.(e.pointerId);
         const onMove = (ev) => {
-            const next = Math.min(480, Math.max(88, startH + (ev.clientY - startY)));
-            ql.style.minHeight = next + 'px';
-            ql.style.height = next + 'px';
+            const next = Math.min(520, Math.max(96, startH + (ev.clientY - startY)));
+            ql.style.setProperty('min-height', next + 'px', 'important');
+            ql.style.setProperty('height', next + 'px', 'important');
+            ql.style.setProperty('max-height', 'none', 'important');
+            if (container) {
+                container.style.setProperty('min-height', next + 'px', 'important');
+                container.style.height = 'auto';
+            }
         };
-        const onUp = () => {
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', onUp);
+        const onUp = (ev) => {
+            resizeHandle.classList.remove('is-dragging');
+            try { resizeHandle.releasePointerCapture?.(ev.pointerId); } catch (err) {}
+            resizeHandle.removeEventListener('pointermove', onMove);
+            resizeHandle.removeEventListener('pointerup', onUp);
+            resizeHandle.removeEventListener('pointercancel', onUp);
         };
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
+        resizeHandle.addEventListener('pointermove', onMove);
+        resizeHandle.addEventListener('pointerup', onUp);
+        resizeHandle.addEventListener('pointercancel', onUp);
     });
 
     /* Модалка связей */
