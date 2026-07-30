@@ -15,7 +15,7 @@ import {
   setApiBase,
   setSession,
 } from './api';
-import type { ChatMessage, ChatSummary, CommentCard, StatusAction, TaskCard } from './types';
+import type { ChatMessage, ChatSummary, CommentCard, MentionUser, StatusAction, TaskCard } from './types';
 import {
   connectRoom,
   disconnectRoom,
@@ -25,6 +25,7 @@ import {
   type CallConnection,
 } from './calls';
 import { escapeText, richHtml } from './html';
+import { icons } from './icons';
 import { bindVoicePlayers, createVoiceRecorder, voicePlayerHtml } from './voice';
 
 type Route =
@@ -71,7 +72,7 @@ function shell(opts: {
   return `
     <div class="app-shell">
       <header class="topbar">
-        ${opts.back ? `<button class="icon-btn" type="button" data-act="back" aria-label="Назад">‹</button>` : ''}
+        ${opts.back ? `<button class="icon-btn" type="button" data-act="back" aria-label="Назад">${icons.chevronLeft()}</button>` : ''}
         <h1>${escapeText(opts.title)}</h1>
         ${opts.actions || ''}
       </header>
@@ -153,7 +154,7 @@ function chatListHtml(chats: ChatSummary[]): string {
       ${avatarHtml(c.avatar)}
       <div class="list-body">
         <div class="list-title">
-          <span>${c.pinned ? '📌 ' : ''}${escapeText(c.title)}</span>
+          <span class="list-title-text">${c.pinned ? `<span class="pin-mark">${icons.pin(true)}</span>` : ''}${escapeText(c.title)}</span>
           ${c.unread ? `<span class="badge">${c.unread}</span>` : ''}
         </div>
         <div class="list-preview">${escapeText(c.preview || 'Нет сообщений')}</div>
@@ -169,9 +170,9 @@ async function renderChats() {
     title: filter === 'pinned' ? 'Закреплённые' : 'Чаты',
     tabs: 'chats',
     actions: `
-      <button class="icon-btn" type="button" data-act="pinned" title="Закреплённые">📌</button>
-      <button class="icon-btn" type="button" data-act="new-dm" title="Новый чат">✎</button>
-      <button class="icon-btn" type="button" data-act="settings">⚙</button>
+      <button class="icon-btn" type="button" data-act="pinned" title="Закреплённые">${icons.pin()}</button>
+      <button class="icon-btn" type="button" data-act="new-dm" title="Новый чат">${icons.pencil()}</button>
+      <button class="icon-btn" type="button" data-act="settings" title="Настройки">${icons.cog()}</button>
     `,
     search: `<div class="search-bar"><input id="chat-search" placeholder="Поиск по чатам и сообщениям" /></div>`,
     body: `<div class="empty">Загрузка…</div>`,
@@ -329,7 +330,10 @@ function messageHtml(m: ChatMessage): string {
     .join('');
   const files = m.attachments
     .filter((a) => a.kind === 'file')
-    .map((a) => `<a class="msg-att" href="${escapeText(a.url)}" target="_blank">${escapeText(a.name)}</a>`)
+    .map(
+      (a) =>
+        `<a class="msg-file" href="${escapeText(a.url)}" target="_blank" rel="noopener"><span class="msg-file-icon">${icons.paperClip()}</span><span>${escapeText(a.name)}</span></a>`,
+    )
     .join('');
 
   const body = m.deleted
@@ -338,6 +342,7 @@ function messageHtml(m: ChatMessage): string {
 
   return `
     <div class="msg ${m.mine ? 'mine' : ''}" data-id="${m.id}">
+      <div class="msg-check" aria-hidden="true"></div>
       <div class="bubble">
         ${!m.mine ? `<div class="msg-author">${escapeText(m.author.name)}</div>` : ''}
         ${m.forwarded ? `<div class="msg-reply">Переслано</div>` : ''}
@@ -350,10 +355,11 @@ function messageHtml(m: ChatMessage): string {
         ${body}
         ${voices}${images}${files}
         <div class="msg-meta"><span>${escapeText(m.created_label)}</span></div>
-        <div class="msg-actions">
-          <button type="button" data-reply="${m.id}">Ответить</button>
-          <button type="button" data-forward="${m.id}">Переслать</button>
-        </div>
+        ${
+          m.deleted
+            ? ''
+            : `<div class="msg-actions"><button type="button" data-reply="${m.id}">${icons.reply()} Ответить</button></div>`
+        }
       </div>
     </div>`;
 }
@@ -373,34 +379,42 @@ async function renderChat(id: number, title: string) {
     title,
     back: true,
     actions: `
-      <button class="icon-btn" type="button" data-act="pin" title="Закрепить">📌</button>
-      <button class="icon-btn" type="button" data-act="call-audio">📞</button>
-      <button class="icon-btn" type="button" data-act="call-video">🎥</button>
+      <button class="icon-btn" type="button" data-act="pin" title="Закрепить">${icons.pin()}</button>
+      <button class="icon-btn" type="button" data-act="call-audio" title="Аудиозвонок">${icons.phone()}</button>
+      <button class="icon-btn" type="button" data-act="call-video" title="Видеозвонок">${icons.video()}</button>
     `,
     body: `<div class="empty">Загрузка…</div>`,
     footer: `
+      <div class="selection-bar hidden" id="selection-bar">
+        <span id="selection-count">Выбрано: 0</span>
+        <div class="selection-actions">
+          <button type="button" class="btn btn-primary" id="sel-forward">Переслать</button>
+          <button type="button" class="btn btn-danger" id="sel-delete">Удалить</button>
+          <button type="button" class="btn btn-ghost" id="sel-cancel">Отмена</button>
+        </div>
+      </div>
       <div class="composer-wrap">
         <div class="typing hidden" id="typing"></div>
         <div class="reply-bar hidden" id="reply-bar">
           <div class="grow" id="reply-text"></div>
-          <button class="icon-btn" type="button" id="reply-clear">×</button>
+          <button class="icon-btn" type="button" id="reply-clear" aria-label="Отменить ответ">${icons.xMark()}</button>
         </div>
+        <div class="attach-bar hidden" id="attach-bar"></div>
         <div class="voice-rec hidden" id="voice-rec">
           <span class="dot"></span>
           <span id="voice-timer">0:00</span>
           <div class="meter"><span id="voice-meter"></span></div>
-          <div class="actions">
-            <button type="button" id="voice-cancel">Отмена</button>
-            <button type="button" id="voice-send" style="background:#22c55e;color:#fff">Отправить</button>
-          </div>
+          <button type="button" class="voice-cancel-btn" id="voice-cancel" aria-label="Отмена">${icons.xMark()}</button>
         </div>
         <form class="composer" id="composer">
+          <button class="round-btn" type="button" id="btn-attach" title="Файл">${icons.paperClip()}</button>
+          <input type="file" id="file-input" class="hidden" multiple accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.php,.js,.ts,.json,.sql,.css,audio/*,video/*" />
           <div class="composer-input">
+            <div id="mention-menu" class="mention-menu hidden" role="listbox"></div>
             <textarea name="text" rows="1" placeholder="Сообщение" id="msg-input"></textarea>
           </div>
           <div class="composer-tools">
-            <button class="round-btn" type="button" id="btn-voice" title="Голосовое">🎤</button>
-            <button class="round-btn send" type="submit" title="Отправить">➤</button>
+            <button class="round-btn send" type="button" id="btn-send" title="Отправить">${icons.microphone()}</button>
           </div>
         </form>
       </div>
@@ -412,6 +426,19 @@ async function renderChat(id: number, title: string) {
   const input = app.querySelector('#msg-input') as HTMLTextAreaElement;
   const replyBar = app.querySelector('#reply-bar') as HTMLElement;
   const replyText = app.querySelector('#reply-text') as HTMLElement;
+  const mentionMenu = app.querySelector('#mention-menu') as HTMLElement;
+  const attachBar = app.querySelector('#attach-bar') as HTMLElement;
+  const fileInput = app.querySelector('#file-input') as HTMLInputElement;
+  const sendBtn = app.querySelector('#btn-send') as HTMLButtonElement;
+  const selectionBar = app.querySelector('#selection-bar') as HTMLElement;
+  const selectionCount = app.querySelector('#selection-count') as HTMLElement;
+  const recUi = app.querySelector('#voice-rec') as HTMLElement;
+  const composer = app.querySelector('#composer') as HTMLElement;
+
+  let mentionUsers: MentionUser[] = [];
+  let mentionStart = -1;
+  let pendingFiles: File[] = [];
+  const selectedIds = new Set<number>();
 
   const updateReplyBar = () => {
     if (!replyTo) {
@@ -426,6 +453,90 @@ async function renderChat(id: number, title: string) {
     updateReplyBar();
   });
 
+  const syncAttachBar = () => {
+    if (!pendingFiles.length) {
+      attachBar.classList.add('hidden');
+      attachBar.innerHTML = '';
+      return;
+    }
+    attachBar.classList.remove('hidden');
+    attachBar.innerHTML = pendingFiles
+      .map(
+        (f, i) =>
+          `<span class="attach-chip"><span>${escapeText(f.name)}</span><button type="button" data-rm-file="${i}" aria-label="Убрать">${icons.xMark()}</button></span>`,
+      )
+      .join('');
+    attachBar.querySelectorAll('[data-rm-file]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        pendingFiles.splice(Number((btn as HTMLElement).dataset.rmFile), 1);
+        syncAttachBar();
+        syncSendBtn();
+      });
+    });
+  };
+
+  const syncSendBtn = () => {
+    const hasPayload = input.value.trim().length > 0 || pendingFiles.length > 0;
+    sendBtn.innerHTML = hasPayload ? icons.paperAirplane() : icons.microphone();
+    sendBtn.dataset.mode = hasPayload ? 'send' : 'voice';
+    sendBtn.title = hasPayload ? 'Отправить' : 'Удерживайте для голосового';
+  };
+
+  const updateSelection = () => {
+    const count = selectedIds.size;
+    selectionBar.classList.toggle('hidden', count === 0);
+    app.querySelector('.app-shell')?.classList.toggle('is-selecting', count > 0);
+    selectionCount.textContent = `Выбрано: ${count}`;
+    main.querySelectorAll('.msg:not(.system)').forEach((el) => {
+      const mid = Number((el as HTMLElement).dataset.id);
+      el.classList.toggle('is-selected', selectedIds.has(mid));
+    });
+  };
+
+  const toggleSelect = (mid: number) => {
+    if (!mid) return;
+    if (selectedIds.has(mid)) selectedIds.delete(mid);
+    else if (selectedIds.size < 20) selectedIds.add(mid);
+    updateSelection();
+  };
+
+  const clearSelection = () => {
+    selectedIds.clear();
+    updateSelection();
+  };
+
+  app.querySelector('#sel-cancel')?.addEventListener('click', clearSelection);
+  app.querySelector('#sel-forward')?.addEventListener('click', () => {
+    if (!selectedIds.size) return;
+    void openForwardSheet(id, [...selectedIds]);
+  });
+  app.querySelector('#sel-delete')?.addEventListener('click', async () => {
+    if (!selectedIds.size) return;
+    const scope = confirm('Удалить для всех? (Отмена = только у вас)') ? 'everyone' : 'me';
+    try {
+      await api(`/chats/${id}/messages/delete`, {
+        method: 'POST',
+        body: { message_ids: [...selectedIds], scope } as any,
+      });
+      selectedIds.forEach((mid) => {
+        const el = main.querySelector(`.msg[data-id="${mid}"]`);
+        if (scope === 'everyone' || el?.classList.contains('mine')) {
+          el?.remove();
+        } else {
+          const bubble = el?.querySelector('.bubble');
+          if (bubble) {
+            const text = bubble.querySelector('.msg-text');
+            if (text) text.innerHTML = '<em>Сообщение удалено</em>';
+            bubble.querySelector('.msg-actions')?.remove();
+          }
+        }
+      });
+      clearSelection();
+    } catch (ex) {
+      alert(ex instanceof Error ? ex.message : 'Не удалось удалить');
+    }
+  });
+
   app.querySelector('[data-act="call-audio"]')?.addEventListener('click', () => void openCall(id, false, title));
   app.querySelector('[data-act="call-video"]')?.addEventListener('click', () => void openCall(id, true, title));
   app.querySelector('[data-act="pin"]')?.addEventListener('click', async () => {
@@ -437,10 +548,130 @@ async function renderChat(id: number, title: string) {
     }
   });
 
+  const hideMentionMenu = () => {
+    mentionMenu.classList.add('hidden');
+    mentionMenu.innerHTML = '';
+    mentionStart = -1;
+  };
+
+  const getMentionQuery = (): string | null => {
+    const pos = input.selectionStart ?? 0;
+    const before = input.value.slice(0, pos);
+    const m = before.match(/(^|[\s([{])@([^\s@]*)$/);
+    if (!m) return null;
+    mentionStart = before.length - m[2].length - 1;
+    return m[2].toLowerCase();
+  };
+
+  const updateMentionMenu = () => {
+    if (!mentionUsers.length) return;
+    const q = getMentionQuery();
+    if (q === null) {
+      hideMentionMenu();
+      return;
+    }
+    const filtered = mentionUsers
+      .filter((u) => (u.aliases || [u.name]).join(' ').toLowerCase().includes(q))
+      .slice(0, 8);
+    if (!filtered.length) {
+      hideMentionMenu();
+      return;
+    }
+    mentionMenu.innerHTML = filtered
+      .map(
+        (u, i) =>
+          `<button type="button" class="mention-item ${i === 0 ? 'is-active' : ''}" data-mention-name="${escapeText(u.name)}" role="option">
+            <span class="mention-avatar">${escapeText((u.name || '?').slice(0, 1).toUpperCase())}</span>
+            <span>${escapeText(u.name)}</span>
+          </button>`,
+      )
+      .join('');
+    mentionMenu.classList.remove('hidden');
+  };
+
+  const insertMention = (name: string) => {
+    if (mentionStart < 0) return;
+    const pos = input.selectionStart ?? 0;
+    const before = input.value.slice(0, mentionStart);
+    const after = input.value.slice(pos);
+    input.value = `${before}@${name} ${after}`;
+    const caret = before.length + name.length + 2;
+    input.focus();
+    input.setSelectionRange(caret, caret);
+    hideMentionMenu();
+    syncSendBtn();
+  };
+
+  mentionMenu.addEventListener('mousedown', (e) => {
+    const btn = (e.target as HTMLElement).closest?.('[data-mention-name]');
+    if (!btn) return;
+    e.preventDefault();
+    insertMention((btn as HTMLElement).dataset.mentionName || '');
+  });
+
+  const appendMessage = (m: ChatMessage) => {
+    const feed = app.querySelector('#feed');
+    if (!feed || feed.querySelector(`[data-id="${m.id}"]`)) return;
+    feed.insertAdjacentHTML('beforeend', messageHtml(m));
+    bindVoicePlayers(feed);
+    void hydrateImages(feed);
+    bindMsgActions(feed);
+    sinceId = Math.max(sinceId, m.id);
+    main.scrollTop = main.scrollHeight;
+  };
+
+  const sendTextOrFiles = async () => {
+    const text = input.value.trim();
+    if (!text && !pendingFiles.length) return;
+    const files = [...pendingFiles];
+    input.value = '';
+    input.style.height = '44px';
+    pendingFiles = [];
+    syncAttachBar();
+    syncSendBtn();
+    hideMentionMenu();
+    try {
+      const fd = new FormData();
+      if (text) fd.append('message[text]', text);
+      if (replyTo) fd.append('message[parent_id]', String(replyTo.id));
+      files.forEach((f) => fd.append('message_files[]', f, f.name));
+      const res = await api<{ message: ChatMessage }>(`/chats/${id}/messages`, {
+        method: 'POST',
+        formData: fd,
+      });
+      replyTo = null;
+      updateReplyBar();
+      appendMessage(res.message);
+    } catch (ex) {
+      alert(ex instanceof Error ? ex.message : 'Не отправлено');
+    }
+  };
+
+  const sendVoiceBlob = async (blob: Blob, duration: number) => {
+    try {
+      const fd = new FormData();
+      fd.append('message_voice', blob, 'voice.webm');
+      fd.append('message[voice_duration]', String(duration));
+      if (replyTo) fd.append('message[parent_id]', String(replyTo.id));
+      const res = await api<{ message: ChatMessage }>(`/chats/${id}/messages`, {
+        method: 'POST',
+        formData: fd,
+      });
+      replyTo = null;
+      updateReplyBar();
+      appendMessage(res.message);
+    } catch (ex) {
+      alert(ex instanceof Error ? ex.message : 'Голосовое не отправлено');
+    }
+  };
+
   const bindMsgActions = (root: ParentNode) => {
     root.querySelectorAll('[data-reply]').forEach((btn) => {
+      if ((btn as HTMLElement).dataset.bound === '1') return;
+      (btn as HTMLElement).dataset.bound = '1';
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (selectedIds.size) return;
         const mid = Number((btn as HTMLElement).dataset.reply);
         const msgEl = root.querySelector(`.msg[data-id="${mid}"]`);
         const author = msgEl?.querySelector('.msg-author')?.textContent || (getUser()?.name ?? 'Вы');
@@ -450,64 +681,192 @@ async function renderChat(id: number, title: string) {
         input.focus();
       });
     });
-    root.querySelectorAll('[data-forward]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        void openForwardSheet(id, [Number((btn as HTMLElement).dataset.forward)]);
-      });
+  };
+
+  const bindLongPress = (feedEl: HTMLElement) => {
+    let timer: number | null = null;
+    let holdFired = false;
+    let suppressUntil = 0;
+    let activeMsg: HTMLElement | null = null;
+    let holdStart: { x: number; y: number } | null = null;
+    let holding = false;
+
+    const clearHoldTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+    const endHoldVisual = () => {
+      activeMsg?.classList.remove('is-hold');
+      feedEl.classList.remove('is-press-hold');
+      holding = false;
+      activeMsg = null;
+      holdStart = null;
+    };
+    const clearHold = () => {
+      clearHoldTimer();
+      endHoldVisual();
+    };
+    const movedTooFar = (x: number, y: number) => {
+      if (!holdStart) return false;
+      return Math.abs(x - holdStart.x) > 28 || Math.abs(y - holdStart.y) > 28;
+    };
+    const msgFrom = (t: EventTarget | null) =>
+      (t as HTMLElement | null)?.closest?.('.msg:not(.system)') as HTMLElement | null;
+    const isInteractive = (t: EventTarget | null) =>
+      !!(t as HTMLElement | null)?.closest?.('button,a,input,textarea,label,.voice');
+
+    feedEl.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const message = msgFrom(e.target);
+      if (!message || isInteractive(e.target)) return;
+      if (selectedIds.size > 0) return;
+      clearHold();
+      holdFired = false;
+      holding = true;
+      activeMsg = message;
+      holdStart = { x: e.clientX, y: e.clientY };
+      feedEl.classList.add('is-press-hold');
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (!activeMsg) return;
+        holdFired = true;
+        suppressUntil = Date.now() + 600;
+        activeMsg.classList.add('is-hold');
+        feedEl.classList.remove('is-press-hold');
+        toggleSelect(Number(activeMsg.dataset.id));
+        try {
+          navigator.vibrate?.(25);
+        } catch {
+          /* */
+        }
+        input.blur();
+      }, 450);
     });
-    root.querySelectorAll('.msg:not(.system)').forEach((el) => {
-      el.addEventListener('click', () => {
-        el.classList.toggle('is-selected');
-      });
+
+    feedEl.addEventListener(
+      'touchmove',
+      (e) => {
+        if (!holding || !holdStart) return;
+        const t = e.touches?.[0];
+        if (!t) return;
+        if (holdFired || !movedTooFar(t.clientX, t.clientY)) {
+          e.preventDefault();
+          return;
+        }
+        clearHold();
+      },
+      { passive: false },
+    );
+
+    feedEl.addEventListener('pointermove', (e) => {
+      if (!holding || !timer) return;
+      if (movedTooFar(e.clientX, e.clientY)) clearHold();
+    });
+
+    const finish = (e: Event, toggleIfSelecting: boolean) => {
+      const message = activeMsg || msgFrom((e as any).target);
+      const wasHold = holdFired;
+      clearHoldTimer();
+      endHoldVisual();
+      if (wasHold) {
+        holdFired = false;
+        suppressUntil = Date.now() + 600;
+        e.preventDefault?.();
+        return;
+      }
+      if (Date.now() < suppressUntil) return;
+      if (!toggleIfSelecting || !message || isInteractive((e as any).target)) return;
+      if (!selectedIds.size) return;
+      suppressUntil = Date.now() + 350;
+      toggleSelect(Number(message.dataset.id));
+    };
+
+    feedEl.addEventListener('pointerup', (e) => {
+      if (e.pointerType === 'touch') {
+        if (holding || holdFired) finish(e, false);
+        return;
+      }
+      finish(e, true);
+    });
+    feedEl.addEventListener('touchend', (e) => finish(e, true));
+    feedEl.addEventListener('pointercancel', () => clearHold());
+    feedEl.addEventListener(
+      'click',
+      (e) => {
+        if (Date.now() < suppressUntil) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true,
+    );
+    feedEl.addEventListener('contextmenu', (e) => {
+      if (msgFrom(e.target)) e.preventDefault();
     });
   };
 
   try {
-    const data = await api<{ messages: ChatMessage[] }>(`/chats/${id}`);
+    const data = await api<{ messages: ChatMessage[]; mention_users?: MentionUser[] }>(`/chats/${id}`);
+    mentionUsers = data.mention_users || [];
     sinceId = data.messages.reduce((max, m) => Math.max(max, m.id), 0);
     main.innerHTML = `<div class="chat-feed" id="feed">${data.messages.map(messageHtml).join('')}</div>`;
+    const feed = app.querySelector('#feed') as HTMLElement;
     bindVoicePlayers(main);
     await hydrateImages(main);
     bindMsgActions(main);
+    bindLongPress(feed);
     main.scrollTop = main.scrollHeight;
 
     input.addEventListener('input', () => {
       input.style.height = 'auto';
       input.style.height = Math.min(120, Math.max(44, input.scrollHeight)) + 'px';
+      syncSendBtn();
+      updateMentionMenu();
       void api(`/chats/${id}/typing`, { method: 'POST' }).catch(() => undefined);
     });
-
-    app.querySelector('#composer')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const text = input.value.trim();
-      if (!text) return;
-      input.value = '';
-      input.style.height = '44px';
-      try {
-        const fd = new FormData();
-        fd.append('message[text]', text);
-        if (replyTo) fd.append('message[parent_id]', String(replyTo.id));
-        const res = await api<{ message: ChatMessage }>(`/chats/${id}/messages`, {
-          method: 'POST',
-          formData: fd,
-        });
-        replyTo = null;
-        updateReplyBar();
-        const feed = app.querySelector('#feed')!;
-        feed.insertAdjacentHTML('beforeend', messageHtml(res.message));
-        bindVoicePlayers(feed);
-        bindMsgActions(feed);
-        sinceId = Math.max(sinceId, res.message.id);
-        main.scrollTop = main.scrollHeight;
-      } catch (ex) {
-        alert(ex instanceof Error ? ex.message : 'Не отправлено');
+    input.addEventListener('keydown', (e) => {
+      if (!mentionMenu.classList.contains('hidden')) {
+        const items = [...mentionMenu.querySelectorAll('[data-mention-name]')];
+        const active = mentionMenu.querySelector('.is-active');
+        let idx = items.indexOf(active as Element);
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          items.forEach((el) => el.classList.remove('is-active'));
+          items[(idx + 1) % items.length]?.classList.add('is-active');
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          items.forEach((el) => el.classList.remove('is-active'));
+          items[(idx - 1 + items.length) % items.length]?.classList.add('is-active');
+          return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          const pick = (mentionMenu.querySelector('.is-active') || items[0]) as HTMLElement | null;
+          if (pick) {
+            e.preventDefault();
+            insertMention(pick.dataset.mentionName || '');
+            return;
+          }
+        }
+        if (e.key === 'Escape') {
+          hideMentionMenu();
+          return;
+        }
       }
     });
 
-    // Voice record
-    const recUi = app.querySelector('#voice-rec') as HTMLElement;
-    const composer = app.querySelector('#composer') as HTMLElement;
+    app.querySelector('#btn-attach')?.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const incoming = [...(fileInput.files || [])];
+      fileInput.value = '';
+      const room = Math.max(0, 10 - pendingFiles.length);
+      pendingFiles = pendingFiles.concat(incoming.slice(0, room));
+      syncAttachBar();
+      syncSendBtn();
+    });
+
+    // Voice: hold send button (Telegram-style)
     const recorder = createVoiceRecorder((sec, peak) => {
       const t = app.querySelector('#voice-timer');
       const m = app.querySelector('#voice-meter') as HTMLElement;
@@ -515,47 +874,91 @@ async function renderChat(id: number, title: string) {
       if (m) m.style.width = `${Math.round(peak * 100)}%`;
     });
 
-    app.querySelector('#btn-voice')?.addEventListener('click', async () => {
+    let voiceActive = false;
+    let voiceStartTimer: number | null = null;
+    let voiceCancelled = false;
+
+    const endVoiceUi = () => {
+      recUi.classList.add('hidden');
+      composer.classList.remove('hidden');
+      sendBtn.classList.remove('is-recording');
+      voiceActive = false;
+    };
+
+    const startVoiceHold = async () => {
+      if (sendBtn.dataset.mode !== 'voice') return;
+      voiceCancelled = false;
       try {
         await recorder.start();
+        if (voiceCancelled) {
+          recorder.cancel();
+          return;
+        }
+        voiceActive = true;
         composer.classList.add('hidden');
         recUi.classList.remove('hidden');
+        sendBtn.classList.add('is-recording');
       } catch {
+        endVoiceUi();
         alert('Нет доступа к микрофону');
       }
-    });
-    app.querySelector('#voice-cancel')?.addEventListener('click', () => {
-      recorder.cancel();
-      recUi.classList.add('hidden');
-      composer.classList.remove('hidden');
-    });
-    app.querySelector('#voice-send')?.addEventListener('click', async () => {
+    };
+
+    const finishVoiceHold = async (send: boolean) => {
+      if (voiceStartTimer) {
+        clearTimeout(voiceStartTimer);
+        voiceStartTimer = null;
+      }
+      if (!voiceActive) return;
+      if (!send) {
+        recorder.cancel();
+        endVoiceUi();
+        return;
+      }
       const result = await recorder.stop();
-      recUi.classList.add('hidden');
-      composer.classList.remove('hidden');
-      if (!result) return;
-      try {
-        const fd = new FormData();
-        fd.append('message_voice', result.blob, 'voice.webm');
-        fd.append('message[voice_duration]', String(result.duration));
-        if (replyTo) fd.append('message[parent_id]', String(replyTo.id));
-        const res = await api<{ message: ChatMessage }>(`/chats/${id}/messages`, {
-          method: 'POST',
-          formData: fd,
-        });
-        replyTo = null;
-        updateReplyBar();
-        const feed = app.querySelector('#feed')!;
-        feed.insertAdjacentHTML('beforeend', messageHtml(res.message));
-        bindVoicePlayers(feed);
-        bindMsgActions(feed);
-        sinceId = Math.max(sinceId, res.message.id);
-        main.scrollTop = main.scrollHeight;
-      } catch (ex) {
-        alert(ex instanceof Error ? ex.message : 'Голосовое не отправлено');
+      endVoiceUi();
+      if (result && result.duration >= 1) await sendVoiceBlob(result.blob, result.duration);
+    };
+
+    sendBtn.addEventListener('pointerdown', (e) => {
+      if (sendBtn.dataset.mode !== 'voice') return;
+      e.preventDefault();
+      voiceCancelled = false;
+      voiceStartTimer = window.setTimeout(() => void startVoiceHold(), 180);
+
+      const onUp = () => {
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onCancel);
+        void finishVoiceHold(true);
+      };
+      const onCancel = () => {
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onCancel);
+        voiceCancelled = true;
+        void finishVoiceHold(false);
+      };
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onCancel);
+    });
+    sendBtn.addEventListener('click', (e) => {
+      if (sendBtn.dataset.mode === 'send') {
+        e.preventDefault();
+        void sendTextOrFiles();
       }
     });
 
+    app.querySelector('#voice-cancel')?.addEventListener('click', () => {
+      voiceCancelled = true;
+      void finishVoiceHold(false);
+    });
+
+    // Also allow form Enter on desktop
+    composer.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (sendBtn.dataset.mode === 'send') void sendTextOrFiles();
+    });
+
+    syncSendBtn();
     startChatPoll(id, title);
   } catch (ex) {
     main.innerHTML = `<div class="empty">${escapeText(ex instanceof Error ? ex.message : 'Ошибка')}</div>`;
@@ -597,6 +1000,7 @@ async function openForwardSheet(sourceChatId: number, messageIds: number[]) {
             } as any,
           });
           root.innerHTML = '';
+          (app.querySelector('#sel-cancel') as HTMLButtonElement | null)?.click();
           alert('Переслано');
         } catch (ex) {
           alert(ex instanceof Error ? ex.message : 'Ошибка');
@@ -652,6 +1056,25 @@ function startChatPoll(chatId: number, title: string) {
         }
         bindVoicePlayers(feed);
         await hydrateImages(feed);
+        feed.querySelectorAll('[data-reply]').forEach((btn) => {
+          if ((btn as HTMLElement).dataset.bound === '1') return;
+          (btn as HTMLElement).dataset.bound = '1';
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const mid = Number((btn as HTMLElement).dataset.reply);
+            const msgEl = feed.querySelector(`.msg[data-id="${mid}"]`);
+            const author = msgEl?.querySelector('.msg-author')?.textContent || (getUser()?.name ?? 'Вы');
+            const preview = msgEl?.querySelector('.msg-text')?.textContent?.slice(0, 80) || 'Сообщение';
+            replyTo = { id: mid, author, preview };
+            const replyBar = app.querySelector('#reply-bar') as HTMLElement | null;
+            const replyText = app.querySelector('#reply-text') as HTMLElement | null;
+            if (replyBar && replyText) {
+              replyBar.classList.remove('hidden');
+              replyText.innerHTML = `<strong>${escapeText(replyTo.author)}</strong> · ${escapeText(replyTo.preview)}`;
+            }
+            (app.querySelector('#msg-input') as HTMLTextAreaElement | null)?.focus();
+          });
+        });
         if (atBottom && main) main.scrollTop = main.scrollHeight;
       }
       if (data.max_id) sinceId = Math.max(sinceId, data.max_id);
@@ -741,9 +1164,9 @@ async function mountCallUi(conn: CallConnection, title: string) {
         </div>
       </div>
       <div class="call-actions">
-        <button class="round-btn mute" type="button" id="toggle-mic">🎤</button>
-        ${conn.can_end ? `<button class="round-btn hangup" type="button" id="end-call">⏹</button>` : ''}
-        <button class="round-btn hangup" type="button" id="leave-call">📵</button>
+        <button class="round-btn mute" type="button" id="toggle-mic">${icons.microphone()}</button>
+        ${conn.can_end ? `<button class="round-btn hangup" type="button" id="end-call">${icons.stop()}</button>` : ''}
+        <button class="round-btn hangup" type="button" id="leave-call">${icons.phoneOff()}</button>
       </div>
     </div>`;
 
@@ -787,7 +1210,7 @@ async function renderTasks() {
   app.innerHTML = shell({
     title: 'Мои задачи',
     tabs: 'tasks',
-    actions: `<button class="icon-btn" type="button" data-act="settings">⚙</button>`,
+    actions: `<button class="icon-btn" type="button" data-act="settings" title="Настройки">${icons.cog()}</button>`,
     search: `<div class="search-bar"><input id="task-search" placeholder="Поиск задач" /></div>`,
     body: `<div class="empty">Загрузка…</div>`,
   });
@@ -845,7 +1268,7 @@ async function renderTask(id: number) {
       <div class="composer-wrap">
         <form class="composer" id="comment-form">
           <div class="composer-input"><textarea name="text" rows="1" placeholder="Комментарий" id="c-input"></textarea></div>
-          <div class="composer-tools"><button class="round-btn send" type="submit">➤</button></div>
+          <div class="composer-tools"><button class="round-btn send" type="submit">${icons.paperAirplane()}</button></div>
         </form>
       </div>`,
   });
@@ -857,7 +1280,7 @@ async function renderTask(id: number) {
       comments: CommentCard[];
       history: CommentCard[];
       status_actions: StatusAction[];
-      pipeline: Array<{ value: string; label: string; state: string }>;
+      pipeline: Array<{ value: string; short?: string; label?: string; state: string }>;
       can_discuss: boolean;
     }>(`/tasks/${id}`);
     const t = data.task;
@@ -868,7 +1291,7 @@ async function renderTask(id: number) {
         <span class="status-pill" style="background:${escapeText(t.status_color)}">${escapeText(t.status_label)}</span>
         <div class="pipeline">
           ${(data.pipeline || [])
-            .map((p) => `<span class="${escapeText(p.state)}">${escapeText(p.label)}</span>`)
+            .map((p) => `<span class="${escapeText(p.state)}">${escapeText(p.short || p.label || p.value)}</span>`)
             .join('')}
         </div>
         <div class="meta-row">Проект: ${escapeText(t.project || '—')}</div>
@@ -1000,7 +1423,7 @@ async function renderSettings() {
         <button class="btn btn-ghost btn-block" type="button" id="enable-push">Включить уведомления</button>
         <div style="height:.75rem"></div>
         <button class="btn btn-danger btn-block" type="button" id="logout">Выйти</button>
-        <p class="meta-row" style="margin-top:1rem">Закреплённые чаты — кнопка 📌 в списке чатов. Push: локальные уведомления + регистрация device token (FCM на сервере — отдельно).</p>
+        <p class="meta-row" style="margin-top:1rem">Закреплённые чаты — кнопка с иконкой булавки в списке чатов. Push: локальные уведомления + регистрация device token (FCM на сервере — отдельно).</p>
       </div>`,
   });
   bindChrome();

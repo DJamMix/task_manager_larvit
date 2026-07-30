@@ -45,8 +45,8 @@ export function richHtml(html: string): string {
   return Array.from(root.childNodes).map(walk).join('');
 }
 
-export function escapeText(s: string): string {
-  return s
+export function escapeText(s: string | null | undefined): string {
+  return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

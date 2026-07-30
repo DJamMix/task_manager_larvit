@@ -83,3 +83,9 @@ export type StatusAction = {
   tone?: string;
   confirm?: string | null;
 };
+
+export type MentionUser = {
+  id: number;
+  name: string;
+  aliases?: string[];
+};

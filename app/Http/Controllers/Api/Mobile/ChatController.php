@@ -53,6 +53,21 @@ class ChatController extends Controller
             $listed = $chat;
         }
 
+        $chat->loadMissing(['members']);
+        $mentionUsers = $chat->members
+            ->reject(fn ($u) => (int) $u->id === (int) $user->id)
+            ->map(fn ($u) => [
+                'id' => (int) $u->id,
+                'name' => $u->name,
+                'aliases' => array_values(array_unique(array_filter([
+                    $u->name,
+                    $u->displayName(),
+                    $u->email ? strtok((string) $u->email, '@') : null,
+                ]))),
+            ])
+            ->values()
+            ->all();
+
         return response()->json([
             'chat' => $this->presenter->chatSummary($listed, $user),
             'messages' => $feed['messages']
@@ -60,6 +75,7 @@ class ChatController extends Controller
                 ->values(),
             'has_more' => (bool) $feed['has_more'],
             'oldest_id' => $feed['oldest_id'],
+            'mention_users' => $mentionUsers,
         ]);
     }
 
