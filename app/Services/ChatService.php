@@ -1340,9 +1340,9 @@ class ChatService
 
     private function notifyMembers(Chat $chat, User $actor, ChatMessage $message, array $mentionIds): void
     {
-        $title = $mentionIds !== [] ? 'Вас упомянули в чате' : 'Новое сообщение в чате';
         $preview = \Illuminate\Support\Str::limit($message->plain_text, 140);
-        $body = "{$actor->displayName()} · {$chat->displayTitle($actor->id)}: {$preview}";
+        // Только автор + текст. Название чата не дублируем: в личке это имя получателя («это я»).
+        $body = "{$actor->displayName()}: {$preview}";
         $url = route('platform.systems.chats.view', $chat);
 
         $recipients = $chat->members
@@ -1369,7 +1369,7 @@ class ChatService
         }
 
         foreach ($recipients as $user) {
-            $this->notifier->send($user, $title, $body, $url, Color::INFO);
+            $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO);
         }
     }
 
