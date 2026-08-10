@@ -1,114 +1,85 @@
 /**
- * CrewDev shell: бренд в aside + сворачивание меню до иконок.
+ * CrewDev shell: имя приложения + сворачивание меню до иконок.
  */
 
-/* ===== Brand (logo) ===== */
+/* ===== Brand text (как в Orchid header) ===== */
 .crewdev-aside-brand-wrap {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.35rem;
-    padding: 0.75rem 0.65rem 0.55rem 0.75rem;
+    gap: 0.5rem;
+    padding: 1rem 0.85rem 0.75rem;
     position: relative;
     z-index: 20;
 }
 
 .crewdev-aside-brand {
-    display: flex !important;
-    align-items: center;
-    gap: 0.7rem;
+    display: block !important;
     min-width: 0;
     flex: 1 1 auto;
-    text-decoration: none !important;
-    color: #0f172a !important;
-}
-
-.crewdev-aside-brand__mark {
-    flex: 0 0 auto;
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 14px;
-    background: #0f172a !important;
-    color: #ffffff !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
-}
-
-.crewdev-aside-brand__mark svg {
-    width: 28px !important;
-    height: 28px !important;
-    display: block;
-    color: #ffffff !important;
-}
-
-.crewdev-aside-brand__mark svg path {
-    stroke: #ffffff !important;
-}
-
-.crewdev-aside-brand__text {
-    font-size: 1.28rem !important;
-    font-weight: 800 !important;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-    color: #0f172a !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+    text-decoration: none !important;
+    color: #ffffff !important;
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.aside a.crewdev-aside-brand:link,
+.aside a.crewdev-aside-brand:visited,
+.aside a.crewdev-aside-brand:hover,
+.aside a.crewdev-aside-brand:focus {
+    color: #ffffff !important;
+    text-decoration: none !important;
+    opacity: 1;
 }
 
 .crewdev-aside-toggle {
     flex: 0 0 auto;
-    width: 34px;
-    height: 34px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    border-radius: 10px;
-    color: #334155;
+    width: 32px;
+    height: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: #ffffff;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
     padding: 0;
     cursor: pointer;
     z-index: 30;
-    position: relative;
     pointer-events: auto !important;
 }
 .crewdev-aside-toggle:hover {
-    background: #f1f5f9;
-    color: #0f172a;
-    border-color: #94a3b8;
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #ffffff;
 }
 
-/* ===== Collapsed aside ===== */
+/* ===== Collapsed: только иконки, без поломки collapse Orchid ===== */
 @media (min-width: 992px) {
-    html.crewdev-aside-collapsed .aside,
-    body.crewdev-aside-collapsed .aside,
-    html.crewdev-aside-collapsed .aside.col-xs-12,
-    body.crewdev-aside-collapsed .aside.col-xs-12,
-    html.crewdev-aside-collapsed [class*="aside"],
+    html.crewdev-aside-collapsed > .container-fluid > .row > .aside,
     body.crewdev-aside-collapsed > .container-fluid > .row > .aside {
-        flex: 0 0 76px !important;
-        max-width: 76px !important;
-        width: 76px !important;
-        min-width: 76px !important;
+        flex: 0 0 4.75rem !important;
+        width: 4.75rem !important;
+        max-width: 4.75rem !important;
+        min-width: 4.75rem !important;
     }
 
     html.crewdev-aside-collapsed .crewdev-aside-brand-wrap,
     body.crewdev-aside-collapsed .crewdev-aside-brand-wrap {
         flex-direction: column;
         align-items: center;
-        padding: 0.75rem 0.4rem;
-        gap: 0.45rem;
+        justify-content: center;
+        padding: 0.85rem 0.35rem 0.55rem;
+        gap: 0.5rem;
     }
 
     html.crewdev-aside-collapsed .crewdev-aside-brand,
     body.crewdev-aside-collapsed .crewdev-aside-brand {
-        justify-content: center;
-        width: 100%;
-    }
-
-    html.crewdev-aside-collapsed .crewdev-aside-brand__text,
-    body.crewdev-aside-collapsed .crewdev-aside-brand__text {
         display: none !important;
     }
 
@@ -117,46 +88,59 @@
         transform: rotate(180deg);
     }
 
-    html.crewdev-aside-collapsed .aside .nav-link > span:not(.icon):not(.badge),
-    body.crewdev-aside-collapsed .aside .nav-link > span:not(.icon):not(.badge),
-    html.crewdev-aside-collapsed .aside .nav-link .badge,
-    body.crewdev-aside-collapsed .aside .nav-link .badge,
-    html.crewdev-aside-collapsed .aside h5,
-    body.crewdev-aside-collapsed .aside h5,
-    html.crewdev-aside-collapsed .aside .small,
-    body.crewdev-aside-collapsed .aside .small,
-    html.crewdev-aside-collapsed .aside .text-muted,
-    body.crewdev-aside-collapsed .aside .text-muted,
-    html.crewdev-aside-collapsed .aside .menu-title,
-    body.crewdev-aside-collapsed .aside .menu-title,
+    /* Заголовки секций меню */
     html.crewdev-aside-collapsed .aside .nav-heading,
     body.crewdev-aside-collapsed .aside .nav-heading,
-    html.crewdev-aside-collapsed .aside p,
-    body.crewdev-aside-collapsed .aside p {
+    html.crewdev-aside-collapsed .aside .nav-item .nav-heading,
+    body.crewdev-aside-collapsed .aside .nav-item .nav-heading {
         display: none !important;
     }
 
-    html.crewdev-aside-collapsed .aside .nav-link,
-    body.crewdev-aside-collapsed .aside .nav-link {
-        justify-content: center !important;
-        padding-left: 0.45rem !important;
-        padding-right: 0.45rem !important;
+    /* Пункты: прячем подписи через font-size:0, иконки оставляем */
+    html.crewdev-aside-collapsed .aside a.nav-link,
+    body.crewdev-aside-collapsed .aside a.nav-link {
+        font-size: 0 !important;
+        line-height: 0 !important;
         gap: 0 !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 0.7rem 0.4rem !important;
+        overflow: hidden;
     }
 
-    html.crewdev-aside-collapsed .aside .nav-link .icon,
-    body.crewdev-aside-collapsed .aside .nav-link .icon,
-    html.crewdev-aside-collapsed .aside .nav-link svg,
-    body.crewdev-aside-collapsed .aside .nav-link svg {
+    html.crewdev-aside-collapsed .aside a.nav-link .icon,
+    body.crewdev-aside-collapsed .aside a.nav-link .icon,
+    html.crewdev-aside-collapsed .aside a.nav-link svg,
+    body.crewdev-aside-collapsed .aside a.nav-link svg,
+    html.crewdev-aside-collapsed .aside a.nav-link i,
+    body.crewdev-aside-collapsed .aside a.nav-link i {
+        font-size: 1.15rem !important;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        min-width: 1.25rem !important;
         margin: 0 !important;
+        line-height: 1 !important;
+        flex: 0 0 auto;
     }
 
-    /* секции меню Orchid остаются раскрытыми */
-    html.crewdev-aside-collapsed .aside .collapse,
-    body.crewdev-aside-collapsed .aside .collapse {
-        display: block !important;
-        height: auto !important;
-        visibility: visible !important;
+    html.crewdev-aside-collapsed .aside a.nav-link .badge,
+    body.crewdev-aside-collapsed .aside a.nav-link .badge,
+    html.crewdev-aside-collapsed .aside a.nav-link > span,
+    body.crewdev-aside-collapsed .aside a.nav-link > span {
+        display: none !important;
+    }
+
+    /* Профиль внизу — компактнее */
+    html.crewdev-aside-collapsed .aside .d-flex.align-items-center.gap-3 span,
+    body.crewdev-aside-collapsed .aside .d-flex.align-items-center.gap-3 span,
+    html.crewdev-aside-collapsed .aside .aside-collapse + div span,
+    body.crewdev-aside-collapsed .aside .aside-collapse + div span {
+        display: none !important;
+    }
+
+    html.crewdev-aside-collapsed .aside .aside-collapse,
+    body.crewdev-aside-collapsed .aside .aside-collapse {
+        overflow-x: hidden;
     }
 }
 
@@ -164,7 +148,7 @@
     .crewdev-aside-toggle { display: none !important; }
 }
 
-/* Скрыть дефолтный футер Orchid (MIT / orchid.software) */
+/* Скрыть дефолтный футер Orchid (MIT) */
 body .text-center.user-select-none.my-4.d-none.d-lg-block,
 body .text-center.user-select-none.my-4,
 body .workspace > div.text-center.user-select-none,
