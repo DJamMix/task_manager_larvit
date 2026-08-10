@@ -32,6 +32,11 @@ class PlatformProvider extends OrchidServiceProvider
      */
     public function menu(): array
     {
+        $user = auth()->user();
+        $isEmployeeBoard = (bool) ($user?->hasAccess('platform.systems.my_tasks')
+            && ! $user?->hasAccess('platform.systems.tasks'));
+        $isAdminBoard = (bool) $user?->hasAccess('platform.systems.tasks');
+
         return [
             Menu::make(__('adminpanel.MyTasks'))
                 ->icon('bs.journal-bookmark')
@@ -48,8 +53,7 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Доски')
                 ->icon('bs.columns-gap')
                 ->route('platform.systems.boards')
-                ->canSee(fn () => (bool) (auth()->user()?->hasAccess('platform.systems.my_tasks')
-                    && ! auth()->user()?->hasAccess('platform.systems.tasks'))),
+                ->canSee($isEmployeeBoard),
 
             Menu::make('Чаты')
                 ->icon('bs.chat-dots')
@@ -62,7 +66,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.eye')
                 ->route('platform.systems.contact.tasks')
                 ->permission('platform.systems.contact.tasks')
-                ->canSee((bool) auth()->user()?->isClientContact())
+                ->canSee((bool) $user?->isClientContact())
                 ->title('Контакт клиента')
                 ->divider(),
 
@@ -99,7 +103,7 @@ class PlatformProvider extends OrchidServiceProvider
                 ->icon('bs.columns-gap')
                 ->route('platform.systems.boards')
                 ->permission('platform.systems.tasks')
-                ->canSee(fn () => (bool) auth()->user()?->hasAccess('platform.systems.tasks')),
+                ->canSee($isAdminBoard),
 
             Menu::make('Спринты')
                 ->icon('bs.lightning-charge')
