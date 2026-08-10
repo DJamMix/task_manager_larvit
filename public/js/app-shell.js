@@ -1,64 +1,25 @@
+/* Fallback: основная логика в brand/header (window.crewdevToggleAside). */
 (function () {
-    const KEY = 'crewdev.aside.collapsed';
-    const CLASS = 'crewdev-aside-collapsed';
-
-    function readLocal() {
-        try {
-            return localStorage.getItem(KEY) === '1';
-        } catch (e) {
-            return false;
-        }
+    if (typeof window.crewdevToggleAside === 'function') {
+        return;
     }
 
-    function writeLocal(collapsed) {
-        try {
-            localStorage.setItem(KEY, collapsed ? '1' : '0');
-        } catch (e) {}
-    }
+    var KEY = 'crewdev.aside.collapsed';
+    var CLASS = 'crewdev-aside-collapsed';
 
     function apply(collapsed) {
-        document.body.classList.toggle(CLASS, !!collapsed);
-        const btn = document.getElementById('crewdev-aside-toggle');
-        if (btn) {
-            btn.title = collapsed ? 'Развернуть меню' : 'Свернуть меню';
-            btn.setAttribute('aria-label', btn.title);
-        }
+        collapsed = !!collapsed;
+        document.documentElement.classList.toggle(CLASS, collapsed);
+        if (document.body) document.body.classList.toggle(CLASS, collapsed);
     }
 
-    // Мгновенно из localStorage, чтобы не мигало
-    const serverFlag = window.__crewdevUi && typeof window.__crewdevUi.sidebarCollapsed === 'boolean'
-        ? window.__crewdevUi.sidebarCollapsed
-        : null;
-    const initial = serverFlag !== null ? serverFlag : readLocal();
-    apply(initial);
-    writeLocal(initial);
-
-    document.addEventListener('DOMContentLoaded', () => {
-        apply(readLocal() || (serverFlag === true));
-        const btn = document.getElementById('crewdev-aside-toggle');
+    document.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest && e.target.closest('#crewdev-aside-toggle, .crewdev-aside-toggle');
         if (!btn) return;
-
-        btn.addEventListener('click', async () => {
-            const next = !document.body.classList.contains(CLASS);
-            apply(next);
-            writeLocal(next);
-
-            const url = window.__crewdevUi && window.__crewdevUi.prefsUrl;
-            const csrf = window.__crewdevUi && window.__crewdevUi.csrf;
-            if (!url || !csrf) return;
-
-            try {
-                await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrf,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify({ sidebar_collapsed: next }),
-                    credentials: 'same-origin',
-                });
-            } catch (e) {}
-        });
-    });
+        e.preventDefault();
+        e.stopPropagation();
+        var next = !document.body.classList.contains(CLASS);
+        apply(next);
+        try { localStorage.setItem(KEY, next ? '1' : '0'); } catch (err) {}
+    }, true);
 })();
