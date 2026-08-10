@@ -1589,9 +1589,16 @@
         root?.classList.toggle('is-selecting', count > 0);
         document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
             const id = Number(String(message.id || '').replace('chat-msg-', ''));
-            message.classList.toggle('is-selected', selectedMessageIds.has(id));
+            const on = selectedMessageIds.has(id);
+            message.classList.toggle('is-selected', on);
+            const check = message.querySelector('[data-msg-check]');
+            if (check) {
+                check.classList.toggle('is-on', on);
+                check.setAttribute('aria-pressed', on ? 'true' : 'false');
+                check.setAttribute('aria-label', on ? 'Снять выделение' : 'Выбрать сообщение');
+            }
         });
-        // Скрыть композер в режиме выбора — как в Telegram
+        // Скрыть композер в режиме выбора — как в VK/Telegram
         document.getElementById('bx-composer')?.classList.toggle('is-dimmed', count > 0);
     };
     const toggleMessageSelection = (id) => {
@@ -1728,7 +1735,8 @@
         const holdMs = () => (isCoarse() ? 450 : 380);
         const msgIdOf = (el) => Number(String(el?.id || '').replace('chat-msg-', ''));
         const msgFromTarget = (t) => t?.closest?.('.bx-msg:not(.bx-msg--system)');
-        const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox,.bx-msg__body a,.bx-msg__reply,.bx-msg__actions');
+        const isInteractive = (t) => !!t?.closest?.('button:not([data-msg-check]),a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox,.bx-msg__body a,.bx-msg__reply,.bx-msg__actions');
+        const isCheckTarget = (t) => !!t?.closest?.('[data-msg-check]');
         const hasTextSelection = () => hasFeedTextSelection();
 
         const clearHoldTimer = () => {
@@ -1810,24 +1818,36 @@
         feedEl.addEventListener('pointerdown', (e) => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             const message = msgFromTarget(e.target);
-            if (!message || isInteractive(e.target)) return;
+            if (!message) return;
+
+            // Галочка VK — сразу выбор, без long-press
+            if (isCheckTarget(e.target)) {
+                clearHold();
+                holding = false;
+                e.preventDefault();
+                toggleMessageSelection(msgIdOf(message));
+                suppressClickUntil = Date.now() + 400;
+                return;
+            }
+            if (isInteractive(e.target)) return;
+
+            // В режиме выбора клик по строке SMS переключает галочку (как в VK)
+            if (selectedMessageIds.size > 0 || e.ctrlKey || e.metaKey) {
+                holding = false;
+                return;
+            }
 
             // Клик по тексту сообщения — обычное выделение/копирование, без long-press и без фокуса композера
-            if (isMessageTextTarget(e.target) && !e.ctrlKey && !e.metaKey && selectedMessageIds.size === 0) {
+            if (isMessageTextTarget(e.target) && !e.ctrlKey && !e.metaKey) {
                 markMessageTextSelect();
                 clearHold();
                 return;
             }
-            if (hasTextSelection() && selectedMessageIds.size === 0) {
+            if (hasTextSelection()) {
                 markMessageTextSelect();
                 return;
             }
 
-            // Уже режим выбора — переключаем на pointerup/touchend
-            if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) {
-                holding = false;
-                return;
-            }
             startHold(message, e.clientX || 0, e.clientY || 0);
         });
 
@@ -1879,10 +1899,23 @@
                 return;
             }
             const message = msgFromTarget(e.target);
-            if (!message || isInteractive(e.target)) return;
+            if (!message) return;
+            if (isCheckTarget(e.target)) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            if (isInteractive(e.target)) return;
+            // Ctrl/Cmd — выбор; в режиме выбора toggle уже на pointerup/touchend
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
+                e.stopPropagation();
                 toggleMessageSelection(msgIdOf(message));
+                return;
+            }
+            if (selectedMessageIds.size > 0) {
+                e.preventDefault();
+                e.stopPropagation();
             }
         }, true);
 

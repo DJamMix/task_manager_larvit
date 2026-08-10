@@ -2575,7 +2575,7 @@ body.bx-messenger-page .command-bar {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin: 0.35rem 0 0.55rem;
+    margin: 0.35rem 0.75rem 0.55rem;
     color: #2563eb;
     font-size: 0.78rem;
     font-weight: 700;
@@ -2684,10 +2684,10 @@ body.bx-messenger-page .command-bar {
     min-height: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    padding: 1rem;
+    padding: 0.55rem 0 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
+    gap: 0.1rem;
     background: linear-gradient(180deg, #fbfcfd, #f5f7fa);
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
@@ -3180,15 +3180,82 @@ body.bx-messenger-page .command-bar {
 }
 
 .bx-msg {
-    max-width: min(720px, 92%);
+    position: relative;
+    width: 100%;
+    max-width: 100%;
     display: flex;
     align-items: flex-end;
     gap: 0.5rem;
-    align-self: flex-start;
+    align-self: stretch;
     background: transparent;
     border: 0;
+    margin: 0;
+    padding: 0.32rem 0.75rem 0.32rem 2.55rem;
+    box-sizing: border-box;
+    border-radius: 0;
+    transition: background .12s ease, transform .18s ease;
+}
+.bx-msg:not(.bx-msg--system):hover {
+    background: rgba(37, 99, 235, 0.055);
+}
+.bx-msg.is-selected {
+    background: rgba(37, 99, 235, 0.12) !important;
+}
+.bx-msg.is-selected:hover {
+    background: rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Галочка выбора как в VK — слева на всю строку */
+.bx-msg__check {
+    position: absolute;
+    left: 0.45rem;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 28px;
+    height: 28px;
     padding: 0;
-    transition: transform .18s ease;
+    border: 0;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .14s ease, transform .14s ease;
+}
+.bx-msg:not(.bx-msg--system):hover .bx-msg__check,
+.bx-msg.is-selected .bx-msg__check,
+.bx-messenger.is-selecting .bx-msg__check {
+    opacity: 1;
+    pointer-events: auto;
+}
+.bx-msg__check-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #94a3b8;
+    background: #fff;
+    color: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    transition: border-color .12s ease, background .12s ease, color .12s ease, box-shadow .12s ease;
+}
+.bx-msg__check:hover .bx-msg__check-box {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.bx-msg__check.is-on .bx-msg__check-box,
+.bx-msg.is-selected .bx-msg__check-box {
+    border-color: #2563eb;
+    background: #2563eb;
+    color: #fff;
+}
+.bx-msg__check svg {
+    display: block;
 }
 
 .bx-msg__bubble {
@@ -3197,12 +3264,15 @@ body.bx-messenger-page .command-bar {
     border-radius: 12px;
     padding: 0.65rem 0.8rem;
     min-width: 0;
+    max-width: min(720px, calc(100% - 2.5rem));
     transition: box-shadow .12s ease, background .12s ease, transform .12s ease;
 }
 
 .bx-msg--mine {
-    align-self: flex-end;
+    align-self: stretch;
     flex-direction: row-reverse;
+    padding-left: 2.55rem;
+    padding-right: 0.75rem;
 }
 .bx-msg--mine .bx-msg__bubble {
     background: #eef5ff;
@@ -3211,17 +3281,23 @@ body.bx-messenger-page .command-bar {
 
 .bx-msg--system {
     align-self: center;
-    background: transparent;
+    background: transparent !important;
     border: 0;
     color: #64748b;
     font-size: 0.82rem;
     text-align: center;
     max-width: 100%;
+    padding: 0.35rem 0.75rem;
+    justify-content: center;
+}
+.bx-msg--system:hover {
+    background: transparent !important;
 }
 .bx-msg--system .bx-msg__bubble {
     background: transparent;
     border: 0;
     padding: 0.2rem 0.5rem;
+    max-width: 100%;
 }
 
 .bx-msg__avatar { flex-shrink: 0; padding-bottom: 0.15rem; }
@@ -3500,11 +3576,10 @@ body.bx-messenger-page .command-bar {
     }
 }
 .bx-msg.is-selected .bx-msg__bubble {
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45);
-    background: #eff6ff;
+    box-shadow: none;
 }
 .bx-msg--mine.is-selected .bx-msg__bubble {
-    background: #dbeafe;
+    background: #e0edff;
 }
 .bx-msg--replying .bx-msg__bubble {
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
@@ -3744,10 +3819,16 @@ pre.ql-syntax,
 }
 .bx-messenger.is-selecting .bx-msg:not(.bx-msg--system) {
     cursor: pointer;
-    position: relative;
-    padding-left: 1.35rem;
 }
 @media (pointer: coarse) {
+    .bx-msg__check {
+        opacity: 0.35;
+        pointer-events: auto;
+    }
+    .bx-messenger.is-selecting .bx-msg__check,
+    .bx-msg.is-selected .bx-msg__check {
+        opacity: 1;
+    }
     .bx-selection-bar {
         position: sticky;
         bottom: 0;
@@ -3760,23 +3841,6 @@ pre.ql-syntax,
         min-height: 44px;
     }
 }
-.bx-messenger.is-selecting .bx-msg:not(.bx-msg--system)::before {
-    content: '';
-    position: absolute;
-    left: 0.2rem;
-    top: 1.1rem;
-    width: 15px;
-    height: 15px;
-    border: 2px solid #94a3b8;
-    border-radius: 50%;
-    background: #fff;
-}
-.bx-messenger.is-selecting .bx-msg.is-selected::before {
-    border-color: #2563eb;
-    background: #2563eb;
-    box-shadow: inset 0 0 0 3px #fff;
-}
-
 .bx-messenger.is-selecting .bx-msg,
 .bx-messenger.is-selecting .bx-msg__body,
 .bx-messenger.is-selecting .bx-msg__body *,
@@ -4405,13 +4469,19 @@ pre.ql-syntax,
         flex-shrink: 0;
     }
     .bx-messenger__feed {
-        padding: 0.55rem 0.55rem 0.75rem;
+        padding: 0.35rem 0 0.55rem;
     }
     .bx-msg {
         max-width: 100%;
+        padding-left: 2.35rem;
+        padding-right: 0.45rem;
+    }
+    .bx-msg--mine {
+        padding-left: 2.35rem;
+        padding-right: 0.45rem;
     }
     .bx-msg__bubble {
-        max-width: min(100%, 92vw);
+        max-width: min(100%, calc(100vw - 4.5rem));
     }
     .bx-voice {
         max-width: 100%;

@@ -47,6 +47,16 @@
          data-author="{{ $message->user?->displayName() ?? 'участник' }}"
          data-preview="{{ \Illuminate\Support\Str::limit($quickPreview, 120) }}">
     @unless($message->is_system)
+        <button type="button"
+                class="bx-msg__check"
+                data-msg-check
+                aria-label="Выбрать сообщение"
+                title="Выбрать"
+                tabindex="-1">
+            <span class="bx-msg__check-box" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>
+            </span>
+        </button>
         <div class="bx-msg__avatar">
             @include('orchid.layouts.partials.bx-avatar', [
                 'avatarUser' => $isForwarded && $forwardOrigin ? $forwardOrigin : $message->user,
