@@ -3234,14 +3234,25 @@ body.bx-messenger-page .command-bar {
     margin-bottom: 0.25rem;
     color: #64748b;
 }
+.bx-msg__meta strong {
+    font-weight: 600;
+    color: #2563eb;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.bx-msg--mine .bx-msg__meta strong { color: #1d4ed8; }
 
 .bx-msg__footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    justify-content: flex-end;
+    gap: 0.35rem;
     margin-top: 0.25rem;
     min-height: 1.1rem;
+}
+.bx-msg__footer .bx-msg__actions {
+    margin-right: auto;
 }
 
 .bx-msg__receipt {
@@ -3374,45 +3385,39 @@ body.bx-messenger-page .command-bar {
 }
 .bx-msg__forwarded {
     display: flex;
-    align-items: flex-start;
-    gap: 0.4rem;
-    margin: 0 0 0.45rem;
-    padding: 0.15rem 0;
-    color: #2563eb;
-    font-size: 0.78rem;
-    font-weight: 600;
+    align-items: center;
+    gap: 0.3rem;
+    margin: 0 0 0.3rem;
+    padding: 0;
+    color: #5b8def;
+    font-size: 0.75rem;
+    font-weight: 400;
     line-height: 1.25;
 }
-.bx-msg--mine .bx-msg__forwarded { color: #1d4ed8; }
+.bx-msg--mine .bx-msg__forwarded { color: #4a7fd4; }
 .bx-msg__forwarded svg {
     flex-shrink: 0;
-    margin-top: 0.1rem;
-    opacity: 0.9;
+    opacity: 0.75;
 }
-.bx-msg__forwarded-meta {
+.bx-msg__forwarded-text {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.05rem;
-}
-.bx-msg__forwarded-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    opacity: 0.85;
-    text-transform: none;
-}
-.bx-msg__forwarded-name {
-    font-size: 0.9rem;
-    font-weight: 800;
-    color: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.bx-msg__meta--time-only {
-    margin-bottom: 0.25rem;
+.bx-msg__forwarded-name {
+    font-weight: 600;
+    color: inherit;
 }
-.bx-msg__meta--time-only strong { display: none; }
+.bx-msg__time {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 400;
+    white-space: nowrap;
+    padding-top: 0.15rem;
+}
+.bx-msg--mine .bx-msg__time { color: #7a93b0; }
 
 .bx-msg-actions-sheet .bx-msg-actions__panel {
     width: min(380px, 100%) !important;
@@ -3713,6 +3718,11 @@ body.bx-lightbox-open { overflow: hidden; }
 }
 .bx-msg__body,
 .bx-msg__body *,
+.bx-msg__meta,
+.bx-msg__meta *,
+.bx-msg__forwarded,
+.bx-msg__forwarded *,
+.bx-msg__time,
 .tw-msg__body,
 .tw-msg__body *,
 .tw-description,

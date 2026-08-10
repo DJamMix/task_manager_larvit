@@ -1688,6 +1688,29 @@
 
     // Удержание / long-press как в Telegram; Ctrl/Cmd+клик и tap в режиме выбора — toggle.
     // Делегирование на ленту: новые сообщения тоже работают; на мобиле блокируем scroll во время удержания.
+    // Флаг: пользователь тянет выделение текста в сообщении — композер не должен воровать фокус.
+    let selectingMessageText = false;
+    const isMessageTextTarget = (t) => !!t?.closest?.(
+        '.bx-msg__body, .bx-msg__meta, .bx-msg__forwarded, .bx-msg__time, .tw-codeblock, pre, code'
+    );
+    const hasFeedTextSelection = () => {
+        const sel = window.getSelection?.();
+        if (!sel || sel.isCollapsed || !String(sel).trim()) return false;
+        const node = sel.anchorNode;
+        if (!node || (input && input.contains(node))) return false;
+        const feedEl = document.getElementById('chat-feed');
+        return !!(feedEl && feedEl.contains(node));
+    };
+    const markMessageTextSelect = () => {
+        selectingMessageText = true;
+    };
+    const releaseMessageTextSelectSoon = () => {
+        window.setTimeout(() => {
+            if (hasFeedTextSelection()) return;
+            selectingMessageText = false;
+        }, 80);
+    };
+
     (() => {
         const feedEl = document.getElementById('chat-feed');
         if (!feedEl) return;
@@ -1706,12 +1729,7 @@
         const msgIdOf = (el) => Number(String(el?.id || '').replace('chat-msg-', ''));
         const msgFromTarget = (t) => t?.closest?.('.bx-msg:not(.bx-msg--system)');
         const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox,.bx-msg__body a,.bx-msg__reply,.bx-msg__actions');
-        const hasTextSelection = () => {
-            const sel = window.getSelection?.();
-            if (!sel || sel.isCollapsed || !sel.toString().trim()) return false;
-            const node = sel.anchorNode;
-            return !!(node && feedEl.contains(node));
-        };
+        const hasTextSelection = () => hasFeedTextSelection();
 
         const clearHoldTimer = () => {
             if (timer) clearTimeout(timer);
@@ -1739,6 +1757,11 @@
             timer = window.setTimeout(() => {
                 timer = null;
                 if (!activeMsg) return;
+                // Пока тянули текст — не открываем меню и не блокируем select
+                if (hasTextSelection() || selectingMessageText) {
+                    clearHold();
+                    return;
+                }
                 holdFired = true;
                 suppressClickUntil = Date.now() + 600;
                 activeMsg.classList.add('is-hold');
@@ -1768,6 +1791,7 @@
             const inSelectMode = selectedMessageIds.size > 0;
             clearHoldTimer();
             endHoldVisual();
+            releaseMessageTextSelectSoon();
 
             if (wasHold) {
                 holdFired = false;
@@ -1787,13 +1811,17 @@
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             const message = msgFromTarget(e.target);
             if (!message || isInteractive(e.target)) return;
-            // Если пользователь выделяет текст в теле сообщения — не запускаем long-press выбора
-            if (e.target.closest?.('.bx-msg__body, .tw-codeblock, pre, code')) {
-                if (e.pointerType === 'mouse' && !e.ctrlKey && !e.metaKey && selectedMessageIds.size === 0) {
-                    return;
-                }
+
+            // Клик по тексту сообщения — обычное выделение/копирование, без long-press и без фокуса композера
+            if (isMessageTextTarget(e.target) && !e.ctrlKey && !e.metaKey && selectedMessageIds.size === 0) {
+                markMessageTextSelect();
+                clearHold();
+                return;
             }
-            if (hasTextSelection() && selectedMessageIds.size === 0) return;
+            if (hasTextSelection() && selectedMessageIds.size === 0) {
+                markMessageTextSelect();
+                return;
+            }
 
             // Уже режим выбора — переключаем на pointerup/touchend
             if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) {
@@ -1911,6 +1939,7 @@
         let swipe = null;
         feedEl.addEventListener('touchstart', (e) => {
             if (selectedMessageIds.size > 0) return;
+            if (isMessageTextTarget(e.target)) return;
             const msg = e.target.closest?.('.bx-msg:not(.bx-msg--system)');
             if (!msg || e.target.closest?.('button,a,.bx-voice,.bx-msg__reply')) return;
             const t = e.touches?.[0];
@@ -2574,6 +2603,9 @@
         // Не тянуть фокус в композер во время выбора сообщений (особенно на мобиле)
         if (root.classList.contains('is-selecting')) return true;
         if (document.getElementById('chat-feed')?.classList.contains('is-press-hold')) return true;
+        // Не сбрасывать выделение текста внутри SMS (иначе копировать кусок нельзя)
+        if (typeof selectingMessageText !== 'undefined' && selectingMessageText) return true;
+        if (typeof hasFeedTextSelection === 'function' && hasFeedTextSelection()) return true;
         const ae = document.activeElement;
         if (!ae || ae === input) return false;
         if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden]), .ui-choice-overlay, .ui-toast-root')) return true;
@@ -2597,10 +2629,17 @@
         input.addEventListener('blur', () => {
             setTimeout(keepComposerFocused, 0);
         });
+        input.addEventListener('focus', () => {
+            selectingMessageText = false;
+        });
 
         const mainPane = root.querySelector('.bx-messenger__main');
         mainPane?.addEventListener('pointerup', (e) => {
             if (composerFocusBlocked()) return;
+            if (typeof isMessageTextTarget === 'function' && isMessageTextTarget(e.target)) {
+                releaseMessageTextSelectSoon();
+                return;
+            }
             if (e.target.closest?.('a, button, label, input, textarea, select, audio, video, .bx-composer__tool, .bx-msg__receipt, .bx-header-menu, .bx-lightbox, .bx-selection-bar')) {
                 // После клика по кнопке композера/отправке — вернуть фокус
                 if (e.target.closest?.('#bx-composer, .bx-messenger__feed, .bx-messenger__header')) {
@@ -2617,6 +2656,8 @@
             if (e.target === input) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             if (e.key === 'Tab' || e.key === 'Escape') return;
+            // Пока выделен текст в SMS — Ctrl+C / копирование, не перехват в композер
+            if (typeof hasFeedTextSelection === 'function' && hasFeedTextSelection()) return;
 
             if (e.key.length === 1) {
                 e.preventDefault();

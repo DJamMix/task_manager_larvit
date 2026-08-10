@@ -89,19 +89,14 @@
 
         @if($isForwarded)
             <div class="bx-msg__forwarded">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
-                <div class="bx-msg__forwarded-meta">
-                    <span class="bx-msg__forwarded-label">Переслано от</span>
-                    <strong class="bx-msg__forwarded-name">{{ $forwardOriginName ?: 'пользователя' }}</strong>
-                </div>
-            </div>
-            <div class="bx-msg__meta bx-msg__meta--time-only">
-                <span>{{ $message->created_at?->format('d.m H:i') }}</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
+                <span class="bx-msg__forwarded-text">
+                    Переслано от <span class="bx-msg__forwarded-name">{{ $forwardOriginName ?: 'пользователя' }}</span>
+                </span>
             </div>
         @elseif(!$message->is_system)
             <div class="bx-msg__meta">
                 <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
-                <span>{{ $message->created_at?->format('d.m H:i') }}</span>
             </div>
         @endif
 
@@ -214,6 +209,8 @@
                     </button>
                 </div>
             @endunless
+
+            <span class="bx-msg__time">{{ $message->created_at?->format('H:i') }}</span>
 
             @if($mine && $readStatus)
                 <div class="bx-msg__receipt bx-msg__receipt--{{ $readStatus }}" tabindex="0">
