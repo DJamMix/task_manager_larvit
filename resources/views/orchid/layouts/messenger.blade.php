@@ -401,15 +401,21 @@
                     </button>
                 </div>
 
-                @php($replyKb = $bot_reply_keyboard ?? null)
+                @php
+                    $replyKb = $bot_reply_keyboard ?? null;
+                    $replyKbRows = is_array($replyKb['keyboard'] ?? null) ? $replyKb['keyboard'] : [];
+                    $replyKbOneTime = !empty($replyKb['one_time_keyboard']);
+                @endphp
                 <div id="bx-bot-reply-keyboard"
-                     class="bx-bot-reply-keyboard {{ empty($replyKb['keyboard']) ? 'd-none' : '' }}"
-                     @if(!empty($replyKb['one_time_keyboard'])) data-one-time="1" @endif>
-                    @foreach(($replyKb['keyboard'] ?? []) as $row)
+                     class="bx-bot-reply-keyboard {{ $replyKbRows === [] ? 'd-none' : '' }}"
+                     @if($replyKbOneTime) data-one-time="1" @endif>
+                    @foreach($replyKbRows as $row)
                         @if(is_array($row))
                             <div class="bx-bot-reply-keyboard__row">
                                 @foreach($row as $btn)
-                                    @php($label = is_array($btn) ? ($btn['text'] ?? '') : (string) $btn)
+                                    @php
+                                        $label = is_array($btn) ? (string) ($btn['text'] ?? '') : (string) $btn;
+                                    @endphp
                                     @if($label !== '')
                                         <button type="button" class="bx-bot-reply-keyboard__btn" data-reply-text="{{ $label }}">{{ $label }}</button>
                                     @endif
