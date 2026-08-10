@@ -11,6 +11,7 @@ use App\Orchid\Layouts\MyTasks\TaskEvaluationLayout;
 use App\Orchid\Layouts\Task\TaskObserversLayout;
 use App\Services\CommentService;
 use App\Services\TaskLogger;
+use App\Services\WorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
@@ -28,7 +29,7 @@ class MyTasksViewScreen extends Screen
     {
         $this->authorizeAccess($task);
 
-        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue']);
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue', 'workflowStatus', 'sprint']);
 
         $comments = $task->comments()
             ->with(['user', 'parent.user', 'attachment'])
@@ -40,35 +41,26 @@ class MyTasksViewScreen extends Screen
             && (int) $task->executor_id !== (int) $user->id
             && !$user->hasAccess('platform.systems.tasks');
 
-        $canChangeStatus = (int) $task->executor_id === (int) $user->id
-            && $task->canChangeWorkflow((int) $user->id);
+        $workflows = app(WorkflowService::class);
+        $workflows->bootstrapDefaults($user);
+
+        $statusTransitions = $workflows->allowedTransitions($task, $user);
+        $canChangeStatus = $statusTransitions !== [] || $task->canChangeWorkflow((int) $user->id);
 
         $statusActions = [];
-        if ($canChangeStatus) {
-            foreach (TaskStatusEnum::executorTransitions((string) $task->status) as $transition) {
-                $btn = Button::make($transition['label'])
-                    ->method('changeStatus')
-                    ->novalidate()
-                    ->parameters(['status' => $transition['to']])
-                    ->class(
-                        ($transition['tone'] ?? 'next') === 'back'
-                            ? 'btn btn-sm btn-outline-secondary tw-status__btn'
-                            : 'btn btn-sm btn-primary tw-status__btn'
-                    );
-
-                if (!empty($transition['confirm'])) {
-                    $btn = $btn->confirm($transition['confirm']);
-                }
-
-                $statusActions[] = $btn;
-            }
+        foreach ($statusTransitions as $transition) {
+            $statusActions[] = Button::make($transition['name'])
+                ->method('changeStatus')
+                ->novalidate()
+                ->parameters(['status' => $transition['slug']])
+                ->class('btn btn-sm btn-outline-primary tw-status__btn');
         }
 
         $statusHint = null;
         if ($task->status === TaskStatusEnum::DEMO->value) {
             $statusHint = 'На демо у заказчика — ждите решение.';
         } elseif ($task->status === TaskStatusEnum::NEW->value && $canChangeStatus) {
-            $statusHint = 'Нажмите «Взять в работу» сверху, чтобы начать.';
+            $statusHint = 'Выберите переход статуса, чтобы взять задачу в работу.';
         }
 
         $linkOptions = Task::query()
@@ -83,7 +75,7 @@ class MyTasksViewScreen extends Screen
 
         return [
             'task' => $task,
-            'task_status_label' => TaskStatusEnum::tryFrom($task->status)?->label(),
+            'task_status_label' => $task->statusLabel(),
             'discussion_comments' => $comments,
             'history_comments' => $comments->where('is_system', true)->values(),
             'notify_options' => $task->participantsForNotify(),
@@ -99,6 +91,8 @@ class MyTasksViewScreen extends Screen
                 : null,
             'status_pipeline' => TaskStatusEnum::pipelineWithState((string) $task->status),
             'status_actions' => $statusActions,
+            'status_transitions' => $statusTransitions,
+            'can_change_status' => $canChangeStatus && $statusTransitions !== [],
             'status_hint' => $statusHint,
             'user' => $user,
         ];
@@ -389,22 +383,13 @@ class MyTasksViewScreen extends Screen
         $this->authorizeAccess($task);
 
         if (!$task->canChangeWorkflow()) {
-            Toast::error('Наблюдатель не может менять статус');
+            Toast::error('Нет прав менять статус');
             return back();
         }
 
-        $validStatuses = [
-            TaskStatusEnum::IN_PROGRESS->value,
-            TaskStatusEnum::TESTING_STAGE->value,
-            TaskStatusEnum::TESTING_PROD->value,
-            TaskStatusEnum::DEMO->value,
-            TaskStatusEnum::UNPAID->value,
-        ];
-
         $newStatus = $request->get('status');
-
-        if (!in_array($newStatus, $validStatuses, true)) {
-            Toast::error('Недопустимый статус');
+        if (!$newStatus) {
+            Toast::error('Не указан статус');
             return back();
         }
 
@@ -412,13 +397,12 @@ class MyTasksViewScreen extends Screen
             $newStatus = TaskStatusEnum::COMPLETED->value;
         }
 
-        $from = (string) $task->status;
-        $task->status = $newStatus;
-        $task->save();
-
-        app(TaskLogger::class)->logStatusChange($task, $request->user(), $newStatus, null, $from);
-
-        Toast::success('Статус обновлён');
+        try {
+            app(WorkflowService::class)->changeStatus($task, $request->user(), $newStatus);
+            Toast::success('Статус обновлён');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Toast::error(collect($e->errors())->flatten()->first() ?: 'Переход запрещён');
+        }
 
         return back();
     }

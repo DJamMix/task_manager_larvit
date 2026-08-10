@@ -1,4 +1,4 @@
-<div class="task-workspace">
+<div class="task-workspace task-workspace--tracker">
     @php
         $statusEnum = \App\CoreLayer\Enums\TaskStatusEnum::tryFrom($task->status);
         $priorityEnum = \App\CoreLayer\Enums\TaskPriorityEnum::tryFrom((string) $task->priority);
@@ -8,28 +8,78 @@
         $history = $history_comments ?? $discussion->where('is_system', true)->values();
         $pipeline = $status_pipeline ?? [];
         $statusActions = $status_actions ?? [];
+        $statusTransitions = $status_transitions ?? [];
+        $canChangeStatus = $can_change_status ?? false;
         $statusHint = $status_hint ?? null;
         $relatedLinks = $related_links ?? collect();
         $linkOptions = $link_task_options ?? [];
         $relationLabels = \App\Models\TaskLink::relationLabels();
         $canManageLinks = $can_manage_links ?? false;
         $viewRoute = $task_view_route ?? route('platform.systems.my_tasks.view', $task);
+        $statusLabel = $task_status_label ?? $task->statusLabel();
+        $statusColor = $task->statusColor();
     @endphp
 
+    <header class="yt-issue-head">
+        <div class="yt-issue-head__top">
+            <span class="yt-issue-key">{{ $task->displayKey() }}</span>
+            @if($task->queue)
+                <span class="yt-issue-queue">{{ $task->queue->key }}</span>
+            @endif
+            @if($task->sprint)
+                <span class="yt-issue-sprint">{{ $task->sprint->name }}</span>
+            @endif
+        </div>
+        <div class="yt-issue-head__row">
+            <h1 class="yt-issue-title">{{ $task->name }}</h1>
+            <div class="yt-status-dd" data-yt-status>
+                <button type="button"
+                        class="yt-status-pill {{ $canChangeStatus ? 'is-interactive' : '' }}"
+                        style="--st:{{ $statusColor }}"
+                        @if($canChangeStatus) data-yt-status-toggle @endif
+                        @if(!$canChangeStatus) disabled @endif>
+                    <span class="yt-status-pill__dot"></span>
+                    {{ $statusLabel }}
+                    @if($canChangeStatus)<span class="yt-status-pill__caret">▾</span>@endif
+                </button>
+                @if($canChangeStatus && !empty($statusTransitions))
+                    <div class="yt-status-menu" hidden data-yt-status-menu>
+                        <div class="yt-status-menu__label">Перевести в</div>
+                        @foreach($statusTransitions as $tr)
+                            <form method="post" action="{{ url()->current() }}/changeStatus">
+                                @csrf
+                                <input type="hidden" name="status" value="{{ $tr['slug'] }}">
+                                <button type="submit" class="yt-status-menu__item">
+                                    <span class="yt-status-menu__dot" style="background:{{ $tr['color'] }}"></span>
+                                    {{ $tr['name'] }}
+                                </button>
+                            </form>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        </div>
+    </header>
+
     <div class="task-workspace__grid">
+        <section class="task-workspace__main">
+            <div class="tw-card tw-description-card">
+                <div class="fw-semibold mb-2">Описание</div>
+                <div class="tw-description">
+                    {!! $task->description ?: '<span class="text-muted">Описание не заполнено</span>' !!}
+                </div>
+            </div>
+        </section>
+
         <aside class="task-workspace__sidebar">
             <div class="tw-card">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                    <div>
-                        <div class="text-muted small text-uppercase mb-1">{{ $task->displayKey() }}</div>
-                        <h2 class="h5 mb-0 text-body-emphasis">{{ $task->name }}</h2>
-                    </div>
-                    @if($statusEnum)
-                        <span class="badge" style="background:{{ $statusEnum->color() }};color:#fff;">{{ $statusEnum->label() }}</span>
-                    @endif
-                </div>
-
                 <div class="tw-meta">
+                    <div class="tw-meta__row">
+                        <span>Статус</span>
+                        <strong>
+                            <span class="yt-inline-status" style="--st:{{ $statusColor }}">{{ $statusLabel }}</span>
+                        </strong>
+                    </div>
                     <div class="tw-meta__row">
                         <span>Очередь</span>
                         <strong>{{ $task->queue?->key ?? '—' }}</strong>
@@ -49,6 +99,10 @@
                     <div class="tw-meta__row">
                         <span>Приоритет</span>
                         <strong>{!! $priorityEnum?->badgeHtml() ?? '—' !!}</strong>
+                    </div>
+                    <div class="tw-meta__row">
+                        <span>Спринт</span>
+                        <strong>{{ $task->sprint?->name ?? 'Бэклог' }}</strong>
                     </div>
                     <div class="tw-meta__row">
                         <span>Оценка / факт</span>
@@ -89,7 +143,7 @@
 
             @if(!empty($pipeline) || !empty($statusActions) || $statusHint)
                 <div class="tw-card mt-3 tw-status">
-                    <div class="fw-semibold mb-2">Статус</div>
+                    <div class="fw-semibold mb-2">Workflow</div>
 
                     @if(!empty($pipeline))
                         <div class="tw-pipeline" aria-label="Этапы задачи">
@@ -187,15 +241,6 @@
                 </div>
             @endif
         </aside>
-
-        <section class="task-workspace__main">
-            <div class="tw-card tw-description-card">
-                <div class="fw-semibold mb-2">Описание</div>
-                <div class="tw-description">
-                    {!! $task->description ?: '<span class="text-muted">Описание не заполнено</span>' !!}
-                </div>
-            </div>
-        </section>
     </div>
 
     <div class="tw-card tw-bottom mt-3">
@@ -789,6 +834,22 @@
 
     const feed = document.getElementById('task-discussion-feed');
     if (feed) feed.scrollTop = feed.scrollHeight;
+
+    // Статус-меню как в Трекере
+    document.querySelectorAll('[data-yt-status]').forEach((wrap) => {
+        const toggle = wrap.querySelector('[data-yt-status-toggle]');
+        const menu = wrap.querySelector('[data-yt-status-menu]');
+        if (!toggle || !menu) return;
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = menu.hasAttribute('hidden');
+            document.querySelectorAll('[data-yt-status-menu]').forEach((m) => m.setAttribute('hidden', ''));
+            if (open) menu.removeAttribute('hidden');
+        });
+    });
+    document.addEventListener('click', () => {
+        document.querySelectorAll('[data-yt-status-menu]').forEach((m) => m.setAttribute('hidden', ''));
+    });
 
     // Простой lightbox для картинок в обсуждении
     document.querySelectorAll('[data-bx-lightbox]').forEach((el) => {

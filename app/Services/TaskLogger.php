@@ -23,9 +23,13 @@ class TaskLogger
         ?string $fromStatus = null
     ): void {
         $fromLabel = $fromStatus !== null
-            ? (TaskStatusEnum::tryFrom($fromStatus)?->label() ?? $fromStatus)
+            ? (TaskStatusEnum::tryFrom($fromStatus)?->label()
+                ?? \App\Models\WorkflowStatus::query()->where('slug', $fromStatus)->value('name')
+                ?? $fromStatus)
             : null;
-        $toLabel = TaskStatusEnum::tryFrom($toStatus)?->label() ?? $toStatus;
+        $toLabel = TaskStatusEnum::tryFrom($toStatus)?->label()
+            ?? \App\Models\WorkflowStatus::query()->where('slug', $toStatus)->value('name')
+            ?? $toStatus;
 
         $plainText = 'изменён статус';
         if ($fromLabel) {

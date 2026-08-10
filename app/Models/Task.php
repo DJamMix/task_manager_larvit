@@ -38,12 +38,16 @@ class Task extends Model
         'queue_id',
         'queue_number',
         'status',
+        'status_id',
         'pay_status',
         'hours_spent',
         'task_category_id',
         'estimation_hours',
         'type_task',
         'priority',
+        'sprint_id',
+        'board_id',
+        'board_sort',
     ];
 
     protected $casts = [
@@ -139,6 +143,39 @@ class Task extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class, 'project_id');
+    }
+
+    public function workflowStatus(): BelongsTo
+    {
+        return $this->belongsTo(WorkflowStatus::class, 'status_id');
+    }
+
+    public function sprint(): BelongsTo
+    {
+        return $this->belongsTo(Sprint::class);
+    }
+
+    public function board(): BelongsTo
+    {
+        return $this->belongsTo(Board::class);
+    }
+
+    public function statusLabel(): string
+    {
+        if ($this->workflowStatus) {
+            return $this->workflowStatus->name;
+        }
+
+        return TaskStatusEnum::tryFrom((string) $this->status)?->label() ?? (string) $this->status;
+    }
+
+    public function statusColor(): string
+    {
+        if ($this->workflowStatus) {
+            return $this->workflowStatus->color;
+        }
+
+        return TaskStatusEnum::tryFrom((string) $this->status)?->color() ?? '#64748b';
     }
 
     public function queue(): BelongsTo

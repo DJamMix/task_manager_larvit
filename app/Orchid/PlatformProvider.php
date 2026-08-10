@@ -86,6 +86,22 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make(__('adminpanel.Tasks'))
                 ->icon('bs.card-checklist')
                 ->route('platform.systems.tasks')
+                ->permission('platform.systems.tasks')
+                ->title('Трекер'),
+
+            Menu::make('Доски')
+                ->icon('bs.columns-gap')
+                ->route('platform.systems.boards')
+                ->permission('platform.systems.tasks'),
+
+            Menu::make('Спринты')
+                ->icon('bs.lightning-charge')
+                ->route('platform.systems.sprints')
+                ->permission('platform.systems.tasks'),
+
+            Menu::make('Workflow')
+                ->icon('bs.diagram-3')
+                ->route('platform.systems.workflow')
                 ->permission('platform.systems.tasks'),
 
             Menu::make(__('adminpanel.Projects'))

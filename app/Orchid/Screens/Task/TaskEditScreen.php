@@ -10,6 +10,7 @@ use App\Orchid\Layouts\Task\TaskEditLayout;
 use App\Orchid\Layouts\Task\TaskObserversLayout;
 use App\Services\CommentService;
 use App\Services\TaskLogger;
+use App\Services\WorkflowService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Orchid\Screen\Actions\Button;
@@ -36,7 +37,7 @@ class TaskEditScreen extends Screen
         }
 
         if ($task->exists) {
-            $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue']);
+            $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue', 'workflowStatus', 'sprint']);
         }
 
         $user = auth()->user();
@@ -57,11 +58,24 @@ class TaskEditScreen extends Screen
                 ->all();
         }
 
+        $statusTransitions = [];
+        $statusActions = [];
+        if ($task->exists) {
+            $workflows = app(WorkflowService::class);
+            $workflows->bootstrapDefaults($user);
+            $statusTransitions = $workflows->allowedTransitions($task, $user);
+            foreach ($statusTransitions as $transition) {
+                $statusActions[] = Button::make($transition['name'])
+                    ->method('changeStatus')
+                    ->novalidate()
+                    ->parameters(['status' => $transition['slug']])
+                    ->class('btn btn-sm btn-outline-primary tw-status__btn');
+            }
+        }
+
         return [
             'task' => $task,
-            'task_status_label' => $task->exists
-                ? TaskStatusEnum::tryFrom($task->status)?->label()
-                : null,
+            'task_status_label' => $task->exists ? $task->statusLabel() : null,
             'discussion_comments' => $comments,
             'history_comments' => $comments->where('is_system', true)->values(),
             'notify_options' => $task->exists ? $task->participantsForNotify() : [],
@@ -76,7 +90,9 @@ class TaskEditScreen extends Screen
             'status_pipeline' => $task->exists
                 ? TaskStatusEnum::pipelineWithState((string) $task->status)
                 : [],
-            'status_actions' => [],
+            'status_actions' => $statusActions,
+            'status_transitions' => $statusTransitions,
+            'can_change_status' => $task->exists && $statusTransitions !== [],
             'status_hint' => null,
             'timeEntries' => $task->exists
                 ? $task->timeEntries()->with('user')->latest()->get()
@@ -287,6 +303,25 @@ class TaskEditScreen extends Screen
         }
 
         Toast::info('Связь удалена');
+
+        return back();
+    }
+
+    public function changeStatus(Task $task, Request $request)
+    {
+        $newStatus = $request->get('status');
+        if (!$newStatus) {
+            Toast::error('Не указан статус');
+
+            return back();
+        }
+
+        try {
+            app(WorkflowService::class)->changeStatus($task, $request->user(), $newStatus);
+            Toast::success('Статус обновлён');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Toast::error(collect($e->errors())->flatten()->first() ?: 'Переход запрещён');
+        }
 
         return back();
     }

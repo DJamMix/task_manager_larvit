@@ -215,6 +215,110 @@ Route::screen('tasks/create', TaskEditScreen::class)
         ->parent('platform.systems.tasks')
         ->push(__('project.add'), route('platform.systems.tasks.create')));
 
+// Tracker: boards, sprints, workflow
+Route::screen('boards', \App\Orchid\Screens\Tracker\BoardScreen::class)
+    ->name('platform.systems.boards')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Доски', route('platform.systems.boards')));
+
+Route::screen('sprints', \App\Orchid\Screens\Tracker\SprintListScreen::class)
+    ->name('platform.systems.sprints')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Спринты', route('platform.systems.sprints')));
+
+Route::screen('workflow', \App\Orchid\Screens\Tracker\WorkflowDesignerScreen::class)
+    ->name('platform.systems.workflow')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Workflow', route('platform.systems.workflow')));
+
+Route::post('boards/move', function (
+    \Illuminate\Http\Request $request,
+    \App\Services\WorkflowService $workflows
+) {
+    if (! $request->user()?->hasAccess('platform.systems.tasks')) {
+        abort(403);
+    }
+
+    $data = $request->validate([
+        'task_id' => 'required|integer|exists:tasks,id',
+        'status_id' => 'required|integer|exists:workflow_statuses,id',
+        'order' => 'nullable|array',
+        'order.*' => 'integer',
+    ]);
+
+    $task = \App\Models\Task::query()->findOrFail($data['task_id']);
+
+    try {
+        $workflows->changeStatus($task, $request->user(), (int) $data['status_id']);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => collect($e->errors())->flatten()->first() ?: 'Переход запрещён',
+            'errors' => $e->errors(),
+        ], 422);
+    }
+
+    if (! empty($data['order'])) {
+        foreach ($data['order'] as $i => $id) {
+            \App\Models\Task::query()->where('id', $id)->update(['board_sort' => $i]);
+        }
+    }
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.boards.move');
+
+Route::post('sprints/assign', function (\Illuminate\Http\Request $request) {
+    if (! $request->user()?->hasAccess('platform.systems.tasks')) {
+        abort(403);
+    }
+
+    $data = $request->validate([
+        'task_id' => 'required|integer|exists:tasks,id',
+        'sprint_id' => 'nullable|integer|exists:sprints,id',
+    ]);
+
+    \App\Models\Task::query()->where('id', $data['task_id'])->update([
+        'sprint_id' => $data['sprint_id'] ?? null,
+    ]);
+
+    return response()->json(['ok' => true]);
+})->name('platform.systems.sprints.assign');
+
+Route::post('workflow/save', function (
+    \Illuminate\Http\Request $request,
+    \App\Services\WorkflowService $workflows
+) {
+    if (! $request->user()?->hasAccess('platform.systems.tasks')) {
+        abort(403);
+    }
+
+    $data = $request->validate([
+        'statuses' => 'required|array|min:1',
+        'statuses.*.id' => 'nullable',
+        'statuses.*.name' => 'required|string|max:120',
+        'statuses.*.slug' => 'nullable|string|max:64',
+        'statuses.*.color' => 'nullable|string|max:16',
+        'statuses.*.category' => 'nullable|string|max:32',
+        'statuses.*.sort_order' => 'nullable|integer',
+        'statuses.*.is_initial' => 'nullable|boolean',
+        'statuses.*.is_final' => 'nullable|boolean',
+        'statuses.*.is_active' => 'nullable|boolean',
+        'transitions' => 'nullable|array',
+        'transitions.*.from' => 'required',
+        'transitions.*.to' => 'required',
+        'transitions.*.name' => 'nullable|string|max:120',
+    ]);
+
+    $workflows->saveGraph($data['statuses'], $data['transitions'] ?? []);
+
+    return response()->json([
+        'ok' => true,
+        'graph' => $workflows->graphPayload(),
+    ]);
+})->name('platform.systems.workflow.save');
+
 // Platform > System > Acts
 Route::screen('acts', ActListScreen::class)
     ->name('platform.systems.acts')
