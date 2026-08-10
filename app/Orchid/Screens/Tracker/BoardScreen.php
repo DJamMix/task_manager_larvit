@@ -142,6 +142,9 @@ class BoardScreen extends Screen
             ->orderBy('name')
             ->get(['id', 'name', 'position', 'avatar_path']);
 
+        $quickFilters = $this->quickFiltersForBoard($user, $board?->id);
+        $activeQuickId = $this->matchQuickFilterId($quickFilters, $filters);
+
         return [
             'board' => $board,
             'boards' => Board::query()->orderByDesc('is_default')->orderBy('name')->get(),
@@ -155,6 +158,8 @@ class BoardScreen extends Screen
             'active_sprint' => $sprint,
             'columns' => $columns,
             'filters' => $filters,
+            'quick_filters' => $quickFilters,
+            'active_quick_id' => $activeQuickId,
             'can_manage' => $this->canManage,
             'move_url' => route('platform.systems.boards.move'),
             'csrf' => csrf_token(),
@@ -178,6 +183,158 @@ class BoardScreen extends Screen
             'viewer_id' => $user->id,
             'tasks_total' => $tasks->count(),
         ];
+    }
+
+    public function saveQuickFilter(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user && ($user->hasAccess('platform.systems.tasks') || $user->hasAccess('platform.systems.my_tasks')),
+            403
+        );
+
+        $data = $request->validate([
+            'name' => 'required|string|max:80',
+            'board_id' => 'nullable|integer',
+            'params' => 'nullable|array',
+            'params.assignee' => 'nullable|string|max:40',
+            'params.project' => 'nullable|string|max:40',
+            'params.sprint' => 'nullable|string|max:40',
+            'params.priority' => 'nullable|string|max:40',
+            'params.queue' => 'nullable|string|max:40',
+            'params.type' => 'nullable|string|max:40',
+            'params.q' => 'nullable|string|max:160',
+        ]);
+
+        $boardId = isset($data['board_id']) ? (int) $data['board_id'] : null;
+        $params = collect($data['params'] ?? [])
+            ->map(fn ($v) => is_string($v) ? trim($v) : $v)
+            ->filter(fn ($v) => $v !== null && $v !== '')
+            ->all();
+
+        if ($boardId) {
+            $params['board'] = $boardId;
+        }
+
+        $all = $user->uiPreference('board_quick_filters', []) ?: [];
+        if (! is_array($all)) {
+            $all = [];
+        }
+
+        $all[] = [
+            'id' => (string) \Illuminate\Support\Str::uuid(),
+            'name' => trim($data['name']),
+            'board_id' => $boardId,
+            'params' => $params,
+            'created_at' => now()->toIso8601String(),
+        ];
+
+        $user->setUiPreference('board_quick_filters', array_values($all));
+        Toast::success('Фильтр сохранён');
+
+        return redirect()->route('platform.systems.boards', $params);
+    }
+
+    public function deleteQuickFilter(Request $request)
+    {
+        $user = $request->user();
+        abort_unless(
+            $user && ($user->hasAccess('platform.systems.tasks') || $user->hasAccess('platform.systems.my_tasks')),
+            403
+        );
+
+        $data = $request->validate([
+            'id' => 'required|string|max:64',
+            'board_id' => 'nullable|integer',
+        ]);
+
+        $all = $user->uiPreference('board_quick_filters', []) ?: [];
+        if (! is_array($all)) {
+            $all = [];
+        }
+
+        $all = array_values(array_filter(
+            $all,
+            fn ($item) => (string) ($item['id'] ?? '') !== (string) $data['id']
+        ));
+
+        $user->setUiPreference('board_quick_filters', $all);
+        Toast::info('Фильтр удалён');
+
+        return redirect()->route('platform.systems.boards', array_filter([
+            'board' => $data['board_id'] ?? null,
+            'assignee' => $user->hasAccess('platform.systems.tasks') ? 'all' : 'me',
+        ]));
+    }
+
+    /**
+     * @return list<array{id:string,name:string,board_id:?int,params:array}>
+     */
+    private function quickFiltersForBoard(?User $user, ?int $boardId): array
+    {
+        if (! $user) {
+            return [];
+        }
+
+        $all = $user->uiPreference('board_quick_filters', []) ?: [];
+        if (! is_array($all)) {
+            return [];
+        }
+
+        return collect($all)
+            ->filter(function ($item) use ($boardId) {
+                if (! is_array($item) || empty($item['id']) || empty($item['name'])) {
+                    return false;
+                }
+                $itemBoard = $item['board_id'] ?? null;
+
+                return $itemBoard === null || (int) $itemBoard === (int) $boardId;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  list<array{id:string,params?:array}>  $quickFilters
+     * @param  array<string, mixed>  $filters
+     */
+    private function matchQuickFilterId(array $quickFilters, array $filters): ?string
+    {
+        $normalize = function (array $params) use ($filters): array {
+            $keys = ['assignee', 'project', 'sprint', 'priority', 'queue', 'type', 'q'];
+            $out = [];
+            foreach ($keys as $key) {
+                $val = $params[$key] ?? null;
+                if ($val === null || $val === '') {
+                    continue;
+                }
+                $out[$key] = (string) $val;
+            }
+
+            return $out;
+        };
+
+        $current = $normalize([
+            'assignee' => $filters['assignee'] ?? null,
+            'project' => $filters['project'] ?? null,
+            'sprint' => $filters['sprint'] ?? null,
+            'priority' => $filters['priority'] ?? null,
+            'queue' => $filters['queue'] ?? null,
+            'type' => $filters['type'] ?? null,
+            'q' => $filters['q'] ?? null,
+        ]);
+
+        foreach ($quickFilters as $qf) {
+            $candidate = $normalize($qf['params'] ?? []);
+            ksort($candidate);
+            $cmp = $current;
+            ksort($cmp);
+            if ($candidate === $cmp) {
+                return (string) $qf['id'];
+            }
+        }
+
+        return null;
     }
 
     public function name(): ?string
