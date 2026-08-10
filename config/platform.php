@@ -128,9 +128,9 @@ return [
     'resource' => [
         'stylesheets' => [
             '/css/footer.css',
-            '/css/app-shell.css?v=20260810g',
+            '/css/app-shell.css?v=20260810h',
             '/css/ui-toast.css?v=20260730a',
-            '/css/project-switcher.css?v=20260810b',
+            '/css/project-switcher.css?v=20260810c',
             '/css/task-workspace.css?v=20260810u',
             '/css/act-composer.css',
         ],

@@ -155,6 +155,43 @@
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
+    overflow: visible;
+    position: relative;
+}
+
+.crewdev-profile__notify > a,
+.crewdev-profile__notify .btn,
+.crewdev-profile__notify button {
+    overflow: visible !important;
+    position: relative;
+}
+
+/* Красная точка вместо большого badge */
+.crewdev-profile__notify [data-notification-target="badge"] {
+    width: 7px !important;
+    height: 7px !important;
+    min-width: 7px !important;
+    min-height: 7px !important;
+    max-width: 7px !important;
+    max-height: 7px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    border-radius: 50% !important;
+    top: 1px !important;
+    right: 0 !important;
+    left: auto !important;
+    transform: none !important;
+    translate: none !important;
+    border: 1.5px solid #1c1b22 !important;
+    box-shadow: none !important;
+    background: #ef4444 !important;
+    z-index: 2;
+}
+.crewdev-profile__notify [data-notification-target="badge"] svg,
+.crewdev-profile__notify [data-notification-target="badge"] * {
+    display: none !important;
 }
 
 /* ===== Search compact ===== */
@@ -218,17 +255,31 @@
 
     html.crewdev-aside-collapsed .crewdev-profile__notify,
     body.crewdev-aside-collapsed .crewdev-profile__notify {
-        width: 100%;
+        width: auto;
         display: flex !important;
         justify-content: center !important;
+        overflow: visible !important;
     }
 
     html.crewdev-aside-collapsed .crewdev-profile__notify .btn,
     body.crewdev-aside-collapsed .crewdev-profile__notify .btn,
     html.crewdev-aside-collapsed .crewdev-profile__notify button,
-    body.crewdev-aside-collapsed .crewdev-profile__notify button {
+    body.crewdev-aside-collapsed .crewdev-profile__notify button,
+    html.crewdev-aside-collapsed .crewdev-profile__notify > a,
+    body.crewdev-aside-collapsed .crewdev-profile__notify > a {
         margin: 0 !important;
         padding: 0.3rem !important;
+        overflow: visible !important;
+    }
+
+    html.crewdev-aside-collapsed .crewdev-profile__notify [data-notification-target="badge"],
+    body.crewdev-aside-collapsed .crewdev-profile__notify [data-notification-target="badge"] {
+        top: 0 !important;
+        right: 0 !important;
+        width: 6px !important;
+        height: 6px !important;
+        min-width: 6px !important;
+        min-height: 6px !important;
     }
 
     html.crewdev-aside-collapsed .crewdev-search,

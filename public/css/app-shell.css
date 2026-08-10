@@ -59,37 +59,66 @@
     color: #ffffff;
 }
 
-/* ===== Custom thin scrollbar (aside) — виден только при скролле/hover ===== */
+/* ===== Custom scrollbar (aside) — отступ от пунктов, виден при скролле ===== */
 .aside .aside-collapse,
 .aside-collapse {
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+    scrollbar-gutter: stable;
+    padding-right: 0.35rem;
+    box-sizing: border-box;
 }
 .aside .aside-collapse:hover,
 .aside .aside-collapse.is-scrolling,
 .aside-collapse:hover,
 .aside-collapse.is-scrolling {
-    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.32) transparent;
 }
 .aside .aside-collapse::-webkit-scrollbar,
 .aside-collapse::-webkit-scrollbar {
-    width: 3px;
-    height: 3px;
+    width: 10px;
+    height: 10px;
 }
 .aside .aside-collapse::-webkit-scrollbar-track,
 .aside-collapse::-webkit-scrollbar-track {
     background: transparent;
+    margin: 8px 0;
 }
 .aside .aside-collapse::-webkit-scrollbar-thumb,
 .aside-collapse::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 8px;
+    background-color: transparent;
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    min-height: 36px;
 }
 .aside .aside-collapse:hover::-webkit-scrollbar-thumb,
 .aside .aside-collapse.is-scrolling::-webkit-scrollbar-thumb,
 .aside-collapse:hover::-webkit-scrollbar-thumb,
 .aside-collapse.is-scrolling::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.35);
+    background-color: rgba(255, 255, 255, 0.32);
+    background-clip: padding-box;
+    border: 3px solid transparent;
+}
+.aside .aside-collapse.is-scrolling::-webkit-scrollbar-thumb:hover,
+.aside-collapse.is-scrolling::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.45);
+}
+
+@media (min-width: 992px) {
+    html.crewdev-aside-collapsed .aside .aside-collapse,
+    body.crewdev-aside-collapsed .aside .aside-collapse {
+        padding-right: 0.2rem;
+        scrollbar-gutter: auto;
+    }
+    html.crewdev-aside-collapsed .aside .aside-collapse::-webkit-scrollbar,
+    body.crewdev-aside-collapsed .aside .aside-collapse::-webkit-scrollbar {
+        width: 6px;
+    }
+    html.crewdev-aside-collapsed .aside .aside-collapse::-webkit-scrollbar-thumb,
+    body.crewdev-aside-collapsed .aside .aside-collapse::-webkit-scrollbar-thumb {
+        border-width: 1px;
+    }
 }
 
 /* ===== Collapsed: только иконки ===== */
