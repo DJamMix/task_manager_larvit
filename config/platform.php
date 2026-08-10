@@ -130,7 +130,7 @@ return [
             '/css/footer.css',
             '/css/app-shell.css?v=20260810g',
             '/css/ui-toast.css?v=20260730a',
-            '/css/project-switcher.css?v=20260810a',
+            '/css/project-switcher.css?v=20260810b',
             '/css/task-workspace.css?v=20260810u',
             '/css/act-composer.css',
         ],

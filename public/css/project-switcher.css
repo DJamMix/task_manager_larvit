@@ -75,33 +75,79 @@
     }
 }
 
-/* ===== Profile: свёрнутый = аватар + колокольчик ===== */
+/* ===== Profile ===== */
 .crewdev-profile {
-    gap: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.5rem;
+    position: relative;
+    overflow: hidden;
 }
 
 .crewdev-profile__user {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
     min-width: 0;
+    flex: 1 1 auto;
     text-decoration: none !important;
+    color: inherit;
 }
 
 .crewdev-profile__avatar {
-    flex: 0 0 auto;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    object-fit: cover;
+    flex: 0 0 auto !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    object-position: center !important;
+    aspect-ratio: 1 / 1 !important;
+    display: block;
 }
 
 .crewdev-profile__avatar--fallback {
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
     justify-content: center;
     background: var(--crewdev-avatar-bg, #64748b);
     color: #fff;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.crewdev-profile__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    line-height: 1.15;
+}
+
+.crewdev-profile__name {
+    display: block;
+    color: #fff;
+    font-size: 0.86rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.crewdev-profile__sub {
+    display: block;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .crewdev-profile__notify {
@@ -111,26 +157,48 @@
     flex: 0 0 auto;
 }
 
+/* ===== Search compact ===== */
+.crewdev-search__compact {
+    display: none;
+}
+
+.crewdev-search__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    margin: 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    cursor: pointer;
+    padding: 0;
+}
+.crewdev-search__btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #fff;
+}
+
 @media (min-width: 992px) {
     html.crewdev-aside-collapsed .crewdev-profile,
     body.crewdev-aside-collapsed .crewdev-profile {
         flex-direction: column !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 0.55rem !important;
-        padding: 0.65rem 0.35rem !important;
+        gap: 0.5rem !important;
+        padding: 0.55rem 0.25rem !important;
         overflow: visible !important;
     }
 
     html.crewdev-aside-collapsed .crewdev-profile__user,
     body.crewdev-aside-collapsed .crewdev-profile__user {
         width: auto !important;
-        max-width: 100%;
         flex: 0 0 auto !important;
         justify-content: center !important;
         gap: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
     }
 
     html.crewdev-aside-collapsed .crewdev-profile__meta,
@@ -140,9 +208,12 @@
 
     html.crewdev-aside-collapsed .crewdev-profile__avatar,
     body.crewdev-aside-collapsed .crewdev-profile__avatar {
-        width: 34px !important;
-        height: 34px !important;
-        margin: 0 !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        max-width: 28px !important;
+        max-height: 28px !important;
     }
 
     html.crewdev-aside-collapsed .crewdev-profile__notify,
@@ -152,13 +223,31 @@
         justify-content: center !important;
     }
 
-    /* Orchid notification button inside compact profile */
     html.crewdev-aside-collapsed .crewdev-profile__notify .btn,
     body.crewdev-aside-collapsed .crewdev-profile__notify .btn,
     html.crewdev-aside-collapsed .crewdev-profile__notify button,
     body.crewdev-aside-collapsed .crewdev-profile__notify button {
         margin: 0 !important;
-        padding: 0.35rem !important;
+        padding: 0.3rem !important;
+    }
+
+    html.crewdev-aside-collapsed .crewdev-search,
+    body.crewdev-aside-collapsed .crewdev-search {
+        padding: 0.25rem 0 0.55rem !important;
+        display: flex;
+        justify-content: center;
+    }
+
+    html.crewdev-aside-collapsed .crewdev-search__full,
+    body.crewdev-aside-collapsed .crewdev-search__full {
+        display: none !important;
+    }
+
+    html.crewdev-aside-collapsed .crewdev-search__compact,
+    body.crewdev-aside-collapsed .crewdev-search__compact {
+        display: flex !important;
+        justify-content: center;
+        width: 100%;
     }
 }
 

@@ -8,15 +8,18 @@
     $avatarColor = method_exists($user, 'avatarColor') ? $user->avatarColor() : '#64748b';
 @endphp
 
-<div class="profile-container crewdev-profile d-flex align-items-stretch p-3 rounded lh-sm position-relative overflow-hidden">
+<div class="profile-container crewdev-profile">
     <a href="{{ route(config('platform.profile', 'platform.profile')) }}"
-       class="crewdev-profile__user col-10 d-flex align-items-center gap-3"
+       class="crewdev-profile__user"
        title="{{ $title }}">
         @if($image)
             <img src="{{ $image }}"
                  alt="{{ $title }}"
-                 class="thumb-sm avatar b crewdev-profile__avatar"
-                 type="image/*">
+                 class="crewdev-profile__avatar"
+                 width="32"
+                 height="32"
+                 loading="lazy"
+                 decoding="async">
         @else
             <span class="crewdev-profile__avatar crewdev-profile__avatar--fallback"
                   style="--crewdev-avatar-bg: {{ $avatarColor }}">
@@ -24,12 +27,12 @@
             </span>
         @endif
 
-        <small class="crewdev-profile__meta d-flex flex-column lh-1 col-9">
-            <span class="text-ellipsis text-white">{{ $title }}</span>
+        <span class="crewdev-profile__meta">
+            <span class="crewdev-profile__name">{{ $title }}</span>
             @if($subtitle !== '')
-                <span class="text-ellipsis text-muted">{{ $subtitle }}</span>
+                <span class="crewdev-profile__sub">{{ $subtitle }}</span>
             @endif
-        </small>
+        </span>
     </a>
 
     <div class="crewdev-profile__notify">
