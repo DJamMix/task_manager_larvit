@@ -26,13 +26,21 @@
      data-can-manage="{{ $canManage ? '1' : '0' }}">
 
     <div class="yt-board__top">
-        <div class="yt-board__board-switch">
-            @foreach($boards as $b)
-                <a href="{{ $boardUrl(['board' => $b->id]) }}"
-                   class="yt-chip {{ ($board && (int)$board->id === (int)$b->id) ? 'is-active' : '' }}">
-                    {{ $b->name }}
-                </a>
-            @endforeach
+        <div class="yt-board__heading">
+            @if(($boards ?? collect())->count() > 1)
+                <div class="yt-board__board-switch" role="tablist" aria-label="Доски">
+                    @foreach($boards as $b)
+                        <a href="{{ $boardUrl(['board' => $b->id]) }}"
+                           class="yt-chip {{ ($board && (int)$board->id === (int)$b->id) ? 'is-active' : '' }}"
+                           role="tab"
+                           aria-selected="{{ ($board && (int)$board->id === (int)$b->id) ? 'true' : 'false' }}">
+                            {{ $b->name }}
+                        </a>
+                    @endforeach
+                </div>
+            @else
+                <h2 class="yt-board__title">{{ $board?->name ?? 'Доска' }}</h2>
+            @endif
         </div>
         <div class="yt-board__meta">
             <span class="yt-board__count">{{ $tasks_total ?? 0 }} задач</span>
@@ -146,7 +154,8 @@
     @if(!$board)
         <div class="yt-empty">Создайте доску через кнопку «Создать доску».</div>
     @else
-        <div class="yt-board__cols" id="yt-cols">
+        <div class="yt-board__viewport" id="yt-board-viewport">
+            <div class="yt-board__cols" id="yt-cols">
             @foreach($columns as $col)
                 <section class="yt-col" data-status-id="{{ $col['status_id'] }}" data-column-id="{{ $col['id'] }}">
                     <header class="yt-col__head">
@@ -197,6 +206,7 @@
                     </div>
                 </section>
             @endforeach
+            </div>
         </div>
     @endif
 </div>
@@ -214,6 +224,17 @@
     document.querySelectorAll('#yt-filters select').forEach((el) => {
         el.addEventListener('change', () => el.form?.requestSubmit());
     });
+
+    // Горизонтальный скролл колесиком (как на доске Трекера)
+    const viewport = document.getElementById('yt-board-viewport');
+    if (viewport) {
+        viewport.addEventListener('wheel', (e) => {
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            if (viewport.scrollWidth <= viewport.clientWidth) return;
+            e.preventDefault();
+            viewport.scrollLeft += e.deltaY;
+        }, { passive: false });
+    }
 
     if (!canManage) return;
 

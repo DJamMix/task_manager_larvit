@@ -187,7 +187,8 @@ class BoardScreen extends Screen
 
     public function description(): ?string
     {
-        return $this->board?->name ?? 'Kanban';
+        // Название доски показывается в UI переключателя — не дублируем в шапке Orchid
+        return null;
     }
 
     public function permission(): ?iterable
