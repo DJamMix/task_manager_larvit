@@ -3403,6 +3403,136 @@ body.bx-messenger-page .command-bar {
     object-fit: cover;
 }
 
+.bx-msg--bot .bx-msg__bubble {
+    background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+    border: 1px solid #dbeafe;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.06);
+}
+.bx-msg__body--bot {
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+.bx-msg__body--bot p { margin: 0 0 0.55em; }
+.bx-msg__body--bot p:last-child { margin-bottom: 0; }
+.bx-msg__body--bot pre,
+.bx-bot-pre {
+    margin: 0.55em 0;
+    padding: 0.65rem 0.75rem;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #e2e8f0;
+    overflow-x: auto;
+    font-size: 0.82rem;
+}
+.bx-msg__body--bot code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.86em;
+    padding: 0.05em 0.3em;
+    border-radius: 4px;
+    background: rgba(15, 23, 42, 0.06);
+}
+.bx-msg__body--bot pre code { background: transparent; padding: 0; color: inherit; }
+.bx-msg__body--bot a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+.bx-bot-keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.55rem;
+}
+.bx-bot-keyboard__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.bx-bot-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 10px;
+    border: 1px solid #bfdbfe;
+    background: #fff;
+    color: #1d4ed8;
+    font-size: 0.82rem;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1.2;
+    transition: background .12s ease, border-color .12s ease;
+}
+.bx-bot-btn:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1e40af;
+}
+.bx-bot-btn:disabled { opacity: 0.6; cursor: wait; }
+.bx-bot-btn--url::after {
+    content: '';
+    width: 10px;
+    height: 10px;
+    opacity: 0.7;
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M6.5 3H3.75A.75.75 0 003 3.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75V9.5a.75.75 0 00-1.5 0v2.75h-7v-7H6.5a.75.75 0 000-1.5z'/%3E%3Cpath fill='black' d='M9.25 2.5a.75.75 0 000 1.5h1.69L6.72 8.22a.75.75 0 101.06 1.06l4.22-4.22v1.69a.75.75 0 001.5 0V3.25a.75.75 0 00-.75-.75H9.25z'/%3E%3C/svg%3E") center / contain no-repeat;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='black' d='M6.5 3H3.75A.75.75 0 003 3.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75V9.5a.75.75 0 00-1.5 0v2.75h-7v-7H6.5a.75.75 0 000-1.5z'/%3E%3Cpath fill='black' d='M9.25 2.5a.75.75 0 000 1.5h1.69L6.72 8.22a.75.75 0 101.06 1.06l4.22-4.22v1.69a.75.75 0 001.5 0V3.25a.75.75 0 00-.75-.75H9.25z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.bx-bot-reply-keyboard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0 0 0.45rem;
+    padding: 0.45rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+.bx-bot-reply-keyboard__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+.bx-bot-reply-keyboard__btn {
+    flex: 1 1 auto;
+    padding: 0.45rem 0.65rem;
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.bx-bot-reply-keyboard__btn:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+.bx-bot-cmd-menu {
+    margin: 0 0 0.4rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.bx-bot-cmd-menu__item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    padding: 0.55rem 0.75rem;
+    border: 0;
+    border-bottom: 1px solid #f1f5f9;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+.bx-bot-cmd-menu__item:last-child { border-bottom: 0; }
+.bx-bot-cmd-menu__item:hover { background: #f8fafc; }
+.bx-bot-cmd-menu__item strong { color: #2563eb; font-size: 0.86rem; }
+.bx-bot-cmd-menu__item span { color: #64748b; font-size: 0.75rem; }
+
 .bx-avatar-wrap {
     position: relative;
     display: inline-flex;

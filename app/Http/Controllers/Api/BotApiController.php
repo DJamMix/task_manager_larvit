@@ -42,11 +42,21 @@ class BotApiController extends Controller
             'sendDocument', 'sendPhoto' => $this->sendDocument($request, $bot),
             'deleteMessage' => $this->deleteMessage($request, $bot),
             'editMessageText' => $this->editMessageText($request, $bot),
+            'editMessageReplyMarkup' => $this->editMessageReplyMarkup($request, $bot),
             'getChat' => $this->getChat($request, $bot),
             'getChatMember' => $this->getChatMember($request, $bot),
             'getChatAdministrators' => $this->getChatAdministrators($request, $bot),
             'leaveChat' => $this->ok($this->bots->leaveChat($bot, (int) $request->input('chat_id'))),
             'forwardMessage' => $this->forwardMessage($request, $bot),
+            'setMyCommands' => $this->ok($this->bots->setMyCommands($bot, $this->commandsInput($request))),
+            'getMyCommands' => $this->ok($this->bots->getMyCommands($bot)),
+            'deleteMyCommands' => $this->ok($this->bots->setMyCommands($bot, [])),
+            'answerCallbackQuery' => $this->ok($this->bots->answerCallbackQuery(
+                $bot,
+                (string) $request->input('callback_query_id', ''),
+                $request->input('text'),
+                (bool) $request->boolean('show_alert'),
+            )),
             default => response()->json([
                 'ok' => false,
                 'error_code' => 404,
@@ -58,16 +68,19 @@ class BotApiController extends Controller
     private function sendMessage(Request $request, Bot $bot): JsonResponse
     {
         $chatId = (int) $request->input('chat_id');
-        $text = (string) $request->input('text', '');
-        $replyTo = $request->filled('reply_to_message_id')
-            ? (int) $request->input('reply_to_message_id')
-            : null;
-        $disable = (bool) $request->boolean('disable_notification');
+        $parseMode = $request->input('parse_mode');
 
-        $message = $this->bots->sendMessage($bot, $chatId, $text, $replyTo, $disable);
-        $chat = Chat::query()->findOrFail($chatId);
+        $message = $this->bots->sendMessage(
+            $bot,
+            $chatId,
+            (string) $request->input('text', ''),
+            $request->filled('reply_to_message_id') ? (int) $request->input('reply_to_message_id') : null,
+            (bool) $request->boolean('disable_notification'),
+            is_string($parseMode) ? $parseMode : null,
+            $request->input('reply_markup'),
+        );
 
-        return $this->ok($this->bots->messagePayload($message, $chat));
+        return $this->ok($this->bots->messagePayload($message, Chat::query()->findOrFail($chatId)));
     }
 
     private function sendDocument(Request $request, Bot $bot): JsonResponse
@@ -81,50 +94,76 @@ class BotApiController extends Controller
             return $this->fail(400, 'document is required');
         }
 
+        $parseMode = $request->input('parse_mode');
         $message = $this->bots->sendDocument(
             $bot,
             $chatId,
             $file,
-            $request->input('caption')
+            $request->input('caption'),
+            is_string($parseMode) ? $parseMode : null,
+            $request->input('reply_markup'),
         );
-        $chat = Chat::query()->findOrFail($chatId);
 
-        return $this->ok($this->bots->messagePayload($message, $chat));
+        return $this->ok($this->bots->messagePayload($message, Chat::query()->findOrFail($chatId)));
     }
 
     private function deleteMessage(Request $request, Bot $bot): JsonResponse
     {
-        $ok = $this->bots->deleteMessage(
+        return $this->ok($this->bots->deleteMessage(
             $bot,
             (int) $request->input('chat_id'),
             (int) $request->input('message_id')
-        );
-
-        return $this->ok($ok);
+        ));
     }
 
     private function editMessageText(Request $request, Bot $bot): JsonResponse
     {
+        $parseMode = $request->input('parse_mode');
         $message = $this->bots->editMessageText(
             $bot,
             (int) $request->input('chat_id'),
             (int) $request->input('message_id'),
-            (string) $request->input('text', '')
+            (string) $request->input('text', ''),
+            is_string($parseMode) ? $parseMode : null,
+            $request->has('reply_markup') ? $request->input('reply_markup') : null,
         );
 
         if (! $message) {
             return $this->fail(400, 'Message not found');
         }
 
-        $chat = Chat::query()->findOrFail((int) $request->input('chat_id'));
+        return $this->ok($this->bots->messagePayload(
+            $message,
+            Chat::query()->findOrFail((int) $request->input('chat_id'))
+        ));
+    }
 
-        return $this->ok($this->bots->messagePayload($message, $chat));
+    private function editMessageReplyMarkup(Request $request, Bot $bot): JsonResponse
+    {
+        $chatId = (int) $request->input('chat_id');
+        $message = ChatMessage::query()
+            ->where('chat_id', $chatId)
+            ->whereKey((int) $request->input('message_id'))
+            ->where('user_id', $bot->user_id)
+            ->first();
+
+        if (! $message) {
+            return $this->fail(400, 'Message not found');
+        }
+
+        $meta = is_array($message->bot_meta) ? $message->bot_meta : [];
+        $meta['reply_markup'] = $this->bots->normalizeReplyMarkup($request->input('reply_markup'));
+        $message->forceFill(['bot_meta' => $meta])->save();
+
+        return $this->ok($this->bots->messagePayload(
+            $message->fresh(['user', 'attachment']),
+            Chat::query()->findOrFail($chatId)
+        ));
     }
 
     private function getChat(Request $request, Bot $bot): JsonResponse
     {
-        $chatId = (int) $request->input('chat_id');
-        $chat = Chat::query()->find($chatId);
+        $chat = Chat::query()->find((int) $request->input('chat_id'));
         if (! $chat || ! $chat->isMember($bot->user_id)) {
             return $this->fail(400, 'Chat not found');
         }
@@ -134,9 +173,8 @@ class BotApiController extends Controller
 
     private function getChatMember(Request $request, Bot $bot): JsonResponse
     {
-        $chatId = (int) $request->input('chat_id');
+        $chat = Chat::query()->find((int) $request->input('chat_id'));
         $userId = (int) $request->input('user_id');
-        $chat = Chat::query()->find($chatId);
         if (! $chat || ! $chat->isMember($bot->user_id)) {
             return $this->fail(400, 'Chat not found');
         }
@@ -146,10 +184,8 @@ class BotApiController extends Controller
             return $this->ok(['status' => 'left', 'user' => ['id' => $userId]]);
         }
 
-        $status = ($member->pivot->role ?? '') === 'owner' ? 'creator' : 'member';
-
         return $this->ok([
-            'status' => $status,
+            'status' => ($member->pivot->role ?? '') === 'owner' ? 'creator' : 'member',
             'user' => [
                 'id' => (int) $member->id,
                 'is_bot' => (bool) $member->is_bot,
@@ -160,27 +196,26 @@ class BotApiController extends Controller
 
     private function getChatAdministrators(Request $request, Bot $bot): JsonResponse
     {
-        $chatId = (int) $request->input('chat_id');
-        $chat = Chat::query()->find($chatId);
+        $chat = Chat::query()->find((int) $request->input('chat_id'));
         if (! $chat || ! $chat->isMember($bot->user_id)) {
             return $this->fail(400, 'Chat not found');
         }
 
-        $admins = $chat->members()
-            ->wherePivot('role', 'owner')
-            ->get()
-            ->map(fn (User $u) => [
-                'status' => 'creator',
-                'user' => [
-                    'id' => (int) $u->id,
-                    'is_bot' => (bool) $u->is_bot,
-                    'first_name' => $u->name,
-                ],
-            ])
-            ->values()
-            ->all();
-
-        return $this->ok($admins);
+        return $this->ok(
+            $chat->members()
+                ->wherePivot('role', 'owner')
+                ->get()
+                ->map(fn (User $u) => [
+                    'status' => 'creator',
+                    'user' => [
+                        'id' => (int) $u->id,
+                        'is_bot' => (bool) $u->is_bot,
+                        'first_name' => $u->name,
+                    ],
+                ])
+                ->values()
+                ->all()
+        );
     }
 
     private function forwardMessage(Request $request, Bot $bot): JsonResponse
@@ -219,6 +254,17 @@ class BotApiController extends Controller
         ])->save();
 
         return $this->ok($this->bots->messagePayload($copy->fresh(['user', 'attachment']), $to));
+    }
+
+    private function commandsInput(Request $request): array
+    {
+        $commands = $request->input('commands', []);
+        if (is_string($commands)) {
+            $decoded = json_decode($commands, true);
+            $commands = is_array($decoded) ? $decoded : [];
+        }
+
+        return is_array($commands) ? $commands : [];
     }
 
     private function ok(mixed $result): JsonResponse

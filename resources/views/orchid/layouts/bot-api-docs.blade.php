@@ -111,6 +111,52 @@ Authorization: Bearer {{ $tok }}</pre>
     <pre>POST {{ $base }}{token}/setWebhook
 {"url":"https://example.com/hooks/crewdev","secret_token":"mysecret"}</pre>
 
+    <h3>sendMessage + HTML + inline-кнопки</h3>
+    <pre>POST {{ $base }}{token}/sendMessage
+{
+  "chat_id": 12,
+  "parse_mode": "HTML",
+  "text": "&lt;b&gt;Сарделька&lt;/b&gt;: деплой &lt;code&gt;#142&lt;/code&gt; готов",
+  "reply_markup": {
+    "inline_keyboard": [
+      [
+        {"text": "✅ Ок", "callback_data": "deploy_ok"},
+        {"text": "🔁 Retry", "callback_data": "deploy_retry"}
+      ],
+      [
+        {"text": "Открыть CI", "url": "https://example.com"}
+      ]
+    ]
+  }
+}</pre>
+
+    <h3>Reply-клавиатура (кнопки над полем ввода)</h3>
+    <pre>{
+  "chat_id": 12,
+  "text": "Выберите действие",
+  "reply_markup": {
+    "keyboard": [["/status", "/help"], ["Закрыть"]],
+    "resize_keyboard": true,
+    "one_time_keyboard": true
+  }
+}</pre>
+
+    <h3>Команды</h3>
+    <p><code>setMyCommands</code> / <code>getMyCommands</code> / <code>deleteMyCommands</code></p>
+    <pre>POST {{ $base }}{token}/setMyCommands
+{
+  "commands": [
+    {"command": "start", "description": "Запуск"},
+    {"command": "status", "description": "Статус"},
+    {"command": "help", "description": "Справка"}
+  ]
+}</pre>
+    <p class="muted">В чате наберите <code>/</code> — появится меню команд. Сообщение <code>/status</code> уходит боту в updates с <code>entities: bot_command</code>.</p>
+
+    <h3>answerCallbackQuery</h3>
+    <pre>POST {{ $base }}{token}/answerCallbackQuery
+{"callback_query_id":"…","text":"Принято","show_alert":false}</pre>
+
     <h2>5. Права</h2>
     <ul>
         <li>Создание и настройка ботов — право <code>platform.systems.bots</code> (роль admin).</li>

@@ -28,6 +28,8 @@
      data-delete-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.messages.delete', $active_chat_id) : '' }}"
      data-read-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.read', $active_chat_id) : '' }}"
      data-first-unread="{{ $first_unread_id ?? '' }}"
+     data-bot-callback-url="{{ $bot_callback_url ?? '' }}"
+     data-bot-commands='@json($bot_commands ?? [])'
      data-chats-picker-url="{{ $chats_picker_url ?? route('platform.systems.chats.picker') }}"
      data-media-url="{{ $chats_media_url ?? '' }}"
      data-can-edit-chat="{{ !empty($can_edit_chat) ? '1' : '0' }}"
@@ -398,6 +400,25 @@
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
                 </div>
+
+                @php($replyKb = $bot_reply_keyboard ?? null)
+                <div id="bx-bot-reply-keyboard"
+                     class="bx-bot-reply-keyboard {{ empty($replyKb['keyboard']) ? 'd-none' : '' }}"
+                     @if(!empty($replyKb['one_time_keyboard'])) data-one-time="1" @endif>
+                    @foreach(($replyKb['keyboard'] ?? []) as $row)
+                        @if(is_array($row))
+                            <div class="bx-bot-reply-keyboard__row">
+                                @foreach($row as $btn)
+                                    @php($label = is_array($btn) ? ($btn['text'] ?? '') : (string) $btn)
+                                    @if($label !== '')
+                                        <button type="button" class="bx-bot-reply-keyboard__btn" data-reply-text="{{ $label }}">{{ $label }}</button>
+                                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+                <div id="bx-bot-cmd-menu" class="bx-bot-cmd-menu d-none" role="listbox" aria-label="Команды ботов"></div>
 
                 <div class="bx-composer__box">
                     <div id="bx-composer-input"
@@ -3508,6 +3529,109 @@
     document.getElementById('bx-composer-send')?.addEventListener('click', (e) => {
         e.preventDefault();
         sendMessageAjax();
+    });
+
+    /* ===== Боты: inline / reply keyboard / команды ===== */
+    const botCallbackUrl = root?.getAttribute('data-bot-callback-url') || '';
+    let botCommands = [];
+    try { botCommands = JSON.parse(root?.getAttribute('data-bot-commands') || '[]'); } catch (e) { botCommands = []; }
+    const botCmdMenu = document.getElementById('bx-bot-cmd-menu');
+    const botReplyKb = document.getElementById('bx-bot-reply-keyboard');
+
+    const setComposerText = (text) => {
+        if (!input) return;
+        input.textContent = text;
+        input.focus();
+        const range = document.createRange();
+        range.selectNodeContents(input);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+    };
+
+    document.addEventListener('click', async (e) => {
+        const cbBtn = e.target.closest?.('.bx-bot-btn--callback');
+        if (cbBtn) {
+            e.preventDefault();
+            if (!botCallbackUrl) return;
+            const msgId = cbBtn.getAttribute('data-msg-id');
+            const data = cbBtn.getAttribute('data-callback');
+            cbBtn.disabled = true;
+            try {
+                const res = await fetch(botCallbackUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        message_id: Number(msgId),
+                        callback_data: data,
+                        _token: csrf,
+                    }),
+                });
+                if (!res.ok) throw new Error('fail');
+                toast('Отправлено боту', 'success');
+            } catch (err) {
+                toast('Не удалось нажать кнопку', 'error');
+            } finally {
+                cbBtn.disabled = false;
+            }
+            return;
+        }
+
+        const replyBtn = e.target.closest?.('.bx-bot-reply-keyboard__btn');
+        if (replyBtn) {
+            e.preventDefault();
+            const text = replyBtn.getAttribute('data-reply-text') || '';
+            if (!text) return;
+            setComposerText(text);
+            if (botReplyKb?.getAttribute('data-one-time') === '1') {
+                botReplyKb.classList.add('d-none');
+            }
+            sendMessageAjax();
+        }
+    });
+
+    const renderBotCmdMenu = (query) => {
+        if (!botCmdMenu || !botCommands.length) return;
+        const q = String(query || '').replace(/^\//, '').toLowerCase();
+        const items = botCommands.filter((c) => {
+            const cmd = String(c.command || '').replace(/^\//, '').toLowerCase();
+            return !q || cmd.startsWith(q);
+        }).slice(0, 8);
+        if (!items.length) {
+            botCmdMenu.classList.add('d-none');
+            botCmdMenu.innerHTML = '';
+            return;
+        }
+        botCmdMenu.innerHTML = items.map((c) => (
+            `<button type="button" class="bx-bot-cmd-menu__item" data-cmd="${escapeHtml(c.command)}">
+                <strong>${escapeHtml(c.command)}</strong>
+                <span>${escapeHtml(c.description || ('@' + (c.bot || 'bot')))}</span>
+            </button>`
+        )).join('');
+        botCmdMenu.classList.remove('d-none');
+    };
+
+    botCmdMenu?.addEventListener('click', (e) => {
+        const item = e.target.closest?.('[data-cmd]');
+        if (!item) return;
+        setComposerText(item.getAttribute('data-cmd') + ' ');
+        botCmdMenu.classList.add('d-none');
+    });
+
+    input?.addEventListener('input', () => {
+        const text = (input.innerText || '').trim();
+        if (text.startsWith('/') && botCommands.length) {
+            renderBotCmdMenu(text.split(/\s+/)[0]);
+        } else {
+            botCmdMenu?.classList.add('d-none');
+        }
     });
 
     /* Вставка картинок из буфера (Ctrl+V) */

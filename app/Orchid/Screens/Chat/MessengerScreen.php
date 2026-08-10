@@ -163,6 +163,15 @@ class MessengerScreen extends Screen
             'chats_media_url' => $resolved
                 ? route('platform.systems.chats.media', $resolved)
                 : null,
+            'bot_callback_url' => $resolved
+                ? route('platform.systems.chats.bot.callback', $resolved)
+                : null,
+            'bot_reply_keyboard' => $resolved
+                ? app(\App\Services\BotService::class)->activeReplyKeyboardForChat($resolved)
+                : null,
+            'bot_commands' => $resolved
+                ? app(\App\Services\BotService::class)->commandsForChat($resolved)
+                : [],
             'calls_enabled' => app(\App\Services\CallService::class)->isAvailable(),
             'calls_start_url' => $resolved
                 ? route('platform.systems.chats.calls.start', $resolved)

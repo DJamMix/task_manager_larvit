@@ -24,6 +24,7 @@ class ChatMessage extends Model
         'mentioned_user_ids',
         'task_id',
         'is_system',
+        'bot_meta',
         'forwarded_from_message_id',
         'forwarded_from_chat_id',
         'forwarded_from_user_id',
@@ -33,6 +34,7 @@ class ChatMessage extends Model
     protected $casts = [
         'text' => 'array',
         'mentioned_user_ids' => 'array',
+        'bot_meta' => 'array',
         'is_system' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -139,5 +141,30 @@ class ChatMessage extends Model
         }
 
         return app(MessageHtmlRenderer::class)->render($this->text, $this->plain_text, $labels);
+    }
+
+    public function botReplyMarkup(): ?array
+    {
+        $markup = $this->bot_meta['reply_markup'] ?? null;
+
+        return is_array($markup) ? $markup : null;
+    }
+
+    public function botInlineKeyboard(): array
+    {
+        $rows = $this->botReplyMarkup()['inline_keyboard'] ?? null;
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function botReplyKeyboard(): array
+    {
+        $markup = $this->botReplyMarkup();
+        if (! is_array($markup) || ! empty($markup['remove_keyboard'])) {
+            return [];
+        }
+        $rows = $markup['keyboard'] ?? null;
+
+        return is_array($rows) ? $rows : [];
     }
 }

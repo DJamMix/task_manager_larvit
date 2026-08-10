@@ -32,6 +32,22 @@ class BotEditScreen extends Screen
         if ($bot->exists) {
             $bot->loadMissing('user');
             $bot->setAttribute('avatar_path', $bot->user?->avatar_path);
+            $bot->setAttribute(
+                'commands_json',
+                json_encode($bot->commands ?: [
+                    ['command' => 'start', 'description' => 'Запуск'],
+                    ['command' => 'help', 'description' => 'Справка'],
+                ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+            );
+        } else {
+            $bot->setAttribute(
+                'commands_json',
+                json_encode([
+                    ['command' => 'start', 'description' => 'Запуск'],
+                    ['command' => 'help', 'description' => 'Справка'],
+                    ['command' => 'status', 'description' => 'Статус сервиса'],
+                ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+            );
         }
 
         $chats = collect();
@@ -147,6 +163,10 @@ class BotEditScreen extends Screen
                 Input::make('bot.webhook_secret')
                     ->title('Webhook secret')
                     ->help('Заголовок X-Bot-Api-Secret-Token'),
+                TextArea::make('bot.commands_json')
+                    ->title('Команды бота (JSON)')
+                    ->rows(6)
+                    ->help('Как setMyCommands в Telegram. Пример: [{"command":"start","description":"Запуск"},{"command":"status","description":"Статус"}]'),
             ])->title('Профиль'),
 
             Layout::rows([
@@ -184,10 +204,25 @@ class BotEditScreen extends Screen
             'bot.can_read_messages' => 'nullable|boolean',
             'bot.webhook_url' => 'nullable|url|max:500',
             'bot.webhook_secret' => 'nullable|string|max:128',
+            'bot.commands_json' => 'nullable|string|max:5000',
         ])['bot'];
+
+        if (! empty($data['commands_json'])) {
+            $decoded = json_decode($data['commands_json'], true);
+            if (! is_array($decoded)) {
+                Toast::error('Команды: невалидный JSON');
+
+                return back()->withInput();
+            }
+            $data['commands'] = $decoded;
+        }
+        unset($data['commands_json']);
 
         if (! $bot->exists) {
             $created = $bots->create($request->user(), $data);
+            if (isset($data['commands'])) {
+                $bots->setMyCommands($created['bot'], $data['commands']);
+            }
             $request->session()->flash('bot_plain_token', $created['token']);
             Toast::success('Бот создан. Скопируйте токен — он показывается один раз.');
 
@@ -195,6 +230,9 @@ class BotEditScreen extends Screen
         }
 
         $bots->update($bot, $request->user(), $data);
+        if (array_key_exists('commands', $data)) {
+            $bots->setMyCommands($bot, $data['commands'] ?? []);
+        }
         Toast::info('Сохранено');
 
         return redirect()->route('platform.systems.bots.edit', $bot);

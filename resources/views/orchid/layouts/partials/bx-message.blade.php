@@ -42,10 +42,11 @@
         $quickPreview = $message->attachment?->isNotEmpty() ? 'Вложение' : 'Сообщение';
     }
 @endphp
-<article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }} {{ $isForwarded ? 'bx-msg--forwarded' : '' }}"
+<article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }} {{ $isForwarded ? 'bx-msg--forwarded' : '' }} {{ ($message->user?->is_bot && ! $message->is_system) ? 'bx-msg--bot' : '' }}"
          id="chat-msg-{{ $message->id }}"
          data-author="{{ $message->user?->displayName() ?? 'участник' }}"
-         data-preview="{{ \Illuminate\Support\Str::limit($quickPreview, 120) }}">
+         data-preview="{{ \Illuminate\Support\Str::limit($quickPreview, 120) }}"
+         @if($message->user?->is_bot) data-is-bot="1" @endif>
     @unless($message->is_system)
         <button type="button"
                 class="bx-msg__check"
@@ -125,10 +126,41 @@
         @endphp
 
         @unless($hideBody)
-            <div class="bx-msg__body tw-msg__body">
+            <div class="bx-msg__body tw-msg__body {{ $message->user?->is_bot ? 'bx-msg__body--bot' : '' }}">
                 {!! $message->formatted_text !!}
             </div>
         @endunless
+
+        @php
+            $inlineKeyboard = $message->botInlineKeyboard();
+        @endphp
+        @if($inlineKeyboard !== [])
+            <div class="bx-bot-keyboard" data-msg-id="{{ $message->id }}">
+                @foreach($inlineKeyboard as $row)
+                    @if(is_array($row))
+                        <div class="bx-bot-keyboard__row">
+                            @foreach($row as $btn)
+                                @if(is_array($btn) && !empty($btn['text']))
+                                    @if(!empty($btn['url']))
+                                        <a class="bx-bot-btn bx-bot-btn--url"
+                                           href="{{ $btn['url'] }}"
+                                           target="_blank"
+                                           rel="noopener noreferrer">{{ $btn['text'] }}</a>
+                                    @elseif(!empty($btn['callback_data']))
+                                        <button type="button"
+                                                class="bx-bot-btn bx-bot-btn--callback"
+                                                data-callback="{{ $btn['callback_data'] }}"
+                                                data-msg-id="{{ $message->id }}">
+                                            {{ $btn['text'] }}
+                                        </button>
+                                    @endif
+                                @endif
+                            @endforeach
+                        </div>
+                    @endif
+                @endforeach
+            </div>
+        @endif
 
         @if($voiceFiles->isNotEmpty())
             <div class="bx-msg__voices">

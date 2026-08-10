@@ -24,6 +24,7 @@ class BotService
     public function __construct(
         private readonly CommentService $comments,
         private readonly ChatService $chats,
+        private readonly BotMessageFormatter $formatter,
     ) {}
 
     public function canManageBots(?User $user): bool
@@ -258,11 +259,23 @@ class BotService
             }
         }
 
+        $markup = $message->botReplyMarkup();
+        if ($markup) {
+            $payload['reply_markup'] = $markup;
+        }
+
         return $payload;
     }
 
-    public function sendMessage(Bot $bot, int $chatId, string $text, ?int $replyToMessageId = null, bool $disableNotification = false): ChatMessage
-    {
+    public function sendMessage(
+        Bot $bot,
+        int $chatId,
+        string $text,
+        ?int $replyToMessageId = null,
+        bool $disableNotification = false,
+        ?string $parseMode = null,
+        mixed $replyMarkup = null,
+    ): ChatMessage {
         $chat = $this->assertBotChat($bot, $chatId);
         $actor = $bot->user;
         abort_unless($actor, 500);
@@ -271,21 +284,26 @@ class BotService
             abort(400, 'text is empty');
         }
 
-        $quill = $this->comments->normalizeQuill($text);
+        $formatted = $this->formatter->format($text, $parseMode);
+        $markup = $this->normalizeReplyMarkup($replyMarkup);
 
         $message = $chat->messages()->create([
             'user_id' => $actor->id,
             'parent_id' => $replyToMessageId,
-            'text' => $quill,
-            'plain_text' => trim($text),
+            'text' => $formatted['quill'],
+            'plain_text' => $formatted['plain'] !== '' ? $formatted['plain'] : trim($text),
             'mentioned_user_ids' => [],
             'is_system' => false,
+            'bot_meta' => array_filter([
+                'parse_mode' => $parseMode ? strtoupper($parseMode) : null,
+                'reply_markup' => $markup,
+                'source' => 'bot_api',
+            ], fn ($v) => $v !== null && $v !== []),
         ]);
 
         $chat->touch();
 
         if (! $disableNotification) {
-            // Уведомляем людей через ChatService-совместимый путь
             $chat->loadMissing('members');
             $this->notifyHumans($chat, $actor, $message);
         }
@@ -293,21 +311,36 @@ class BotService
         return $message->fresh(['user', 'attachment']);
     }
 
-    public function sendDocument(Bot $bot, int $chatId, UploadedFile $file, ?string $caption = null): ChatMessage
-    {
+    public function sendDocument(
+        Bot $bot,
+        int $chatId,
+        UploadedFile $file,
+        ?string $caption = null,
+        ?string $parseMode = null,
+        mixed $replyMarkup = null,
+    ): ChatMessage {
         $chat = $this->assertBotChat($bot, $chatId);
         $actor = $bot->user;
         abort_unless($actor, 500);
 
         $attachment = (new File($file, 'public'))->load();
-        $plain = trim((string) ($caption ?? '')) ?: ((string) ($attachment->original_name ?? 'Файл'));
+        $rawCaption = trim((string) ($caption ?? ''));
+        $formatted = $rawCaption !== ''
+            ? $this->formatter->format($rawCaption, $parseMode)
+            : $this->formatter->format((string) ($attachment->original_name ?? 'Файл'), null);
+        $markup = $this->normalizeReplyMarkup($replyMarkup);
 
         $message = $chat->messages()->create([
             'user_id' => $actor->id,
-            'text' => $this->comments->normalizeQuill($plain),
-            'plain_text' => $plain,
+            'text' => $formatted['quill'],
+            'plain_text' => $formatted['plain'],
             'mentioned_user_ids' => [],
             'is_system' => false,
+            'bot_meta' => array_filter([
+                'parse_mode' => $parseMode ? strtoupper($parseMode) : null,
+                'reply_markup' => $markup,
+                'source' => 'bot_api',
+            ], fn ($v) => $v !== null && $v !== []),
         ]);
         $message->attachment()->syncWithoutDetaching([$attachment->id]);
         $chat->touch();
@@ -336,8 +369,14 @@ class BotService
         return true;
     }
 
-    public function editMessageText(Bot $bot, int $chatId, int $messageId, string $text): ?ChatMessage
-    {
+    public function editMessageText(
+        Bot $bot,
+        int $chatId,
+        int $messageId,
+        string $text,
+        ?string $parseMode = null,
+        mixed $replyMarkup = null,
+    ): ?ChatMessage {
         $chat = $this->assertBotChat($bot, $chatId);
         $message = ChatMessage::query()
             ->where('chat_id', $chat->id)
@@ -349,9 +388,19 @@ class BotService
             return null;
         }
 
+        $formatted = $this->formatter->format($text, $parseMode);
+        $meta = is_array($message->bot_meta) ? $message->bot_meta : [];
+        if ($parseMode !== null) {
+            $meta['parse_mode'] = strtoupper($parseMode);
+        }
+        if ($replyMarkup !== null) {
+            $meta['reply_markup'] = $this->normalizeReplyMarkup($replyMarkup);
+        }
+
         $message->forceFill([
-            'text' => $this->comments->normalizeQuill($text),
-            'plain_text' => trim($text),
+            'text' => $formatted['quill'],
+            'plain_text' => $formatted['plain'],
+            'bot_meta' => $meta,
         ])->save();
 
         return $message->fresh(['user', 'attachment']);
@@ -539,7 +588,7 @@ class BotService
 
         foreach ($bots as $bot) {
             $this->pushUpdate($bot, 'message', [
-                'message' => $this->messagePayload($message, $chat),
+                'message' => $this->enrichHumanMessageUpdate($message, $chat),
             ]);
         }
     }
@@ -647,6 +696,325 @@ class BotService
         }
 
         return $chat;
+    }
+
+    public function setMyCommands(Bot $bot, array $commands): array
+    {
+        $normalized = [];
+        foreach ($commands as $cmd) {
+            if (! is_array($cmd)) {
+                continue;
+            }
+            $command = ltrim(strtolower(trim((string) ($cmd['command'] ?? ''))), '/');
+            $description = trim((string) ($cmd['description'] ?? ''));
+            if ($command === '' || ! preg_match('/^[a-z0-9_]{1,32}$/', $command)) {
+                continue;
+            }
+            $normalized[] = [
+                'command' => $command,
+                'description' => Str::limit($description !== '' ? $description : $command, 256, ''),
+            ];
+        }
+
+        $bot->forceFill(['commands' => array_values($normalized)])->save();
+
+        return $normalized;
+    }
+
+    public function getMyCommands(Bot $bot): array
+    {
+        return is_array($bot->commands) ? array_values($bot->commands) : [];
+    }
+
+    public function answerCallbackQuery(
+        Bot $bot,
+        string $callbackQueryId,
+        ?string $text = null,
+        bool $showAlert = false,
+    ): bool {
+        $key = 'bot.callback.'.$callbackQueryId;
+        $payload = \Illuminate\Support\Facades\Cache::get($key);
+        if (! is_array($payload) || (int) ($payload['bot_id'] ?? 0) !== (int) $bot->id) {
+            return false;
+        }
+
+        if ($text) {
+            $userId = (int) ($payload['user_id'] ?? 0);
+            if ($userId > 0) {
+                $user = User::query()->find($userId);
+                if ($user) {
+                    app(DashboardNotifier::class)->send(
+                        $user,
+                        $showAlert ? 'Бот' : 'Ответ бота',
+                        Str::limit($text, 200),
+                        isset($payload['chat_id'])
+                            ? route('platform.systems.chats.view', ['chat' => $payload['chat_id']])
+                            : route('platform.systems.chats'),
+                        \Orchid\Support\Color::INFO,
+                        ['callback_query_id' => $callbackQueryId]
+                    );
+                }
+            }
+            \Illuminate\Support\Facades\Cache::put($key.':answer', [
+                'text' => $text,
+                'show_alert' => $showAlert,
+            ], 120);
+        }
+
+        return true;
+    }
+
+    /**
+     * Пользователь нажал inline-кнопку в чате.
+     *
+     * @return array{ok: bool, callback_query_id?: string, answer?: array|null}
+     */
+    public function handleInlineCallback(Chat $chat, User $actor, int $messageId, string $data): array
+    {
+        if (! $chat->isMember($actor->id)) {
+            abort(403);
+        }
+
+        $message = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->whereKey($messageId)
+            ->with('user.bot')
+            ->first();
+
+        if (! $message || ! $message->user?->is_bot) {
+            abort(422, 'Сообщение бота не найдено');
+        }
+
+        $bot = $message->user->bot;
+        if (! $bot || ! $bot->is_active) {
+            abort(422, 'Бот недоступен');
+        }
+
+        // Проверяем, что callback_data есть на кнопках
+        $allowed = [];
+        foreach ($message->botInlineKeyboard() as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            foreach ($row as $btn) {
+                if (is_array($btn) && isset($btn['callback_data'])) {
+                    $allowed[] = (string) $btn['callback_data'];
+                }
+            }
+        }
+        if ($allowed !== [] && ! in_array($data, $allowed, true)) {
+            abort(422, 'Неизвестная кнопка');
+        }
+
+        $callbackId = (string) Str::uuid();
+        \Illuminate\Support\Facades\Cache::put('bot.callback.'.$callbackId, [
+            'bot_id' => $bot->id,
+            'user_id' => $actor->id,
+            'chat_id' => $chat->id,
+            'message_id' => $message->id,
+            'data' => $data,
+        ], 3600);
+
+        $this->pushUpdate($bot, 'callback_query', [
+            'id' => $callbackId,
+            'from' => [
+                'id' => (int) $actor->id,
+                'is_bot' => false,
+                'first_name' => $actor->name,
+            ],
+            'message' => $this->messagePayload($message, $chat),
+            'chat_instance' => (string) $chat->id,
+            'data' => $data,
+        ]);
+
+        return [
+            'ok' => true,
+            'callback_query_id' => $callbackId,
+            'answer' => null,
+        ];
+    }
+
+    /**
+     * Разбор /команд в тексте пользователя для updates.
+     *
+     * @return list<array{offset:int,length:int,type:string}>
+     */
+    public function commandEntitiesFromText(string $plain): array
+    {
+        if (! preg_match('/^\/([a-zA-Z0-9_]{1,32})(?:@([a-zA-Z0-9_]+))?/', ltrim($plain), $m, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+
+        $full = $m[0][0];
+        $offset = $m[0][1];
+
+        return [[
+            'offset' => $offset,
+            'length' => mb_strlen($full),
+            'type' => 'bot_command',
+        ]];
+    }
+
+    public function enrichHumanMessageUpdate(ChatMessage $message, Chat $chat): array
+    {
+        $payload = $this->messagePayload($message, $chat);
+        $entities = $this->commandEntitiesFromText((string) ($message->plain_text ?? ''));
+        if ($entities !== []) {
+            $payload['entities'] = $entities;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function normalizeReplyMarkup(mixed $raw): ?array
+    {
+        if ($raw === null || $raw === '' || $raw === []) {
+            return null;
+        }
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : null;
+        }
+        if (! is_array($raw)) {
+            return null;
+        }
+
+        if (! empty($raw['remove_keyboard'])) {
+            return ['remove_keyboard' => true];
+        }
+
+        $out = [];
+
+        if (isset($raw['inline_keyboard']) && is_array($raw['inline_keyboard'])) {
+            $rows = [];
+            foreach ($raw['inline_keyboard'] as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $buttons = [];
+                foreach ($row as $btn) {
+                    if (! is_array($btn) || trim((string) ($btn['text'] ?? '')) === '') {
+                        continue;
+                    }
+                    $item = ['text' => Str::limit(trim((string) $btn['text']), 64, '')];
+                    if (! empty($btn['callback_data'])) {
+                        $item['callback_data'] = Str::limit((string) $btn['callback_data'], 64, '');
+                    } elseif (! empty($btn['url'])) {
+                        $item['url'] = (string) $btn['url'];
+                    } else {
+                        continue;
+                    }
+                    $buttons[] = $item;
+                }
+                if ($buttons !== []) {
+                    $rows[] = $buttons;
+                }
+            }
+            if ($rows !== []) {
+                $out['inline_keyboard'] = $rows;
+            }
+        }
+
+        if (isset($raw['keyboard']) && is_array($raw['keyboard'])) {
+            $rows = [];
+            foreach ($raw['keyboard'] as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $buttons = [];
+                foreach ($row as $btn) {
+                    if (is_string($btn) && trim($btn) !== '') {
+                        $buttons[] = ['text' => Str::limit(trim($btn), 64, '')];
+                    } elseif (is_array($btn) && trim((string) ($btn['text'] ?? '')) !== '') {
+                        $buttons[] = ['text' => Str::limit(trim((string) $btn['text']), 64, '')];
+                    }
+                }
+                if ($buttons !== []) {
+                    $rows[] = $buttons;
+                }
+            }
+            if ($rows !== []) {
+                $out['keyboard'] = $rows;
+                $out['resize_keyboard'] = (bool) ($raw['resize_keyboard'] ?? true);
+                $out['one_time_keyboard'] = (bool) ($raw['one_time_keyboard'] ?? false);
+                $out['is_persistent'] = (bool) ($raw['is_persistent'] ?? false);
+            }
+        }
+
+        return $out !== [] ? $out : null;
+    }
+
+    /**
+     * Активная reply-клавиатура чата (последнее сообщение бота с keyboard).
+     */
+    public function activeReplyKeyboardForChat(Chat $chat): ?array
+    {
+        $message = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->where('is_system', false)
+            ->whereNotNull('bot_meta')
+            ->orderByDesc('id')
+            ->limit(40)
+            ->get()
+            ->first(function (ChatMessage $m) {
+                $markup = $m->botReplyMarkup();
+
+                return is_array($markup) && (
+                    ! empty($markup['keyboard']) || ! empty($markup['remove_keyboard'])
+                );
+            });
+
+        if (! $message) {
+            return null;
+        }
+
+        $markup = $message->botReplyMarkup();
+        if (! empty($markup['remove_keyboard'])) {
+            return null;
+        }
+
+        return [
+            'message_id' => (int) $message->id,
+            'keyboard' => $markup['keyboard'] ?? [],
+            'one_time_keyboard' => (bool) ($markup['one_time_keyboard'] ?? false),
+            'resize_keyboard' => (bool) ($markup['resize_keyboard'] ?? true),
+        ];
+    }
+
+    /**
+     * Команды всех ботов в чате (для подсказок в композере).
+     *
+     * @return list<array{command:string,description:string,bot:string,bot_user_id:int}>
+     */
+    public function commandsForChat(Chat $chat): array
+    {
+        $chat->loadMissing('members');
+        $botUsers = $chat->members->filter(fn (User $u) => (bool) $u->is_bot);
+        if ($botUsers->isEmpty()) {
+            return [];
+        }
+
+        $bots = Bot::query()
+            ->whereIn('user_id', $botUsers->pluck('id'))
+            ->where('is_active', true)
+            ->get();
+
+        $out = [];
+        foreach ($bots as $bot) {
+            foreach ($this->getMyCommands($bot) as $cmd) {
+                $out[] = [
+                    'command' => '/'.ltrim((string) ($cmd['command'] ?? ''), '/'),
+                    'description' => (string) ($cmd['description'] ?? ''),
+                    'bot' => $bot->username,
+                    'bot_user_id' => (int) $bot->user_id,
+                ];
+            }
+        }
+
+        return $out;
     }
 
     private function notifyHumans(Chat $chat, User $actor, ChatMessage $message): void

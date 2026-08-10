@@ -946,6 +946,26 @@ Route::post('chats/{chat}/members/add', function (
     ]);
 })->name('platform.systems.chats.members.add');
 
+Route::post('chats/{chat}/bot-callback', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats,
+    \App\Services\BotService $bots
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $data = $request->validate([
+        'message_id' => 'required|integer',
+        'callback_data' => 'required|string|max:64',
+    ]);
+
+    return response()->json($bots->handleInlineCallback(
+        $chat,
+        $request->user(),
+        (int) $data['message_id'],
+        (string) $data['callback_data'],
+    ));
+})->name('platform.systems.chats.bot.callback');
+
 Route::delete('chats/{chat}/members/{user}', function (
     \Illuminate\Http\Request $request,
     \App\Models\Chat $chat,

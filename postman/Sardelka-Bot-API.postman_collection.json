@@ -1,0 +1,348 @@
+{
+  "info": {
+    "name": "Сарделька — Bot API (CrewDev)",
+    "description": "Примеры запросов для проверки бота. Перед запуском заполните переменные: base_url, bot_token, chat_id.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://task_manager_larvit" },
+    { "key": "bot_token", "value": "ВСТАВЬТЕ_ТОКЕН_САРДЕЛЬКИ" },
+    { "key": "chat_id", "value": "12" },
+    { "key": "message_id", "value": "1" },
+    { "key": "from_chat_id", "value": "12" },
+    { "key": "user_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Инфо",
+      "item": [
+        {
+          "name": "getMe",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/bot{{bot_token}}/getMe"
+          }
+        },
+        {
+          "name": "getMe (Bearer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bot_token}}" }
+            ],
+            "url": "{{base_url}}/api/bot/getMe"
+          }
+        },
+        {
+          "name": "getChat",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/getChat"
+          }
+        },
+        {
+          "name": "getChatAdministrators",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/getChatAdministrators"
+          }
+        },
+        {
+          "name": "getChatMember",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"user_id\": {{user_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/getChatMember"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Сообщения",
+      "item": [
+        {
+          "name": "sendMessage — короткое",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"text\": \"Сарделька на связи. Тест OK.\"\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "sendMessage — HTML + inline кнопки",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"parse_mode\": \"HTML\",\n  \"text\": \"<b>Сарделька</b>: деплой <code>#142</code> готов\\n<i>Можно нажать кнопку ниже</i>\",\n  \"reply_markup\": {\n    \"inline_keyboard\": [\n      [\n        {\"text\": \"✅ Ок\", \"callback_data\": \"deploy_ok\"},\n        {\"text\": \"🔁 Retry\", \"callback_data\": \"deploy_retry\"}\n      ],\n      [\n        {\"text\": \"Открыть CI\", \"url\": \"https://example.com\"}\n      ]\n    ]\n  }\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "sendMessage — Markdown + reply keyboard",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"parse_mode\": \"Markdown\",\n  \"text\": \"*Сарделька* готова\\nВыберите команду:\",\n  \"reply_markup\": {\n    \"keyboard\": [[\"/status\", \"/help\"], [\"Закрыть\"]],\n    \"resize_keyboard\": true,\n    \"one_time_keyboard\": true\n  }\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "setMyCommands",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commands\": [\n    {\"command\": \"start\", \"description\": \"Запуск\"},\n    {\"command\": \"status\", \"description\": \"Статус сервиса\"},\n    {\"command\": \"help\", \"description\": \"Справка\"}\n  ]\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/setMyCommands"
+          }
+        },
+        {
+          "name": "getMyCommands",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/bot{{bot_token}}/getMyCommands"
+          }
+        },
+        {
+          "name": "answerCallbackQuery",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"callback_query_id\": \"ВСТАВЬТЕ_ID_ИЗ_getUpdates\",\n  \"text\": \"Принято Сарделькой\",\n  \"show_alert\": false\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/answerCallbackQuery"
+          }
+        },
+        {
+          "name": "sendMessage — многострочное",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"text\": \"🔔 Алерт от Сардельки\\n\\nСервис: billing\\nСтатус: OK\\nВремя: 2026-08-11 01:10\\n\\nДетали:\\n- latency 42ms\\n- errors 0\"\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "sendMessage — деплой",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"text\": \"🚀 Deploy #142 завершён\\nВетка: main\\nОкружение: production\\nАвтор: CI\"\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "sendMessage — ошибка",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"text\": \"❌ Ошибка платежа\\nOrder: ORD-9081\\nКод: CARD_DECLINED\\nСумма: 1490 ₽\"\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "sendMessage — без уведомления",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"text\": \"Тихий лог: nightly backup finished\",\n  \"disable_notification\": true\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "sendMessage — ответ на сообщение",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"text\": \"Принято. Сарделька отвечает на ваше сообщение.\",\n  \"reply_to_message_id\": {{message_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendMessage"
+          }
+        },
+        {
+          "name": "editMessageText",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"message_id\": {{message_id}},\n  \"text\": \"✏️ Сообщение Сардельки обновлено (editMessageText)\"\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/editMessageText"
+          }
+        },
+        {
+          "name": "deleteMessage",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"message_id\": {{message_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/deleteMessage"
+          }
+        },
+        {
+          "name": "forwardMessage",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}},\n  \"from_chat_id\": {{from_chat_id}},\n  \"message_id\": {{message_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/forwardMessage"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Файлы",
+      "item": [
+        {
+          "name": "sendDocument",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "chat_id", "value": "{{chat_id}}", "type": "text" },
+                { "key": "caption", "value": "📄 Отчёт от Сардельки", "type": "text" },
+                { "key": "document", "type": "file", "src": [] }
+              ]
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendDocument"
+          }
+        },
+        {
+          "name": "sendPhoto",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "chat_id", "value": "{{chat_id}}", "type": "text" },
+                { "key": "caption", "value": "🖼 Картинка от Сардельки", "type": "text" },
+                { "key": "photo", "type": "file", "src": [] }
+              ]
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/sendPhoto"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Updates / Webhook",
+      "item": [
+        {
+          "name": "getUpdates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/bot{{bot_token}}/getUpdates?limit=20"
+          }
+        },
+        {
+          "name": "getUpdates long poll",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/bot{{bot_token}}/getUpdates?timeout=10&limit=50"
+          }
+        },
+        {
+          "name": "setWebhook (webhook.site)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://webhook.site/ВАШ-UUID\",\n  \"secret_token\": \"sardelka-test-secret\"\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/setWebhook"
+          }
+        },
+        {
+          "name": "getWebhookInfo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/bot{{bot_token}}/getWebhookInfo"
+          }
+        },
+        {
+          "name": "deleteWebhook",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}/api/bot{{bot_token}}/deleteWebhook"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Опасно",
+      "item": [
+        {
+          "name": "leaveChat (бот выйдет из чата)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chat_id\": {{chat_id}}\n}"
+            },
+            "url": "{{base_url}}/api/bot{{bot_token}}/leaveChat"
+          }
+        }
+      ]
+    }
+  ]
+}
