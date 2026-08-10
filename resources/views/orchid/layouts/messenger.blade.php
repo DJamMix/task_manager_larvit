@@ -312,6 +312,14 @@
                     <span id="bx-selection-count">Выбрано: 0</span>
                 </div>
                 <div class="bx-selection-bar__actions">
+                    <button type="button" class="bx-selection-bar__btn" id="bx-reply-selected" hidden title="Ответить">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><path d="M15 15l5-5-5-5"/><path d="M20 10H11"/></svg>
+                        <span>Ответ</span>
+                    </button>
+                    <button type="button" class="bx-selection-bar__btn" id="bx-copy-selected" title="Копировать текст">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                        <span>Копировать</span>
+                    </button>
                     <button type="button" class="bx-selection-bar__btn bx-selection-bar__btn--primary" id="bx-forward-selected">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
                         <span>Переслать</span>
@@ -330,9 +338,11 @@
                 <input type="hidden" id="chat-message-parent-id" value="">
 
                 <div id="bx-reply-banner" class="bx-composer__reply d-none">
-                    <div>
-                        Ответ для <strong id="bx-reply-author"></strong>
-                    </div>
+                    <span class="bx-composer__reply-bar" aria-hidden="true"></span>
+                    <button type="button" class="bx-composer__reply-jump" id="bx-reply-jump" title="К сообщению">
+                        <span class="bx-composer__reply-label">Ответ <strong id="bx-reply-author"></strong></span>
+                        <span class="bx-composer__reply-preview" id="bx-reply-preview"></span>
+                    </button>
                     <button type="button" class="bx-composer__icon-btn" id="bx-reply-cancel" title="Отмена">
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
@@ -579,14 +589,15 @@
     <button type="button" class="bx-sheet__backdrop" id="bx-forward-close-bg" aria-label="Закрыть"></button>
     <div class="bx-sheet__panel bx-forward-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-forward-title">
         <div class="bx-sheet__head">
-            <strong id="bx-forward-title">Переслать сообщения</strong>
+            <strong id="bx-forward-title">Переслать</strong>
             <button type="button" class="bx-sheet__close" id="bx-forward-close" aria-label="Закрыть">×</button>
         </div>
+        <div class="bx-forward-preview" id="bx-forward-preview" hidden></div>
         <div class="bx-forward-search">
             <input type="search"
                    id="bx-forward-search"
                    class="bx-forward-search__input"
-                   placeholder="Поиск по чатам и пользователям…"
+                   placeholder="Поиск по чатам…"
                    autocomplete="off">
         </div>
         <div id="bx-forward-chats" class="bx-forward-chats">Загрузка чатов…</div>
@@ -795,6 +806,55 @@
     const parentInput = document.getElementById('chat-message-parent-id');
     const replyBanner = document.getElementById('bx-reply-banner');
     const replyAuthor = document.getElementById('bx-reply-author');
+    const replyPreview = document.getElementById('bx-reply-preview');
+    const replyJump = document.getElementById('bx-reply-jump');
+
+    const clearReply = () => {
+        if (parentInput) parentInput.value = '';
+        replyBanner?.classList.add('d-none');
+        if (replyPreview) replyPreview.textContent = '';
+        replyBanner?.removeAttribute('data-reply-id');
+    };
+
+    const startReplyTo = (opts = {}) => {
+        const id = String(opts.id || '').trim();
+        if (!id || !parentInput) return;
+        // Выход из режима выбора при ответе
+        if (typeof selectedMessageIds !== 'undefined' && selectedMessageIds?.size) {
+            selectedMessageIds.clear();
+            if (typeof updateSelection === 'function') updateSelection();
+        }
+        parentInput.value = id;
+        replyBanner?.classList.remove('d-none');
+        replyBanner?.setAttribute('data-reply-id', id);
+        if (replyAuthor) replyAuthor.textContent = opts.author || 'участник';
+        if (replyPreview) replyPreview.textContent = opts.preview || 'Сообщение';
+        input?.focus?.();
+        try {
+            const el = document.getElementById('chat-msg-' + id);
+            el?.classList.add('bx-msg--replying');
+            setTimeout(() => el?.classList.remove('bx-msg--replying'), 900);
+        } catch (e) {}
+    };
+
+    const messagePreviewFromEl = (msgEl) => {
+        if (!msgEl) return 'Сообщение';
+        const btn = msgEl.querySelector('.bx-msg__reply-btn');
+        const fromBtn = btn?.getAttribute('data-preview');
+        if (fromBtn) return fromBtn;
+        const body = (msgEl.querySelector('.bx-msg__body')?.innerText || '').replace(/\s+/g, ' ').trim();
+        if (body) return body.slice(0, 120);
+        if (msgEl.querySelector('.bx-voice')) return 'Голосовое сообщение';
+        if (msgEl.querySelector('.bx-msg__image, .bx-msg__files')) return 'Вложение';
+        return 'Сообщение';
+    };
+
+    const messageAuthorFromEl = (msgEl) => {
+        const btn = msgEl?.querySelector('.bx-msg__reply-btn');
+        return btn?.getAttribute('data-author')
+            || msgEl?.querySelector('.bx-msg__meta strong')?.textContent?.trim()
+            || 'участник';
+    };
     const filesInput = document.getElementById('bx-composer-files');
     const filesLabel = document.getElementById('bx-files-label');
     const filesPreview = document.getElementById('bx-files-preview');
@@ -1216,10 +1276,31 @@
 
         const reply = e.target.closest?.('.bx-msg__reply-btn');
         if (reply) {
-            if (parentInput) parentInput.value = reply.getAttribute('data-parent-id') || '';
-            replyBanner?.classList.remove('d-none');
-            if (replyAuthor) replyAuthor.textContent = reply.getAttribute('data-author') || 'участник';
-            input?.focus();
+            startReplyTo({
+                id: reply.getAttribute('data-parent-id'),
+                author: reply.getAttribute('data-author'),
+                preview: reply.getAttribute('data-preview'),
+            });
+            return;
+        }
+
+        const quote = e.target.closest?.('.bx-msg__reply[data-goto-msg]');
+        if (quote) {
+            e.preventDefault();
+            goToChatMessage(quote.getAttribute('data-goto-msg'));
+            return;
+        }
+
+        const fwdOne = e.target.closest?.('.bx-msg__forward-btn');
+        if (fwdOne) {
+            const mid = Number(fwdOne.getAttribute('data-message-id') || 0);
+            if (mid) {
+                selectedMessageIds.clear();
+                selectedMessageIds.add(mid);
+                updateSelection();
+                document.getElementById('bx-forward-selected')?.click();
+            }
+            return;
         }
 
         const copyBtn = e.target.closest?.('.tw-code-copy');
@@ -1234,9 +1315,11 @@
         }
     });
 
-    document.getElementById('bx-reply-cancel')?.addEventListener('click', () => {
-        if (parentInput) parentInput.value = '';
-        replyBanner?.classList.add('d-none');
+    document.getElementById('bx-reply-cancel')?.addEventListener('click', clearReply);
+    replyJump?.addEventListener('click', (e) => {
+        e.preventDefault();
+        const id = replyBanner?.getAttribute('data-reply-id') || parentInput?.value;
+        if (id) goToChatMessage(id);
     });
 
     autosize();
@@ -1268,7 +1351,7 @@
     const goToChatMessage = async (messageId) => {
         const id = Number(messageId) || 0;
         if (!id) return;
-        closeChatInfo();
+        try { typeof closeChatInfo === 'function' && closeChatInfo(); } catch (e) {}
         let el = document.getElementById('chat-msg-' + id);
         if (!el) {
             // Подгрузить историю вверх, пока не найдём (как «Show in chat»)
@@ -1457,8 +1540,11 @@
     const selectionBar = document.getElementById('bx-selection-bar');
     const selectionCount = document.getElementById('bx-selection-count');
     const forwardSelected = document.getElementById('bx-forward-selected');
+    const replySelected = document.getElementById('bx-reply-selected');
+    const copySelected = document.getElementById('bx-copy-selected');
     const forwardSheet = document.getElementById('bx-forward-sheet');
     const forwardChats = document.getElementById('bx-forward-chats');
+    const forwardPreview = document.getElementById('bx-forward-preview');
     const updateSelection = () => {
         const count = selectedMessageIds.size;
         selectionBar?.toggleAttribute('hidden', count === 0);
@@ -1468,11 +1554,15 @@
         if (forwardSelected) {
             forwardSelected.setAttribute('aria-label', 'Переслать (' + count + ')');
         }
+        // Ответ только на одно сообщение
+        replySelected?.toggleAttribute('hidden', count !== 1);
         root?.classList.toggle('is-selecting', count > 0);
         document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
             const id = Number(String(message.id || '').replace('chat-msg-', ''));
             message.classList.toggle('is-selected', selectedMessageIds.has(id));
         });
+        // Скрыть композер в режиме выбора — как в Telegram
+        document.getElementById('bx-composer')?.classList.toggle('is-dimmed', count > 0);
     };
     const toggleMessageSelection = (id) => {
         if (!id) return;
@@ -1500,7 +1590,7 @@
         const holdMs = () => (isCoarse() ? 450 : 380);
         const msgIdOf = (el) => Number(String(el?.id || '').replace('chat-msg-', ''));
         const msgFromTarget = (t) => t?.closest?.('.bx-msg:not(.bx-msg--system)');
-        const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox,.bx-msg__body a');
+        const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox,.bx-msg__body a,.bx-msg__reply,.bx-msg__actions');
         const hasTextSelection = () => {
             const sel = window.getSelection?.();
             if (!sel || sel.isCollapsed || !sel.toString().trim()) return false;
@@ -1659,6 +1749,88 @@
         updateSelection();
     });
 
+    replySelected?.addEventListener('click', () => {
+        if (selectedMessageIds.size !== 1) return;
+        const id = [...selectedMessageIds][0];
+        const el = document.getElementById('chat-msg-' + id);
+        startReplyTo({
+            id,
+            author: messageAuthorFromEl(el),
+            preview: messagePreviewFromEl(el),
+        });
+    });
+
+    copySelected?.addEventListener('click', async () => {
+        const ids = [...selectedMessageIds].sort((a, b) => a - b);
+        const parts = ids.map((id) => {
+            const el = document.getElementById('chat-msg-' + id);
+            const author = messageAuthorFromEl(el);
+            const text = messagePreviewFromEl(el);
+            return author + ': ' + text;
+        }).filter(Boolean);
+        if (!parts.length) return;
+        try {
+            await navigator.clipboard.writeText(parts.join('\n\n'));
+            toast('Скопировано', 'success');
+        } catch (e) {
+            toast('Не удалось скопировать', 'error');
+        }
+    });
+
+    /* Свайп вправо → ответ (как в Telegram) */
+    (() => {
+        const feedEl = document.getElementById('chat-feed');
+        if (!feedEl) return;
+        let swipe = null;
+        feedEl.addEventListener('touchstart', (e) => {
+            if (selectedMessageIds.size > 0) return;
+            const msg = e.target.closest?.('.bx-msg:not(.bx-msg--system)');
+            if (!msg || e.target.closest?.('button,a,.bx-voice,.bx-msg__reply')) return;
+            const t = e.touches?.[0];
+            if (!t) return;
+            swipe = { msg, x: t.clientX, y: t.clientY, dx: 0, active: false };
+        }, { passive: true });
+        feedEl.addEventListener('touchmove', (e) => {
+            if (!swipe) return;
+            const t = e.touches?.[0];
+            if (!t) return;
+            const dx = t.clientX - swipe.x;
+            const dy = t.clientY - swipe.y;
+            if (!swipe.active) {
+                if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx)) {
+                    swipe = null;
+                    return;
+                }
+                if (dx > 14 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                    swipe.active = true;
+                    swipe.msg.classList.add('is-swiping');
+                } else {
+                    return;
+                }
+            }
+            swipe.dx = Math.max(0, Math.min(72, dx));
+            swipe.msg.style.transform = 'translateX(' + swipe.dx + 'px)';
+        }, { passive: true });
+        const endSwipe = () => {
+            if (!swipe) return;
+            const { msg, dx, active } = swipe;
+            swipe = null;
+            msg.classList.remove('is-swiping');
+            msg.style.transform = '';
+            if (active && dx > 48) {
+                const id = Number(String(msg.id || '').replace('chat-msg-', ''));
+                startReplyTo({
+                    id,
+                    author: messageAuthorFromEl(msg),
+                    preview: messagePreviewFromEl(msg),
+                });
+                try { navigator.vibrate?.(12); } catch (err) {}
+            }
+        };
+        feedEl.addEventListener('touchend', endSwipe);
+        feedEl.addEventListener('touchcancel', endSwipe);
+    })();
+
     const removeMessagesFromDom = (ids) => {
         (ids || []).forEach((id) => {
             document.getElementById('chat-msg-' + id)?.remove();
@@ -1769,6 +1941,22 @@
         forwardSheet?.removeAttribute('hidden');
         const searchInput = document.getElementById('bx-forward-search');
         if (searchInput) searchInput.value = '';
+        const title = document.getElementById('bx-forward-title');
+        if (title) title.textContent = selectedMessageIds.size === 1
+            ? 'Переслать сообщение'
+            : ('Переслать · ' + selectedMessageIds.size);
+        if (forwardPreview) {
+            const ids = [...selectedMessageIds].sort((a, b) => a - b).slice(0, 6);
+            forwardPreview.hidden = false;
+            forwardPreview.innerHTML = ids.map((id) => {
+                const el = document.getElementById('chat-msg-' + id);
+                const author = escapeHtml(messageAuthorFromEl(el));
+                const text = escapeHtml(messagePreviewFromEl(el));
+                return `<div class="bx-forward-preview__item"><strong>${author}</strong><span>${text}</span></div>`;
+            }).join('') + (selectedMessageIds.size > 6
+                ? `<div class="bx-forward-preview__more">и ещё ${selectedMessageIds.size - 6}</div>`
+                : '');
+        }
         if (forwardChats) forwardChats.textContent = 'Загрузка чатов…';
         try {
             const response = await fetch(pickerUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
@@ -2229,6 +2417,8 @@
         }
         if (parentInput) parentInput.value = '';
         replyBanner?.classList.add('d-none');
+        if (replyPreview) replyPreview.textContent = '';
+        replyBanner?.removeAttribute('data-reply-id');
         if (taskIdInput) taskIdInput.value = '';
         taskPicked?.classList.add('d-none');
         if (taskPicked) taskPicked.innerHTML = '';

@@ -48,14 +48,32 @@
 
     <div class="bx-msg__bubble">
         @if($message->parent)
-            <div class="bx-msg__reply">
-                @if($message->parent->trashed())
-                    Ответ на удалённое сообщение
-                @else
-                    Ответ на {{ $message->parent->user?->displayName() }}:
-                    {{ \Illuminate\Support\Str::limit(strip_tags($message->parent->plain_text ?? ''), 70) }}
-                @endif
-            </div>
+            @if($message->parent->trashed())
+                <div class="bx-msg__reply bx-msg__reply--deleted">
+                    <span class="bx-msg__reply-bar" aria-hidden="true"></span>
+                    <span class="bx-msg__reply-content">
+                        <span class="bx-msg__reply-author">Удалённое сообщение</span>
+                        <span class="bx-msg__reply-text">Оригинал недоступен</span>
+                    </span>
+                </div>
+            @else
+                @php
+                    $replyPreview = trim(strip_tags((string) ($message->parent->plain_text ?? '')));
+                    if ($replyPreview === '') {
+                        $replyPreview = 'Сообщение';
+                    }
+                @endphp
+                <button type="button"
+                        class="bx-msg__reply"
+                        data-goto-msg="{{ $message->parent->id }}"
+                        title="Перейти к сообщению">
+                    <span class="bx-msg__reply-bar" aria-hidden="true"></span>
+                    <span class="bx-msg__reply-content">
+                        <span class="bx-msg__reply-author">{{ $message->parent->user?->displayName() ?? 'Участник' }}</span>
+                        <span class="bx-msg__reply-text">{{ \Illuminate\Support\Str::limit($replyPreview, 90) }}</span>
+                    </span>
+                </button>
+            @endif
         @endif
 
         @if($message->forwarded_from_message_id)
@@ -169,12 +187,30 @@
 
         <div class="bx-msg__footer">
             @unless($message->is_system)
-                <button type="button"
-                        class="bx-msg__reply-btn"
-                        data-parent-id="{{ $message->id }}"
-                        data-author="{{ $message->user?->displayName() ?? 'участник' }}">
-                    Ответить
-                </button>
+                @php
+                    $quickPreview = trim(strip_tags((string) ($message->plain_text ?? '')));
+                    if ($quickPreview === '') {
+                        $quickPreview = $message->attachment?->isNotEmpty() ? 'Вложение' : 'Сообщение';
+                    }
+                @endphp
+                <div class="bx-msg__actions">
+                    <button type="button"
+                            class="bx-msg__action bx-msg__reply-btn"
+                            data-parent-id="{{ $message->id }}"
+                            data-author="{{ $message->user?->displayName() ?? 'участник' }}"
+                            data-preview="{{ \Illuminate\Support\Str::limit($quickPreview, 120) }}"
+                            title="Ответить">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><path d="M15 15l5-5-5-5"/><path d="M20 10H11"/></svg>
+                        <span>Ответить</span>
+                    </button>
+                    <button type="button"
+                            class="bx-msg__action bx-msg__forward-btn"
+                            data-message-id="{{ $message->id }}"
+                            title="Переслать">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
+                        <span>Переслать</span>
+                    </button>
+                </div>
             @endunless
 
             @if($mine && $readStatus)
