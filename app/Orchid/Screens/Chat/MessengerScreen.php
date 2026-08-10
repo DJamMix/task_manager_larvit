@@ -116,8 +116,7 @@ class MessengerScreen extends Screen
             $pivot = $resolved->members->firstWhere('id', $user->id)?->pivot;
             $isMuted = (bool) ($pivot?->is_muted ?? false);
             $isPinned = (bool) ($pivot?->is_pinned ?? false);
-            $canEditChat = $resolved->type !== 'direct'
-                && ($resolved->isOwner($user->id) || $chats->canCreate($user));
+            $canEditChat = $chats->canManageGroup($resolved, $user);
 
             try {
                 $chats->assertCanWriteInChat($resolved, $user);
@@ -200,8 +199,7 @@ class MessengerScreen extends Screen
                 ->class('d-none bx-orchid-modal-toggle');
         }
 
-        if ($this->chat?->exists && $this->chat->type !== 'direct'
-            && ($this->chat->isOwner() || $this->can_create)) {
+        if ($this->chat?->exists && $this->can_edit_chat) {
             $buttons[] = ModalToggle::make('Изменить')
                 ->modal('editChatModal')
                 ->method('saveChat')

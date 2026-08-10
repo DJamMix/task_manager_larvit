@@ -1056,17 +1056,11 @@ class ChatService
 
     public function updateChat(Chat $chat, User $actor, array $data): Chat
     {
-        if ($chat->type === 'direct') {
-            abort(422, 'Личный чат нельзя редактировать');
-        }
-
-        if (!$chat->isOwner($actor->id) && !$actor->hasAccess('platform.systems.chats.create')) {
-            abort(403);
-        }
+        $this->assertCanManageGroup($chat, $actor);
 
         $chat->fill([
             'title' => $data['title'] ?? $chat->title,
-            'description' => $data['description'] ?? $chat->description,
+            'description' => array_key_exists('description', $data) ? $data['description'] : $chat->description,
             'avatar_path' => array_key_exists('avatar_path', $data) ? $data['avatar_path'] : $chat->avatar_path,
         ])->save();
 
@@ -1075,15 +1069,30 @@ class ChatService
         return $chat->fresh(['members']);
     }
 
-    public function deleteGroup(Chat $chat, User $actor): void
+    public function uploadChatAvatar(Chat $chat, User $actor, \Illuminate\Http\UploadedFile $file): Chat
     {
-        if ($chat->type === 'direct') {
-            abort(422, 'Личный чат нельзя удалить');
+        $this->assertCanManageGroup($chat, $actor);
+
+        $path = $file->store('chat-avatars', 'public');
+        $publicPath = '/storage/'.$path;
+
+        if ($chat->avatar_path && str_starts_with((string) $chat->avatar_path, '/storage/chat-avatars/')) {
+            $relative = preg_replace('#^/storage/#', '', (string) $chat->avatar_path);
+            if ($relative && \Illuminate\Support\Facades\Storage::disk('public')->exists($relative)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($relative);
+            }
         }
 
-        if (!$chat->isOwner($actor->id) && !$actor->hasAccess('platform.systems.chats.create')) {
-            abort(403);
-        }
+        $chat->avatar_path = $publicPath;
+        $chat->save();
+        $this->postSystem($chat, $actor, "{$actor->displayName()} обновил(а) фото чата");
+
+        return $chat->fresh(['members']);
+    }
+
+    public function deleteGroup(Chat $chat, User $actor): void
+    {
+        $this->assertCanManageGroup($chat, $actor);
 
         DB::transaction(function () use ($chat) {
             $chat->loadMissing(['messages.attachment']);
@@ -1096,6 +1105,92 @@ class ChatService
 
             $chat->delete();
         });
+    }
+
+    /**
+     * @param  list<int>  $memberIds
+     */
+    public function addMembers(Chat $chat, User $actor, array $memberIds): Chat
+    {
+        $this->assertCanManageGroup($chat, $actor);
+
+        $ids = collect($memberIds)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->filter(fn ($id) => $id > 0 && $this->isChatMemberUserId($id))
+            ->reject(fn ($id) => $chat->isMember($id))
+            ->values();
+
+        foreach ($ids as $id) {
+            $chat->members()->attach($id, [
+                'role' => 'member',
+                'last_read_at' => now(),
+                'is_muted' => false,
+                'is_pinned' => false,
+            ]);
+        }
+
+        if ($ids->isNotEmpty()) {
+            $names = User::query()->whereIn('id', $ids)->get()
+                ->map(fn (User $u) => $u->displayName())
+                ->filter()
+                ->implode(', ');
+            $this->postSystem(
+                $chat,
+                $actor,
+                $names !== ''
+                    ? "{$actor->displayName()} добавил(а): {$names}"
+                    : "{$actor->displayName()} добавил(а) участников"
+            );
+        }
+
+        return $chat->fresh(['members']);
+    }
+
+    public function removeMember(Chat $chat, User $actor, int $memberId): Chat
+    {
+        $this->assertCanManageGroup($chat, $actor);
+
+        if ($chat->type === 'direct') {
+            abort(422, 'В личном чате состав нельзя менять');
+        }
+
+        $member = $chat->members()->where('users.id', $memberId)->first();
+        if (!$member) {
+            abort(404, 'Участник не найден');
+        }
+        if (($member->pivot->role ?? '') === 'owner' || (int) $memberId === (int) $chat->created_by) {
+            abort(422, 'Владельца нельзя удалить из чата');
+        }
+
+        $chat->members()->detach($memberId);
+        $this->postSystem(
+            $chat,
+            $actor,
+            "{$actor->displayName()} удалил(а) {$member->displayName()} из чата"
+        );
+
+        return $chat->fresh(['members']);
+    }
+
+    public function canManageGroup(Chat $chat, User $actor): bool
+    {
+        if ($chat->type === 'direct') {
+            return false;
+        }
+
+        return $chat->isOwner($actor->id) || $actor->hasAccess('platform.systems.chats.create');
+    }
+
+    protected function assertCanManageGroup(Chat $chat, User $actor): void
+    {
+        if ($chat->type === 'direct') {
+            abort(422, 'Личный чат нельзя редактировать');
+        }
+
+        if (!$this->canManageGroup($chat, $actor)) {
+            abort(403);
+        }
     }
 
     /**
@@ -1176,9 +1271,7 @@ class ChatService
      */
     public function syncMembers(Chat $chat, User $actor, array $memberIds): void
     {
-        if (!$chat->isOwner($actor->id) && !$actor->hasAccess('platform.systems.chats.create')) {
-            abort(403);
-        }
+        $this->assertCanManageGroup($chat, $actor);
 
         if ($chat->type === 'direct') {
             abort(422, 'В личном чате состав нельзя менять');
@@ -1190,6 +1283,15 @@ class ChatService
             ->unique()
             ->filter(fn ($id) => $this->isChatMemberUserId($id))
             ->values();
+
+        // Владелец всегда остаётся
+        $ownerIds = $chat->members()
+            ->wherePivot('role', 'owner')
+            ->pluck('users.id')
+            ->map(fn ($id) => (int) $id)
+            ->push((int) $chat->created_by)
+            ->unique();
+        $ids = $ids->merge($ownerIds)->unique()->values();
 
         $sync = [];
         foreach ($ids as $id) {

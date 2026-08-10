@@ -717,6 +717,108 @@ Route::delete('chats/calls/{call}/guest-link', function (
     return response()->json(['ok' => true]);
 })->name('platform.systems.chats.calls.guest.revoke');
 
+Route::post('chats/{chat}/settings', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $data = $request->validate([
+        'title' => 'required|string|max:120',
+        'description' => 'nullable|string|max:1000',
+    ]);
+    $updated = $chats->updateChat($chat, $request->user(), $data);
+
+    return response()->json([
+        'ok' => true,
+        'title' => $updated->displayTitle($request->user()->id),
+        'description' => (string) ($updated->description ?? ''),
+        'avatar_url' => $updated->avatarUrl($request->user()->id),
+    ]);
+})->name('platform.systems.chats.settings');
+
+Route::post('chats/{chat}/avatar', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $request->validate([
+        'avatar' => 'required|image|max:5120',
+    ]);
+    $updated = $chats->uploadChatAvatar($chat, $request->user(), $request->file('avatar'));
+
+    return response()->json([
+        'ok' => true,
+        'avatar_url' => $updated->avatarUrl($request->user()->id),
+        'avatar_initials' => $updated->avatarInitials($request->user()->id),
+        'avatar_color' => $updated->avatarColor($request->user()->id),
+    ]);
+})->name('platform.systems.chats.avatar');
+
+Route::post('chats/{chat}/members/add', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $data = $request->validate([
+        'member_ids' => 'required|array|min:1',
+        'member_ids.*' => 'integer',
+    ]);
+    $updated = $chats->addMembers($chat, $request->user(), $data['member_ids']);
+    $presence = $chats->presenceMap($updated->members->pluck('id'));
+
+    return response()->json([
+        'ok' => true,
+        'members' => $updated->members
+            ->sortBy(fn ($u) => mb_strtolower($u->displayName()))
+            ->values()
+            ->map(fn ($u) => [
+                'id' => (int) $u->id,
+                'name' => $u->displayName(),
+                'role' => (string) ($u->pivot->role ?? 'member'),
+                'position' => (string) ($u->position ?? ''),
+                'is_owner' => ($u->pivot->role ?? '') === 'owner',
+                'online' => !empty($presence[(int) $u->id]),
+                'avatar_url' => (string) $u->avatarUrl(),
+                'avatar_initials' => (string) $u->avatarInitials(),
+                'avatar_color' => (string) $u->avatarColor(),
+            ]),
+        'count' => $updated->members->count(),
+    ]);
+})->name('platform.systems.chats.members.add');
+
+Route::delete('chats/{chat}/members/{user}', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Models\User $user,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $updated = $chats->removeMember($chat, $request->user(), (int) $user->id);
+
+    return response()->json([
+        'ok' => true,
+        'removed_id' => (int) $user->id,
+        'count' => $updated->members->count(),
+    ]);
+})->name('platform.systems.chats.members.remove');
+
+Route::delete('chats/{chat}', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $chats->deleteGroup($chat, $request->user());
+
+    return response()->json([
+        'ok' => true,
+        'redirect' => route('platform.systems.chats'),
+    ]);
+})->name('platform.systems.chats.destroy');
+
 Route::post('chats/{chat}/pin', function (
     \Illuminate\Http\Request $request,
     \App\Models\Chat $chat,

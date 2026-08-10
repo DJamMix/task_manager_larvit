@@ -28,6 +28,12 @@
      data-first-unread="{{ $first_unread_id ?? '' }}"
      data-chats-picker-url="{{ $chats_picker_url ?? route('platform.systems.chats.picker') }}"
      data-media-url="{{ $chats_media_url ?? '' }}"
+     data-can-edit-chat="{{ !empty($can_edit_chat) ? '1' : '0' }}"
+     data-chat-settings-url="{{ ($active_chat_id ?? null) && !empty($can_edit_chat) ? route('platform.systems.chats.settings', $active_chat_id) : '' }}"
+     data-chat-avatar-url="{{ ($active_chat_id ?? null) && !empty($can_edit_chat) ? route('platform.systems.chats.avatar', $active_chat_id) : '' }}"
+     data-chat-members-add-url="{{ ($active_chat_id ?? null) && !empty($can_edit_chat) ? route('platform.systems.chats.members.add', $active_chat_id) : '' }}"
+     data-chat-member-remove-tpl="{{ ($active_chat_id ?? null) && !empty($can_edit_chat) ? str_replace('999999', '__ID__', route('platform.systems.chats.members.remove', ['chat' => $active_chat_id, 'user' => 999999])) : '' }}"
+     data-chat-destroy-url="{{ ($active_chat_id ?? null) && !empty($can_edit_chat) ? route('platform.systems.chats.destroy', $active_chat_id) : '' }}"
      data-vapid-key-url="{{ route('platform.web-push.vapid-key') }}"
      data-push-subscribe-url="{{ route('platform.web-push.subscribe') }}"
      data-push-unsubscribe-url="{{ route('platform.web-push.unsubscribe') }}"
@@ -275,6 +281,21 @@
                                 <span id="bx-notify-volume-label" class="bx-header-menu__pct">75%</span>
                             </div>
                             <div class="bx-header-menu__sep"></div>
+                            @if($canEditChat)
+                                <button type="button" class="bx-header-menu__item" id="bx-header-edit-chat">
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                    <span>Изменить группу</span>
+                                </button>
+                                <button type="button" class="bx-header-menu__item" id="bx-header-add-members">
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                                    <span>Добавить участников</span>
+                                </button>
+                                <button type="button" class="bx-header-menu__item bx-header-menu__item--danger" id="bx-header-delete-chat">
+                                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                                    <span>Удалить группу</span>
+                                </button>
+                                <div class="bx-header-menu__sep"></div>
+                            @endif
                             <div class="bx-push-settings" id="bx-push-settings">
                                 <div class="bx-header-menu__item bx-header-menu__item--static">
                                     <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
@@ -531,16 +552,24 @@
                                 'isOnline' => $presenceOnline($infoPeer?->id),
                             ])
                         @else
-                            @include('orchid.layouts.partials.bx-avatar', [
-                                'avatarChat' => $active,
-                                'avatarUser' => null,
-                                'size' => 'lg',
-                                'shape' => 'square',
-                            ])
+                            <div class="bx-chat-info__avatar-wrap {{ $canEditChat ? 'is-editable' : '' }}" id="bx-chat-info-avatar-wrap">
+                                @include('orchid.layouts.partials.bx-avatar', [
+                                    'avatarChat' => $active,
+                                    'avatarUser' => null,
+                                    'size' => 'lg',
+                                    'shape' => 'square',
+                                ])
+                                @if($canEditChat)
+                                    <button type="button" class="bx-chat-info__avatar-edit" id="bx-chat-avatar-btn" title="Сменить фото">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    </button>
+                                    <input type="file" id="bx-chat-avatar-input" class="d-none" accept="image/jpeg,image/png,image/webp,image/gif">
+                                @endif
+                            </div>
                         @endif
                         <div class="bx-chat-info__profile-meta">
                             <strong id="bx-chat-info-title">{{ $active->displayTitle() }}</strong>
-                            <span class="bx-chat-info__subtitle">
+                            <span class="bx-chat-info__subtitle" id="bx-chat-info-subtitle">
                                 @if($active->type === 'direct')
                                     {{ $presenceOnline($infoPeer?->id) ? 'в сети' : 'был(а) недавно' }}
                                 @else
@@ -554,12 +583,47 @@
                                                 ? 'участника'
                                                 : 'участников');
                                     @endphp
-                                    {{ $n }} {{ $membersWord }}
+                                    <span id="bx-chat-info-count">{{ $n }}</span> {{ $membersWord }}
                                 @endif
                             </span>
                         </div>
                     </div>
                 </div>
+
+                @if($active->type !== 'direct' && $canEditChat)
+                    <div class="bx-chat-info__actions">
+                        <button type="button" class="bx-chat-info__action" id="bx-chat-edit-open" title="Изменить">
+                            <span class="bx-chat-info__action-ico">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            </span>
+                            <span>Изменить</span>
+                        </button>
+                        <button type="button" class="bx-chat-info__action" id="bx-chat-add-members-open" title="Добавить">
+                            <span class="bx-chat-info__action-ico">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+                            </span>
+                            <span>Добавить</span>
+                        </button>
+                        <button type="button" class="bx-chat-info__action" data-bx-open-modal="editChatModal" title="Ещё">
+                            <span class="bx-chat-info__action-ico">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                            </span>
+                            <span>Ещё</span>
+                        </button>
+                    </div>
+                @endif
+
+                @if($active->type !== 'direct')
+                    <div class="bx-chat-info__about {{ trim((string) ($active->description ?? '')) === '' ? 'bx-chat-info__about--empty' : '' }}"
+                         id="bx-chat-info-about"
+                         @if(trim((string) ($active->description ?? '')) === '' && !$canEditChat) hidden @endif>
+                        <div class="bx-chat-info__about-label">Описание</div>
+                        <div class="bx-chat-info__about-text" id="bx-chat-info-description">
+                            {{ trim((string) ($active->description ?? '')) !== '' ? $active->description : ($canEditChat ? 'Нет описания — нажмите «Изменить»' : '') }}
+                        </div>
+                    </div>
+                @endif
+
                 <div class="bx-chat-info__tabs" role="tablist">
                     <button type="button" class="is-active" data-info-tab="members">Участники</button>
                     <button type="button" data-info-tab="media">Медиа</button>
@@ -570,7 +634,11 @@
                     <div class="bx-chat-info__pane is-active" data-info-pane="members">
                         <ul class="bx-members-modal__list" id="bx-members-list">
                             @foreach($active->members->sortBy(fn ($u) => mb_strtolower($u->displayName())) as $member)
-                                <li class="bx-members-modal__item" data-user-id="{{ $member->id }}">
+                                @php
+                                    $isOwnerMember = ($member->pivot?->role ?? '') === 'owner'
+                                        || (int) $member->id === (int) $active->created_by;
+                                @endphp
+                                <li class="bx-members-modal__item" data-user-id="{{ $member->id }}" data-is-owner="{{ $isOwnerMember ? '1' : '0' }}">
                                     @include('orchid.layouts.partials.bx-avatar', [
                                         'avatarUser' => $member,
                                         'avatarChat' => null,
@@ -583,10 +651,10 @@
                                         <div class="bx-members-modal__name">{{ $member->displayName() }}</div>
                                         <div class="bx-members-modal__status {{ $presenceOnline($member->id) ? 'is-online' : '' }}"
                                              data-online-label="в сети"
-                                             data-offline-label="{{ $member->pivot?->role === 'owner' ? 'владелец' : ($member->position ?: 'не в сети') }}">
+                                             data-offline-label="{{ $isOwnerMember ? 'владелец' : ($member->position ?: 'не в сети') }}">
                                             @if($presenceOnline($member->id))
                                                 в сети
-                                            @elseif($member->pivot?->role === 'owner')
+                                            @elseif($isOwnerMember)
                                                 владелец
                                             @elseif($member->position)
                                                 {{ $member->position }}
@@ -595,9 +663,25 @@
                                             @endif
                                         </div>
                                     </div>
+                                    @if($canEditChat && !$isOwnerMember)
+                                        <button type="button"
+                                                class="bx-members-modal__remove"
+                                                data-remove-member="{{ $member->id }}"
+                                                title="Удалить из чата"
+                                                aria-label="Удалить">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                                        </button>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>
+                        @if($canEditChat)
+                            <div class="bx-chat-info__danger">
+                                <button type="button" class="bx-chat-info__danger-btn" id="bx-chat-delete-btn">
+                                    Удалить группу
+                                </button>
+                            </div>
+                        @endif
                     </div>
                     <div class="bx-chat-info__pane" data-info-pane="gallery" hidden>
                         <div id="bx-media-content" class="bx-media-content">Загрузка…</div>
@@ -608,6 +692,46 @@
         </div>
     @endif
 </div>
+
+<div class="bx-sheet" id="bx-chat-edit-sheet" hidden>
+    <button type="button" class="bx-sheet__backdrop" id="bx-chat-edit-bg" aria-label="Закрыть"></button>
+    <div class="bx-sheet__panel bx-chat-edit__panel" role="dialog" aria-modal="true">
+        <div class="bx-sheet__head">
+            <strong>Изменить группу</strong>
+            <button type="button" class="bx-sheet__close" id="bx-chat-edit-close" aria-label="Закрыть">×</button>
+        </div>
+        <form id="bx-chat-edit-form" class="bx-chat-edit__form">
+            <label class="bx-chat-edit__avatar">
+                <span class="bx-chat-edit__avatar-preview" id="bx-chat-edit-avatar-preview"></span>
+                <span class="bx-chat-edit__avatar-label">Сменить фото</span>
+                <input type="file" id="bx-chat-edit-avatar-file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+            </label>
+            <label class="bx-chat-edit__field">
+                <span>Название</span>
+                <input type="text" id="bx-chat-edit-title" maxlength="120" required placeholder="Название группы" autocomplete="off">
+            </label>
+            <label class="bx-chat-edit__field">
+                <span>Описание</span>
+                <textarea id="bx-chat-edit-description" rows="3" maxlength="1000" placeholder="О чём эта группа"></textarea>
+            </label>
+            <button type="submit" class="bx-chat-edit__save" id="bx-chat-edit-save">Сохранить</button>
+        </form>
+    </div>
+</div>
+
+<div class="bx-sheet" id="bx-chat-add-sheet" hidden>
+    <button type="button" class="bx-sheet__backdrop" id="bx-chat-add-bg" aria-label="Закрыть"></button>
+    <div class="bx-sheet__panel bx-chat-add__panel" role="dialog" aria-modal="true">
+        <div class="bx-sheet__head">
+            <strong>Добавить участников</strong>
+            <button type="button" class="bx-sheet__close" id="bx-chat-add-close" aria-label="Закрыть">×</button>
+        </div>
+        <input type="search" id="bx-chat-add-search" class="bx-chat-add__search" placeholder="Поиск…" autocomplete="off">
+        <div id="bx-chat-add-list" class="bx-chat-add__list"></div>
+        <button type="button" class="bx-chat-edit__save" id="bx-chat-add-submit" disabled>Добавить</button>
+    </div>
+</div>
+<script type="application/json" id="bx-member-options-json">@json(collect($member_options ?? [])->map(fn ($label, $id) => ['id' => (int) $id, 'name' => (string) $label])->values())</script>
 
 {{-- Telegram-style message actions (long-press / context menu) --}}
 <div class="bx-sheet bx-msg-actions-sheet" id="bx-msg-actions" hidden>
@@ -1570,13 +1694,363 @@
             closeChatInfo();
         }
     });
-    document.querySelectorAll('[data-info-tab]').forEach((btn) => {
+    document.querySelectorAll('#bx-chat-info [data-info-tab]').forEach((btn) => {
         btn.addEventListener('click', () => switchInfoTab(btn.getAttribute('data-info-tab') || 'members'));
     });
     mediaMore?.addEventListener('click', () => {
         mediaPage++;
         loadMedia(false);
     });
+
+    /* Редактирование группы как в Telegram */
+    (() => {
+        if (root?.getAttribute('data-can-edit-chat') !== '1') return;
+        const csrfToken = root.getAttribute('data-csrf')
+            || document.querySelector('meta[name="csrf_token"]')?.content
+            || document.querySelector('meta[name="csrf-token"]')?.content
+            || document.querySelector('input[name="_token"]')?.value
+            || '';
+
+        const settingsUrl = root.getAttribute('data-chat-settings-url') || '';
+        const avatarUrl = root.getAttribute('data-chat-avatar-url') || '';
+        const addUrl = root.getAttribute('data-chat-members-add-url') || '';
+        const removeTpl = root.getAttribute('data-chat-member-remove-tpl') || '';
+        const destroyUrl = root.getAttribute('data-chat-destroy-url') || '';
+
+        const editSheet = document.getElementById('bx-chat-edit-sheet');
+        const addSheet = document.getElementById('bx-chat-add-sheet');
+        const titleInput = document.getElementById('bx-chat-edit-title');
+        const descInput = document.getElementById('bx-chat-edit-description');
+        const avatarPreview = document.getElementById('bx-chat-edit-avatar-preview');
+        const editAvatarFile = document.getElementById('bx-chat-edit-avatar-file');
+        const infoAvatarInput = document.getElementById('bx-chat-avatar-input');
+        const addList = document.getElementById('bx-chat-add-list');
+        const addSearch = document.getElementById('bx-chat-add-search');
+        const addSubmit = document.getElementById('bx-chat-add-submit');
+
+        let memberOptions = [];
+        try {
+            memberOptions = JSON.parse(document.getElementById('bx-member-options-json')?.textContent || '[]');
+        } catch (e) { memberOptions = []; }
+        const selectedAdd = new Set();
+
+        const jsonHeaders = () => ({
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+        });
+
+        const openSheet = (el) => el?.removeAttribute('hidden');
+        const closeSheet = (el) => el?.setAttribute('hidden', '');
+
+        const syncHeaderTitle = (title) => {
+            const el = document.getElementById('bx-chat-info-title');
+            if (el) el.textContent = title;
+            const head = document.querySelector('.bx-chat-identity__title, .bx-messenger__header strong');
+            if (head) head.textContent = title;
+            const listItem = document.querySelector('.bx-chat-item.is-active .bx-chat-item__title');
+            if (listItem) listItem.textContent = title;
+        };
+
+        const syncDescription = (text) => {
+            const about = document.getElementById('bx-chat-info-about');
+            const desc = document.getElementById('bx-chat-info-description');
+            if (!about || !desc) return;
+            const clean = String(text || '').trim();
+            about.hidden = false;
+            about.classList.toggle('bx-chat-info__about--empty', !clean);
+            desc.textContent = clean || 'Нет описания — нажмите «Изменить»';
+        };
+
+        const setAvatarPreview = (url, initials, color) => {
+            if (!avatarPreview) return;
+            if (url) {
+                avatarPreview.innerHTML = `<img src="${escapeHtml(url)}" alt="">`;
+                avatarPreview.style.background = '';
+            } else {
+                avatarPreview.textContent = initials || '#';
+                avatarPreview.style.background = color || '#64748b';
+            }
+        };
+
+        const applyAvatarToDom = (url) => {
+            const targets = [
+                document.querySelector('#bx-chat-info-avatar-wrap .bx-avatar'),
+                document.querySelector('.bx-chat-identity .bx-avatar'),
+                document.querySelector('.bx-chat-item.is-active .bx-avatar'),
+            ].filter(Boolean);
+            targets.forEach((av) => {
+                let img = av.querySelector('.bx-avatar__img');
+                if (url) {
+                    if (!img) {
+                        img = document.createElement('img');
+                        img.className = 'bx-avatar__img';
+                        img.alt = '';
+                        av.appendChild(img);
+                    }
+                    img.src = url;
+                }
+            });
+            if (avatarPreview && url) setAvatarPreview(url);
+        };
+
+        const uploadAvatar = async (file) => {
+            if (!file || !avatarUrl) return;
+            const fd = new FormData();
+            fd.append('avatar', file);
+            if (csrfToken) fd.append('_token', csrfToken);
+            const res = await fetch(avatarUrl, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}) },
+                credentials: 'same-origin',
+                body: fd,
+            });
+            if (!res.ok) throw new Error('avatar');
+            const data = await res.json();
+            applyAvatarToDom(data.avatar_url);
+            toast('Фото обновлено', 'success');
+        };
+
+        const openEdit = () => {
+            const title = document.getElementById('bx-chat-info-title')?.textContent?.trim() || '';
+            const descEl = document.getElementById('bx-chat-info-description');
+            let desc = descEl?.textContent?.trim() || '';
+            if (desc.startsWith('Нет описания')) desc = '';
+            if (titleInput) titleInput.value = title;
+            if (descInput) descInput.value = desc;
+            const infoAv = document.querySelector('#bx-chat-info-avatar-wrap .bx-avatar');
+            const img = infoAv?.querySelector('.bx-avatar__img')?.getAttribute('src');
+            const initials = infoAv?.querySelector('.bx-avatar__initials')?.textContent || '#';
+            const color = getComputedStyle(infoAv || document.body).getPropertyValue('--bx-avatar-bg').trim() || '#64748b';
+            setAvatarPreview(img, initials, color);
+            openSheet(editSheet);
+        };
+
+        const membersWord = (n) => {
+            const mod10 = n % 10;
+            const mod100 = n % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'участник';
+            if (mod10 >= 2 && mod10 <= 4 && ![12, 13, 14].includes(mod100)) return 'участника';
+            return 'участников';
+        };
+
+        const renderMembers = (members) => {
+            const list = document.getElementById('bx-members-list');
+            if (!list || !Array.isArray(members)) return;
+            const selfId = String(root.getAttribute('data-self-id') || '');
+            list.innerHTML = members.map((m) => {
+                const online = !!m.online;
+                const owner = !!m.is_owner;
+                const status = online ? 'в сети' : (owner ? 'владелец' : (m.position || 'не в сети'));
+                const img = m.avatar_url
+                    ? `<img class="bx-avatar__img" src="${escapeHtml(m.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`
+                    : '';
+                const removeBtn = (!owner)
+                    ? `<button type="button" class="bx-members-modal__remove" data-remove-member="${m.id}" title="Удалить из чата" aria-label="Удалить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`
+                    : '';
+                return `<li class="bx-members-modal__item" data-user-id="${m.id}" data-is-owner="${owner ? '1' : '0'}">
+                    <div class="bx-avatar-wrap" data-user-id="${m.id}">
+                        <span class="bx-avatar bx-avatar--md bx-avatar--round" style="--bx-avatar-bg:${escapeHtml(m.avatar_color || '#64748b')}">
+                            <span class="bx-avatar__initials">${escapeHtml(m.avatar_initials || '?')}</span>${img}
+                        </span>
+                        <span class="bx-online-dot ${online ? '' : 'd-none'}"></span>
+                    </div>
+                    <div class="bx-members-modal__meta">
+                        <div class="bx-members-modal__name">${escapeHtml(m.name || 'Участник')}${String(m.id) === selfId ? ' (вы)' : ''}</div>
+                        <div class="bx-members-modal__status ${online ? 'is-online' : ''}" data-online-label="в сети" data-offline-label="${escapeHtml(owner ? 'владелец' : (m.position || 'не в сети'))}">${escapeHtml(status)}</div>
+                    </div>
+                    ${removeBtn}
+                </li>`;
+            }).join('');
+            const countEl = document.getElementById('bx-chat-info-count');
+            const sub = document.getElementById('bx-chat-info-subtitle');
+            if (countEl) countEl.textContent = String(members.length);
+            else if (sub) sub.innerHTML = `<span id="bx-chat-info-count">${members.length}</span> ${membersWord(members.length)}`;
+        };
+
+        const currentMemberIds = () => [...document.querySelectorAll('#bx-members-list [data-user-id]')]
+            .map((el) => Number(el.getAttribute('data-user-id')))
+            .filter(Boolean);
+
+        const renderAddList = (query = '') => {
+            if (!addList) return;
+            const q = query.trim().toLowerCase();
+            const existing = new Set(currentMemberIds());
+            const items = memberOptions.filter((o) => !existing.has(Number(o.id))
+                && (!q || String(o.name || '').toLowerCase().includes(q)));
+            if (!items.length) {
+                addList.innerHTML = '<div class="bx-shared-empty">Никого не найдено</div>';
+                return;
+            }
+            addList.innerHTML = items.map((o) => {
+                const on = selectedAdd.has(Number(o.id));
+                return `<button type="button" class="bx-chat-add__item ${on ? 'is-on' : ''}" data-add-id="${o.id}">
+                    <span class="bx-chat-add__item-name">${escapeHtml(o.name || 'Участник')}</span>
+                    <span class="bx-chat-add__check" aria-hidden="true"></span>
+                </button>`;
+            }).join('');
+        };
+
+        const openAdd = () => {
+            selectedAdd.clear();
+            if (addSearch) addSearch.value = '';
+            renderAddList();
+            if (addSubmit) addSubmit.disabled = true;
+            openSheet(addSheet);
+        };
+
+        const destroyChat = async () => {
+            if (!destroyUrl) return;
+            const ok = window.confirm('Удалить групповой чат безвозвратно? Сообщения и файлы будут удалены.');
+            if (!ok) return;
+            try {
+                const res = await fetch(destroyUrl, {
+                    method: 'DELETE',
+                    headers: jsonHeaders(),
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error('fail');
+                const data = await res.json();
+                toast('Чат удалён', 'success');
+                window.location.href = data.redirect || '/admin/chats';
+            } catch (e) {
+                toast('Не удалось удалить чат', 'error');
+            }
+        };
+
+        document.getElementById('bx-chat-edit-open')?.addEventListener('click', openEdit);
+        document.getElementById('bx-header-edit-chat')?.addEventListener('click', () => {
+            document.getElementById('bx-header-menu-drop')?.setAttribute('hidden', '');
+            openEdit();
+        });
+        document.getElementById('bx-chat-add-members-open')?.addEventListener('click', openAdd);
+        document.getElementById('bx-header-add-members')?.addEventListener('click', () => {
+            document.getElementById('bx-header-menu-drop')?.setAttribute('hidden', '');
+            openAdd();
+        });
+        document.getElementById('bx-chat-delete-btn')?.addEventListener('click', destroyChat);
+        document.getElementById('bx-header-delete-chat')?.addEventListener('click', () => {
+            document.getElementById('bx-header-menu-drop')?.setAttribute('hidden', '');
+            destroyChat();
+        });
+
+        document.getElementById('bx-chat-edit-close')?.addEventListener('click', () => closeSheet(editSheet));
+        document.getElementById('bx-chat-edit-bg')?.addEventListener('click', () => closeSheet(editSheet));
+        document.getElementById('bx-chat-add-close')?.addEventListener('click', () => closeSheet(addSheet));
+        document.getElementById('bx-chat-add-bg')?.addEventListener('click', () => closeSheet(addSheet));
+
+        document.getElementById('bx-chat-avatar-btn')?.addEventListener('click', () => infoAvatarInput?.click());
+        infoAvatarInput?.addEventListener('change', async () => {
+            const file = infoAvatarInput.files?.[0];
+            infoAvatarInput.value = '';
+            if (!file) return;
+            try { await uploadAvatar(file); } catch (e) { toast('Не удалось загрузить фото', 'error'); }
+        });
+        editAvatarFile?.addEventListener('change', async () => {
+            const file = editAvatarFile.files?.[0];
+            if (!file) return;
+            if (avatarPreview) {
+                const url = URL.createObjectURL(file);
+                setAvatarPreview(url);
+            }
+            try { await uploadAvatar(file); } catch (e) { toast('Не удалось загрузить фото', 'error'); }
+            editAvatarFile.value = '';
+        });
+
+        document.getElementById('bx-chat-edit-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!settingsUrl) return;
+            const title = (titleInput?.value || '').trim();
+            if (!title) {
+                toast('Укажите название', 'error');
+                return;
+            }
+            const saveBtn = document.getElementById('bx-chat-edit-save');
+            if (saveBtn) saveBtn.disabled = true;
+            try {
+                const res = await fetch(settingsUrl, {
+                    method: 'POST',
+                    headers: { ...jsonHeaders(), 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        title,
+                        description: (descInput?.value || '').trim(),
+                        _token: csrfToken,
+                    }),
+                });
+                if (!res.ok) throw new Error('fail');
+                const data = await res.json();
+                syncHeaderTitle(data.title || title);
+                syncDescription(data.description || '');
+                closeSheet(editSheet);
+                toast('Сохранено', 'success');
+            } catch (err) {
+                toast('Не удалось сохранить', 'error');
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
+            }
+        });
+
+        addSearch?.addEventListener('input', () => renderAddList(addSearch.value));
+        addList?.addEventListener('click', (e) => {
+            const btn = e.target.closest?.('[data-add-id]');
+            if (!btn) return;
+            const id = Number(btn.getAttribute('data-add-id'));
+            if (!id) return;
+            if (selectedAdd.has(id)) selectedAdd.delete(id);
+            else selectedAdd.add(id);
+            btn.classList.toggle('is-on', selectedAdd.has(id));
+            if (addSubmit) addSubmit.disabled = selectedAdd.size === 0;
+        });
+        addSubmit?.addEventListener('click', async () => {
+            if (!addUrl || !selectedAdd.size) return;
+            addSubmit.disabled = true;
+            try {
+                const res = await fetch(addUrl, {
+                    method: 'POST',
+                    headers: { ...jsonHeaders(), 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ member_ids: [...selectedAdd], _token: csrfToken }),
+                });
+                if (!res.ok) throw new Error('fail');
+                const data = await res.json();
+                renderMembers(data.members || []);
+                closeSheet(addSheet);
+                toast('Участники добавлены', 'success');
+            } catch (e) {
+                toast('Не удалось добавить', 'error');
+                addSubmit.disabled = false;
+            }
+        });
+
+        document.getElementById('bx-members-list')?.addEventListener('click', async (e) => {
+            const btn = e.target.closest?.('[data-remove-member]');
+            if (!btn) return;
+            const id = btn.getAttribute('data-remove-member');
+            const url = (removeTpl || '').replace('__ID__', String(id));
+            if (!url || url.includes('__ID__')) return;
+            const name = btn.closest('.bx-members-modal__item')?.querySelector('.bx-members-modal__name')?.textContent?.trim() || 'участника';
+            if (!window.confirm('Удалить ' + name + ' из чата?')) return;
+            try {
+                const res = await fetch(url, {
+                    method: 'DELETE',
+                    headers: jsonHeaders(),
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.message || 'fail');
+                }
+                const data = await res.json();
+                document.querySelector('#bx-members-list [data-user-id="' + id + '"]')?.remove();
+                const countEl = document.getElementById('bx-chat-info-count');
+                if (countEl && data.count != null) countEl.textContent = String(data.count);
+                toast('Участник удалён', 'success');
+            } catch (err) {
+                toast(err.message && err.message !== 'fail' ? err.message : 'Не удалось удалить', 'error');
+            }
+        });
+    })();
 
     /* Меню настроек (шестерёнка) */
     const gearBtn = document.getElementById('bx-header-gear');
@@ -2783,7 +3257,7 @@
         if (typeof hasFeedTextSelection === 'function' && hasFeedTextSelection()) return true;
         const ae = document.activeElement;
         if (!ae || ae === input) return false;
-        if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden]), .ui-choice-overlay, .ui-toast-root')) return true;
+        if (ae.closest?.('.modal.show, .modal[open], .bx-chat-info:not([hidden]), #bx-forward-sheet:not([hidden]), #bx-chat-edit-sheet:not([hidden]), #bx-chat-add-sheet:not([hidden]), .ui-choice-overlay, .ui-toast-root')) return true;
         if (ae.id === 'bx-chat-search' || ae.closest?.('#bx-chat-search, .bx-forward-search, .bx-task-search, .bx-selection-bar')) return true;
         if (ae.matches?.('input:not([type="hidden"]):not([type="file"]):not(#bx-composer-input), textarea:not(#bx-composer-input), select, [contenteditable="true"]:not(#bx-composer-input)')) return true;
         const gearDrop = document.getElementById('bx-header-menu-drop');
