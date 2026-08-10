@@ -25,21 +25,50 @@
     }
 
     $isVoiceAttachment = function ($file): bool {
+        // Голосовые всегда помечаются group=voice при записи из мессенджера.
+        // Обычные видео/файлы (.mp4, .webm) сюда попадать не должны — иначе
+        // плеер качает весь ролик в RAM и чат «трясётся».
         if (($file->group ?? '') === 'voice') {
             return true;
         }
         $mime = strtolower((string) ($file->mime ?? ''));
-        if (str_starts_with($mime, 'audio/') || $mime === 'video/mp4') {
+        if (str_starts_with($mime, 'video/')) {
+            return false;
+        }
+        $name = strtolower((string) ($file->original_name ?? ''));
+        if (str_starts_with($name, 'voice.')) {
+            return true;
+        }
+        if (str_starts_with($mime, 'audio/')) {
             return true;
         }
         $ext = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
 
-        return in_array($ext, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'mp4', 'wav', 'aac', 'opus'], true);
+        return in_array($ext, ['ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true);
+    };
+
+    $isVideoAttachment = function ($file) use ($isVoiceAttachment): bool {
+        if ($isVoiceAttachment($file)) {
+            return false;
+        }
+        $mime = strtolower((string) ($file->mime ?? ''));
+        if (str_starts_with($mime, 'video/')) {
+            return true;
+        }
+        $ext = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
+
+        return in_array($ext, ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'], true);
     };
 
     $quickPreview = trim(strip_tags((string) ($message->plain_text ?? '')));
     if ($quickPreview === '') {
-        $quickPreview = $message->attachment?->isNotEmpty() ? 'Вложение' : 'Сообщение';
+        if ($message->attachment?->isNotEmpty()) {
+            $hasVideo = $message->attachment->contains(fn ($f) => $isVideoAttachment($f));
+            $hasVoice = $message->attachment->contains(fn ($f) => $isVoiceAttachment($f));
+            $quickPreview = $hasVideo ? 'Видео' : ($hasVoice ? 'Голосовое сообщение' : 'Вложение');
+        } else {
+            $quickPreview = 'Сообщение';
+        }
     }
 @endphp
 <article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }} {{ $isForwarded ? 'bx-msg--forwarded' : '' }} {{ ($message->user?->is_bot && ! $message->is_system) ? 'bx-msg--bot' : '' }}"
@@ -217,6 +246,7 @@
                         $fileExt = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
                         $isImage = str_starts_with($fileMime, 'image/')
                             || in_array($fileExt, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+                        $isVideo = $isVideoAttachment($file);
                         $fileUrl = route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]);
                         $downloadUrl = route('platform.task.attachment.download', $file);
                     @endphp
@@ -234,6 +264,15 @@
                                  decoding="async"
                                  style="width:96px;height:96px;object-fit:cover;object-position:center;display:block;">
                         </a>
+                    @elseif($isVideo)
+                        <div class="bx-msg__video">
+                            <video controls
+                                   preload="metadata"
+                                   playsinline
+                                   src="{{ $fileUrl }}"
+                                   title="{{ $file->original_name }}"></video>
+                            <a href="{{ $downloadUrl }}" class="bx-msg__video-name" download title="Скачать">{{ $file->original_name }}</a>
+                        </div>
                     @else
                         <a href="{{ $downloadUrl }}" class="badge text-bg-light border text-decoration-none">
                             {{ $file->original_name }}

@@ -1093,6 +1093,7 @@
         if (fromBtn) return fromBtn;
         const body = (msgEl.querySelector('.bx-msg__body')?.innerText || '').replace(/\s+/g, ' ').trim();
         if (body) return body.slice(0, 120);
+        if (msgEl.querySelector('.bx-msg__video')) return 'Видео';
         if (msgEl.querySelector('.bx-voice')) return 'Голосовое сообщение';
         if (msgEl.querySelector('.bx-msg__image, .bx-msg__files')) return 'Вложение';
         return 'Сообщение';
@@ -2793,9 +2794,18 @@
 
     const analyzeVoiceBars = async (url, count) => {
         try {
-            const res = await fetch(url, { credentials: 'same-origin' });
-            if (!res.ok) throw new Error('fetch');
+            const head = await fetch(url, { method: 'HEAD', credentials: 'same-origin' }).catch(() => null);
+            const len = parseInt(head?.headers?.get('Content-Length') || '0', 10) || 0;
+            // Не анализируем крупные файлы (видео, ошибочно попавшие в voice)
+            if (len > 2.5 * 1024 * 1024) return seededBars(url, count);
+
+            const res = await fetch(url, {
+                credentials: 'same-origin',
+                headers: len ? undefined : { Range: 'bytes=0-1048575' },
+            });
+            if (!res.ok && res.status !== 206) throw new Error('fetch');
             const buf = await res.arrayBuffer();
+            if (!buf || buf.byteLength > 3 * 1024 * 1024) return seededBars(url, count);
             const Ctx = window.AudioContext || window.webkitAudioContext;
             if (!Ctx) throw new Error('ctx');
             const ctx = new Ctx();
@@ -2833,17 +2843,31 @@
     const ensureVoiceBlobSrc = async (wrap, audio, src) => {
         if (wrap.getAttribute('data-blob-ready') === '1') return true;
         try {
+            const head = await fetch(src, { method: 'HEAD', credentials: 'same-origin' }).catch(() => null);
+            const len = parseInt(head?.headers?.get('Content-Length') || '0', 10) || 0;
+            if (len > 4 * 1024 * 1024) {
+                // Слишком большой для remux — играем по прямой ссылке
+                audio.src = src;
+                wrap.setAttribute('data-blob-ready', '1');
+                return true;
+            }
+
             const res = await fetch(src, { credentials: 'same-origin' });
             if (!res.ok) throw new Error('fetch ' + res.status);
             const buf = await res.arrayBuffer();
             if (!buf || buf.byteLength < 64) throw new Error('empty');
-            const head = new Uint8Array(buf.slice(0, 16));
+            if (buf.byteLength > 4 * 1024 * 1024) {
+                audio.src = src;
+                wrap.setAttribute('data-blob-ready', '1');
+                return true;
+            }
+            const headBytes = new Uint8Array(buf.slice(0, 16));
             let type = (res.headers.get('Content-Type') || '').split(';')[0].trim();
-            if (head[0] === 0x52 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x46) {
+            if (headBytes[0] === 0x52 && headBytes[1] === 0x49 && headBytes[2] === 0x46 && headBytes[3] === 0x46) {
                 type = 'audio/wav';
-            } else if (head[0] === 0x4F && head[1] === 0x67 && head[2] === 0x67 && head[3] === 0x53) {
+            } else if (headBytes[0] === 0x4F && headBytes[1] === 0x67 && headBytes[2] === 0x67 && headBytes[3] === 0x53) {
                 type = 'audio/ogg';
-            } else if (head[0] === 0x1A && head[1] === 0x45 && head[2] === 0xDF && head[3] === 0xA3) {
+            } else if (headBytes[0] === 0x1A && headBytes[1] === 0x45 && headBytes[2] === 0xDF && headBytes[3] === 0xA3) {
                 type = 'audio/webm';
             } else if (!type || type === 'application/octet-stream' || type === 'text/html') {
                 type = 'audio/wav';

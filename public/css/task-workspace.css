@@ -4491,6 +4491,30 @@ body.bx-messenger-page .command-bar {
 
 .bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; align-items: flex-start; }
 
+.bx-msg__video {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-width: min(100%, 360px);
+    width: 100%;
+}
+.bx-msg__video video {
+    display: block;
+    width: 100%;
+    max-height: 280px;
+    border-radius: 12px;
+    background: #0f172a;
+    object-fit: contain;
+}
+.bx-msg__video-name {
+    font-size: 0.78rem;
+    color: inherit;
+    opacity: 0.75;
+    text-decoration: none;
+    word-break: break-word;
+}
+.bx-msg__video-name:hover { opacity: 1; text-decoration: underline; }
+
 .bx-messenger .bx-msg__image,
 .bx-msg__image {
     display: block !important;

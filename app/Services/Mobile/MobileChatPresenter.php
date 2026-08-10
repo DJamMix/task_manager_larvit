@@ -47,9 +47,19 @@ final class MobileChatPresenter
             $group = strtolower((string) ($file->group ?? ''));
             $ext = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
             $isVoice = $group === 'voice'
-                || str_starts_with($mime, 'audio/')
-                || in_array($ext, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true);
+                || str_starts_with($name = strtolower((string) ($file->original_name ?? '')), 'voice.')
+                || (
+                    ! str_starts_with($mime, 'video/')
+                    && (
+                        str_starts_with($mime, 'audio/')
+                        || in_array($ext, ['ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true)
+                    )
+                );
             $isImage = str_starts_with($mime, 'image/');
+            $isVideo = ! $isVoice && (
+                str_starts_with($mime, 'video/')
+                || in_array($ext, ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'], true)
+            );
 
             $url = url('/api/mobile/attachments/' . $file->id . '?inline=1');
             if ($token) {
@@ -60,7 +70,7 @@ final class MobileChatPresenter
                 'id' => (int) $file->id,
                 'name' => (string) $file->original_name,
                 'mime' => $mime,
-                'kind' => $isVoice ? 'voice' : ($isImage ? 'image' : 'file'),
+                'kind' => $isVoice ? 'voice' : ($isImage ? 'image' : ($isVideo ? 'video' : 'file')),
                 'url' => $url,
             ];
         }

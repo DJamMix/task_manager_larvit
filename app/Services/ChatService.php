@@ -448,17 +448,30 @@ class ChatService
                 $extension = strtolower((string) ($file->extension ?? pathinfo((string) $file->original_name, PATHINFO_EXTENSION)));
                 $group = strtolower((string) ($file->group ?? ''));
                 $isVoice = $group === 'voice'
-                    || str_starts_with($mime, 'audio/')
-                    || in_array($extension, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true)
-                    || str_starts_with(strtolower((string) $file->original_name), 'voice.');
+                    || str_starts_with(strtolower((string) $file->original_name), 'voice.')
+                    || (
+                        ! str_starts_with($mime, 'video/')
+                        && (
+                            str_starts_with($mime, 'audio/')
+                            || in_array($extension, ['ogg', 'oga', 'mp3', 'm4a', 'wav', 'aac', 'opus'], true)
+                        )
+                    );
                 $isImage = str_starts_with($mime, 'image/')
                     || in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'], true);
+                $isVideo = ! $isVoice && (
+                    str_starts_with($mime, 'video/')
+                    || in_array($extension, ['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'], true)
+                );
 
                 if ($isVoice) {
                     continue;
                 }
 
-                if (($tab === 'media') !== $isImage) {
+                if ($tab === 'media') {
+                    if (! $isImage && ! $isVideo) {
+                        continue;
+                    }
+                } elseif ($isImage || $isVideo) {
                     continue;
                 }
 
