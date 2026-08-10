@@ -179,7 +179,7 @@ class BoardScreen extends Screen
                 ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'planned' THEN 1 ELSE 2 END")
                 ->orderByDesc('id')
                 ->limit(40)
-                ->get(['id', 'name', 'status', 'board_id', 'starts_at', 'ends_at']),
+                ->get(['id', 'name', 'status', 'board_id', 'start_date', 'end_date']),
             'active_sprint' => $sprint,
             'columns' => $columns,
             'filters' => $filters,
