@@ -64,9 +64,15 @@
     <div class="task-workspace__grid">
         <section class="task-workspace__main">
             <div class="tw-card tw-description-card">
-                <div class="fw-semibold mb-2">Описание</div>
-                <div class="tw-description">
-                    {!! $task->description ?: '<span class="text-muted">Описание не заполнено</span>' !!}
+                <div class="tw-description-card__head">
+                    <div class="tw-description-card__title">Описание</div>
+                </div>
+                <div class="tw-description {{ filled($task->description) ? '' : 'tw-description--empty' }}">
+                    @if(filled($task->description))
+                        {!! $task->description !!}
+                    @else
+                        <span class="tw-description__placeholder">Описание не заполнено</span>
+                    @endif
                 </div>
             </div>
         </section>
@@ -333,40 +339,53 @@
                             <div>Ответ для <strong id="tw-reply-author"></strong></div>
                             <button type="button" class="btn btn-sm btn-link" id="tw-reply-cancel">Отмена</button>
                         </div>
-                        <div class="tw-composer__editor-wrap" id="tw-composer-editor-wrap">
-                            <div id="tw-quill-toolbar">
-                                <span class="ql-formats">
-                                    <button type="button" class="ql-bold"></button>
-                                    <button type="button" class="ql-italic"></button>
-                                    <button type="button" class="ql-underline"></button>
-                                    <button type="button" class="ql-strike"></button>
-                                </span>
-                                <span class="ql-formats">
-                                    <button type="button" class="ql-list" value="ordered"></button>
-                                    <button type="button" class="ql-list" value="bullet"></button>
-                                    <button type="button" class="ql-code-block"></button>
-                                    <button type="button" class="ql-link"></button>
-                                </span>
+
+                        <div class="tw-rte" id="tw-rte">
+                            <div class="tw-rte__toolbar" role="toolbar" aria-label="Форматирование">
+                                <button type="button" class="tw-rte__btn" data-cmd="bold" title="Жирный (Ctrl+B)" aria-label="Жирный"><strong>B</strong></button>
+                                <button type="button" class="tw-rte__btn" data-cmd="italic" title="Курсив (Ctrl+I)" aria-label="Курсив"><em>I</em></button>
+                                <button type="button" class="tw-rte__btn" data-cmd="underline" title="Подчёркнутый" aria-label="Подчёркнутый"><span class="tw-rte__u">U</span></button>
+                                <button type="button" class="tw-rte__btn" data-cmd="strikeThrough" title="Зачёркнутый" aria-label="Зачёркнутый"><span class="tw-rte__s">S</span></button>
+                                <span class="tw-rte__sep" aria-hidden="true"></span>
+                                <button type="button" class="tw-rte__btn" data-cmd="insertUnorderedList" title="Маркированный список" aria-label="Список">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm3-1.5h9v1H5v-1zm0 5h9v1H5v-1zm0 5h9v1H5v-1zM2 9a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm0 5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+                                </button>
+                                <button type="button" class="tw-rte__btn" data-cmd="insertOrderedList" title="Нумерованный список" aria-label="Нумерованный список">
+                                    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2.003 2.5a.5.5 0 0 1 .5-.5H3.5v3H2.75V4H2.5a.5.5 0 0 1 0-1h.25V2.5h-.247a.5.5 0 0 1-.5-.5zM5 2.5h9v1H5v-1zm0 5h9v1H5v-1zm0 5h9v1H5v-1zM2.5 7.5h.75v.25H2.25v.75h1.5V7H2.5v.5zm.75 4.25H2.5v.75h1.5V11H2.5v1.5h.75v-.75z"/></svg>
+                                </button>
+                                <button type="button" class="tw-rte__btn" data-cmd="formatBlock" data-value="pre" title="Блок кода" aria-label="Код"><span class="tw-rte__code">&lt;/&gt;</span></button>
+                                <button type="button" class="tw-rte__btn" data-action="link" title="Ссылка" aria-label="Ссылка">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M6.354 5.5H4a3 3 0 0 0 0 6h3a3 3 0 0 0 2.83-4H9c-.386 0-.72.244-.872.604A2 2 0 0 1 7 10.5H4a2 2 0 1 1 0-4h1.535c.218-.376.495-.74.82-1zM9.646 10.5H12a3 3 0 1 0 0-6H9a3 3 0 0 0-2.83 4h.808c.386 0 .72-.244.872-.604A2 2 0 0 1 9 5.5h3a2 2 0 1 1 0 4h-1.535a6 6 0 0 1-.82 1z"/></svg>
+                                </button>
+                                <span class="tw-rte__hint">Ctrl+Enter — отправить</span>
                             </div>
-                            <div id="tw-quill-editor" class="tw-quill-host"></div>
-                            <div class="tw-composer__resize" id="tw-composer-resize" title="Потяните, чтобы изменить высоту"></div>
-                        </div>
-                        <div class="tw-composer__preview d-none" id="tw-files-preview"></div>
-                        <div class="tw-composer__bar">
-                            <label class="tw-composer__clip" title="Прикрепить файл (до 256 МБ)" for="tw-composer-files">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-                                </svg>
-                                <input type="file" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.exe,.msi,.psd,.fig">
-                            </label>
-                            <span class="tw-composer__files-label text-muted small d-none" id="tw-files-label"></span>
-                            <button type="button"
-                                    class="btn btn-primary btn-sm tw-composer__send"
-                                    id="tw-composer-send"
-                                    data-url="{{ url()->current() }}/addComment"
-                                    data-csrf="{{ csrf_token() }}">
-                                Отправить
-                            </button>
+                            <div class="tw-rte__editor-wrap" id="tw-composer-editor-wrap">
+                                <div id="tw-rte-editor"
+                                     class="tw-rte__editor is-empty"
+                                     contenteditable="true"
+                                     role="textbox"
+                                     aria-multiline="true"
+                                     data-placeholder="Написать комментарий…"></div>
+                                <div class="tw-rte__resize" id="tw-composer-resize" title="Потяните, чтобы изменить высоту"></div>
+                            </div>
+                            <div class="tw-composer__preview d-none" id="tw-files-preview"></div>
+                            <div class="tw-rte__footer">
+                                <label class="tw-rte__attach" title="Прикрепить файл (до 256 МБ)" for="tw-composer-files">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                                    </svg>
+                                    <span>Прикрепить</span>
+                                    <input type="file" id="tw-composer-files" multiple accept="image/*,.pdf,.zip,.rar,.7z,.doc,.docx,.xls,.xlsx,.txt,.exe,.msi,.psd,.fig">
+                                </label>
+                                <span class="tw-composer__files-label text-muted small d-none" id="tw-files-label"></span>
+                                <button type="button"
+                                        class="tw-rte__send"
+                                        id="tw-composer-send"
+                                        data-url="{{ url()->current() }}/addComment"
+                                        data-csrf="{{ csrf_token() }}">
+                                    Отправить
+                                </button>
+                            </div>
                         </div>
                     </div>
                 @else
@@ -476,16 +495,17 @@
 @endif
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 <script>
 (() => {
-    if (window.hljs) {
-        document.querySelectorAll('.tw-codeblock code').forEach((el) => {
+    const runHljs = () => {
+        if (!window.hljs) return;
+        document.querySelectorAll('.tw-codeblock code, .tw-description pre code').forEach((el) => {
             try { window.hljs.highlightElement(el); } catch (e) {}
         });
-    }
+    };
+    if (window.hljs) runHljs();
+    else document.addEventListener('DOMContentLoaded', runHljs);
 
     document.querySelectorAll('.tw-tabs__btn').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -506,12 +526,35 @@
     const filesLabel = document.getElementById('tw-files-label');
     const filesPreview = document.getElementById('tw-files-preview');
     const composerEl = document.getElementById('tw-composer');
-    const editorEl = document.getElementById('tw-quill-editor');
+    const editorEl = document.getElementById('tw-rte-editor');
     const sendBtn = document.getElementById('tw-composer-send');
-    let quill = null;
     let pendingFiles = [];
     const FILES_MAX = 10;
     let sending = false;
+
+    const toast = (m, t) => (typeof window.uiToast === 'function' ? window.uiToast(m, t) : console.warn(m));
+
+    const isEditorEmpty = () => {
+        if (!editorEl) return true;
+        const text = (editorEl.innerText || '').replace(/\u00a0/g, ' ').trim();
+        return text === '';
+    };
+
+    const syncEditorEmpty = () => {
+        if (!editorEl) return;
+        editorEl.classList.toggle('is-empty', isEditorEmpty());
+    };
+
+    const getEditorHtml = () => {
+        if (!editorEl || isEditorEmpty()) return '';
+        return editorEl.innerHTML.trim();
+    };
+
+    const clearEditor = () => {
+        if (!editorEl) return;
+        editorEl.innerHTML = '';
+        syncEditorEmpty();
+    };
 
     const renderTwFiles = () => {
         if (!filesPreview || !filesLabel) return;
@@ -550,17 +593,33 @@
         renderTwFiles();
     };
 
-    if (editorEl && window.Quill && !editorEl.classList.contains('ql-container')) {
-        quill = new Quill(editorEl, {
-            theme: 'snow',
-            placeholder: 'Написать сообщение… (Ctrl+V — вставить картинку)',
-            modules: {
-                toolbar: '#tw-quill-toolbar',
-            },
+    /* Кастомный RTE без внешних CDN */
+    document.querySelectorAll('.tw-rte__btn[data-cmd]').forEach((btn) => {
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.addEventListener('click', () => {
+            const cmd = btn.getAttribute('data-cmd');
+            const value = btn.getAttribute('data-value') || null;
+            editorEl?.focus();
+            try {
+                if (cmd === 'formatBlock' && value) {
+                    document.execCommand('formatBlock', false, value);
+                } else {
+                    document.execCommand(cmd, false, value);
+                }
+            } catch (err) {}
+            syncEditorEmpty();
         });
-    } else if (window.Quill && editorEl) {
-        quill = Quill.find(editorEl);
-    }
+    });
+    document.querySelector('.tw-rte__btn[data-action="link"]')?.addEventListener('click', () => {
+        editorEl?.focus();
+        const url = window.prompt('Ссылка (https://…)');
+        if (!url) return;
+        try { document.execCommand('createLink', false, url); } catch (err) {}
+        syncEditorEmpty();
+    });
+    editorEl?.addEventListener('input', syncEditorEmpty);
+    editorEl?.addEventListener('blur', syncEditorEmpty);
+    syncEditorEmpty();
 
     const setTwSending = (on) => {
         sending = on;
@@ -571,27 +630,27 @@
                 ? '<span class="bx-send-spinner"></span> Отправка…'
                 : 'Отправить';
         }
-        if (quill) quill.enable(!on);
+        if (editorEl) editorEl.contentEditable = on ? 'false' : 'true';
         if (filesInput) filesInput.disabled = on;
     };
 
-    sendBtn?.addEventListener('click', async () => {
+    const sendComment = async () => {
         if (sending) return;
-        const url = sendBtn.getAttribute('data-url');
-        const token = sendBtn.getAttribute('data-csrf');
+        const url = sendBtn?.getAttribute('data-url');
+        const token = sendBtn?.getAttribute('data-csrf');
         if (!url) return;
 
-        const plain = quill ? (quill.getText() || '').trim() : '';
+        const html = getEditorHtml();
         const hasFiles = pendingFiles.length > 0;
-        if (!plain && !hasFiles) {
-            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Напишите сообщение или прикрепите файл', 'info');
+        if (!html && !hasFiles) {
+            toast('Напишите сообщение или прикрепите файл', 'info');
             return;
         }
 
         const fd = new FormData();
         if (token) fd.append('_token', token);
-        if (plain && quill) {
-            fd.append('comment[text]', JSON.stringify(quill.getContents()));
+        if (html) {
+            fd.append('comment[text]', JSON.stringify({ html }));
         } else {
             fd.append('comment[text]', '');
         }
@@ -609,14 +668,22 @@
                 headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html' },
             });
             if (!res.ok) {
-                (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось отправить сообщение', 'error');
+                toast('Не удалось отправить сообщение', 'error');
                 setTwSending(false);
                 return;
             }
             window.location.reload();
         } catch (e) {
-            (typeof window.uiToast==='function'?window.uiToast:function(m){console.warn(m);})('Не удалось отправить сообщение', 'error');
+            toast('Не удалось отправить сообщение', 'error');
             setTwSending(false);
+        }
+    };
+
+    sendBtn?.addEventListener('click', sendComment);
+    editorEl?.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            sendComment();
         }
     });
 
@@ -639,30 +706,22 @@
         }
     };
     composerEl?.addEventListener('paste', onPasteImages);
-    quill?.root?.addEventListener('paste', onPasteImages);
+    editorEl?.addEventListener('paste', onPasteImages);
 
-    /* Растягивание высоты редактора */
     const resizeHandle = document.getElementById('tw-composer-resize');
     const editorWrap = document.getElementById('tw-composer-editor-wrap');
     resizeHandle?.addEventListener('pointerdown', (e) => {
         if (e.button !== undefined && e.button !== 0) return;
         e.preventDefault();
-        const ql = editorWrap?.querySelector('.ql-editor');
-        const container = editorWrap?.querySelector('.ql-container');
-        if (!ql) return;
+        if (!editorEl) return;
         const startY = e.clientY;
-        const startH = ql.getBoundingClientRect().height;
+        const startH = editorEl.getBoundingClientRect().height;
         resizeHandle.classList.add('is-dragging');
         resizeHandle.setPointerCapture?.(e.pointerId);
         const onMove = (ev) => {
             const next = Math.min(520, Math.max(96, startH + (ev.clientY - startY)));
-            ql.style.setProperty('min-height', next + 'px', 'important');
-            ql.style.setProperty('height', next + 'px', 'important');
-            ql.style.setProperty('max-height', 'none', 'important');
-            if (container) {
-                container.style.setProperty('min-height', next + 'px', 'important');
-                container.style.height = 'auto';
-            }
+            editorEl.style.minHeight = next + 'px';
+            editorEl.style.height = next + 'px';
         };
         const onUp = (ev) => {
             resizeHandle.classList.remove('is-dragging');
@@ -824,7 +883,7 @@
             if (parentInput) parentInput.value = btn.getAttribute('data-parent-id') || '';
             if (replyAuthor) replyAuthor.textContent = btn.getAttribute('data-author') || '';
             replyBanner?.classList.remove('d-none');
-            quill?.focus();
+            editorEl?.focus();
         });
     });
     document.getElementById('tw-reply-cancel')?.addEventListener('click', () => {

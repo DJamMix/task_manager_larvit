@@ -11,6 +11,7 @@ use App\Models\TaskQueue;
 use App\Models\User;
 use App\Services\WorkflowService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Actions\ModalToggle;
 use Orchid\Screen\Fields\Input;
@@ -38,11 +39,15 @@ class BoardScreen extends Screen
         $this->canManage = $user->hasAccess('platform.systems.tasks');
         $workflows->bootstrapDefaults($user);
 
-        $boardId = $request->integer('board') ?: Board::query()->where('is_default', true)->value('id');
+        $boardId = $request->integer('board') ?: (int) Cache::remember(
+            'board.default_id',
+            300,
+            fn () => Board::query()->where('is_default', true)->value('id')
+        );
         $board = Board::query()->with(['columns.status', 'project'])->find($boardId)
             ?: Board::query()->with(['columns.status', 'project'])->first();
 
-        if ($board) {
+        if ($board && $board->columns->isEmpty()) {
             $workflows->ensureBoardColumns($board);
             $board->load(['columns.status']);
         }
@@ -63,7 +68,15 @@ class BoardScreen extends Screen
         $sprint = $sprintId ? Sprint::query()->find($sprintId) : null;
 
         $tasksQuery = Task::query()
-            ->with(['executor', 'workflowStatus', 'queue', 'project', 'sprint'])
+            ->select([
+                'id', 'name', 'priority', 'type_task', 'executor_id', 'status_id', 'status',
+                'queue_id', 'project_id', 'sprint_id', 'queue_number', 'board_sort',
+            ])
+            ->with([
+                'executor:id,name,position,avatar_path',
+                'workflowStatus:id,name,slug,color',
+                'queue:id,key,name',
+            ])
             ->when($board?->project_id && ! $projectId, fn ($qq) => $qq->where('project_id', $board->project_id))
             ->when($projectId, fn ($qq) => $qq->where('project_id', $projectId))
             ->when($sprint, fn ($qq) => $qq->where('sprint_id', $sprint->id))
@@ -72,9 +85,18 @@ class BoardScreen extends Screen
             ->when($type, fn ($qq) => $qq->where('type_task', $type))
             ->when($q !== '', function ($qq) use ($q) {
                 $qq->where(function ($w) use ($q) {
-                    $w->where('name', 'like', '%'.$q.'%')
-                        ->orWhere('id', $q)
-                        ->orWhereRaw("CONCAT(COALESCE((SELECT `key` FROM task_queues WHERE task_queues.id = tasks.queue_id), ''), '-', COALESCE(queue_number, '')) LIKE ?", ['%'.$q.'%']);
+                    $w->where('name', 'like', '%'.$q.'%');
+                    if (ctype_digit($q)) {
+                        $w->orWhere('id', (int) $q);
+                    }
+                    if (preg_match('/^([A-Za-z][A-Za-z0-9_]*)-(\d+)$/', $q, $m)) {
+                        $w->orWhere(function ($inner) use ($m) {
+                            $inner->where('queue_number', (int) $m[2])
+                                ->whereHas('queue', fn ($queue) => $queue->where('key', $m[1]));
+                        });
+                    } elseif (ctype_digit($q)) {
+                        $w->orWhere('queue_number', (int) $q);
+                    }
                 });
             });
 
@@ -89,7 +111,7 @@ class BoardScreen extends Screen
         $tasks = $tasksQuery
             ->orderBy('board_sort')
             ->orderByDesc('id')
-            ->limit(800)
+            ->limit($this->canManage ? 500 : 250)
             ->get();
 
         $taskUrl = function (Task $t) use ($user) {
@@ -137,24 +159,27 @@ class BoardScreen extends Screen
             'board' => $board?->id,
         ];
 
-        $employees = User::query()
-            ->whereDoesntHave('roles', fn ($r) => $r->whereIn('slug', ['client', 'client_employer', 'client_contact']))
-            ->orderBy('name')
-            ->get(['id', 'name', 'position', 'avatar_path']);
+        $employees = Cache::remember('board.filter_assignees', 120, function () {
+            return User::query()
+                ->whereDoesntHave('roles', fn ($r) => $r->whereIn('slug', ['client', 'client_employer', 'client_contact']))
+                ->orderBy('name')
+                ->get(['id', 'name', 'position', 'avatar_path']);
+        });
 
         $quickFilters = $this->quickFiltersForBoard($user, $board?->id);
         $activeQuickId = $this->matchQuickFilterId($quickFilters, $filters);
 
         return [
             'board' => $board,
-            'boards' => Board::query()->orderByDesc('is_default')->orderBy('name')->get(),
+            'boards' => Cache::remember('board.list', 60, fn () => Board::query()->orderByDesc('is_default')->orderBy('name')->get()),
             'sprints' => Sprint::query()
                 ->when($board?->id, fn ($qq) => $qq->where(function ($w) use ($board) {
                     $w->where('board_id', $board->id)->orWhereNull('board_id');
                 }))
                 ->orderByRaw("CASE status WHEN 'active' THEN 0 WHEN 'planned' THEN 1 ELSE 2 END")
                 ->orderByDesc('id')
-                ->get(),
+                ->limit(40)
+                ->get(['id', 'name', 'status', 'board_id', 'starts_at', 'ends_at']),
             'active_sprint' => $sprint,
             'columns' => $columns,
             'filters' => $filters,
@@ -163,8 +188,8 @@ class BoardScreen extends Screen
             'can_manage' => $this->canManage,
             'move_url' => route('platform.systems.boards.move'),
             'csrf' => csrf_token(),
-            'filter_projects' => Project::query()->orderBy('name')->get(['id', 'name']),
-            'filter_queues' => TaskQueue::query()->orderBy('key')->get(['id', 'key', 'name']),
+            'filter_projects' => Cache::remember('board.filter_projects', 120, fn () => Project::query()->orderBy('name')->get(['id', 'name'])),
+            'filter_queues' => Cache::remember('board.filter_queues', 120, fn () => TaskQueue::query()->orderBy('key')->get(['id', 'key', 'name'])),
             'filter_priorities' => collect(TaskPriorityEnum::cases())->mapWithKeys(
                 fn (TaskPriorityEnum $p) => [$p->value => method_exists($p, 'label') ? $p->label() : $p->value]
             )->all(),

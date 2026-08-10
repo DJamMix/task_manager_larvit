@@ -8,36 +8,61 @@ use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Session;
 
 class ProjectContext
 {
     public const SESSION_KEY = 'active_project_id';
 
+    /** @var Collection<int, Project>|null */
+    private ?Collection $availableCache = null;
+
+    private ?int $resolvedId = null;
+
+    private bool $idResolved = false;
+
+    private static ?bool $projectsHaveIsActive = null;
+
     public function id(): ?int
     {
+        if ($this->idResolved) {
+            return $this->resolvedId;
+        }
+
+        $this->idResolved = true;
         $id = Session::get(self::SESSION_KEY);
 
         if ($id === null) {
-            return null;
+            return $this->resolvedId = null;
         }
 
         $id = (int) $id;
 
-        if (!$this->isAccessible($id)) {
+        if (! $this->isAccessible($id)) {
             $this->clear();
 
-            return null;
+            return $this->resolvedId = null;
         }
 
-        return $id;
+        return $this->resolvedId = $id;
     }
 
     public function project(): ?Project
     {
         $id = $this->id();
+        if (! $id) {
+            return null;
+        }
 
-        return $id ? Project::find($id) : null;
+        $fromList = $this->availableProjects()->firstWhere('id', $id);
+        if ($fromList instanceof Project) {
+            return $fromList;
+        }
+
+        return Project::query()->find($id);
     }
 
     public function has(): bool
@@ -53,80 +78,84 @@ class ProjectContext
             return;
         }
 
-        if (!$this->isAccessible($projectId)) {
+        if (! $this->isAccessible($projectId)) {
             abort(403, 'Нет доступа к выбранному проекту');
         }
 
         Session::put(self::SESSION_KEY, $projectId);
+        $this->resolvedId = $projectId;
+        $this->idResolved = true;
     }
 
     public function clear(): void
     {
         Session::forget(self::SESSION_KEY);
+        $this->resolvedId = null;
+        $this->idResolved = true;
     }
 
     public function availableProjects(): Collection
     {
-        $user = Auth::user();
-
-        if (!$user instanceof User) {
-            return collect();
+        if ($this->availableCache !== null) {
+            return $this->availableCache;
         }
 
-        return $this->projectsForUser($user)->values();
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return $this->availableCache = collect();
+        }
+
+        return $this->availableCache = $this->projectsForUser($user)->values();
     }
 
     public function projectsForUser(User $user): Collection
     {
-        if ($user->hasAccess('platform.systems.projects') || $user->hasAccess('platform.systems.tasks')) {
-            $query = Project::query()->orderBy('name');
-            if (\Illuminate\Support\Facades\Schema::hasColumn('projects', 'is_active')) {
-                $query->where('is_active', true);
+        $cacheKey = 'project_context.user.'.$user->id;
+        $ttl = 60;
+
+        return Cache::remember($cacheKey, $ttl, function () use ($user) {
+            if ($user->hasAccess('platform.systems.projects') || $user->hasAccess('platform.systems.tasks')) {
+                return $this->activeProjectsQuery()->orderBy('name')->get();
             }
 
-            return $query->get();
-        }
+            if (
+                $user->inRole('client')
+                || $user->inRole('client_employer')
+                || $user->hasAccess('platform.systems.client.projects')
+            ) {
+                $query = $user->projects()->orderBy('name');
+                $this->applyActiveFilter($query);
 
-        if (
-            $user->inRole('client')
-            || $user->inRole('client_employer')
-            || $user->hasAccess('platform.systems.client.projects')
-        ) {
-            $query = $user->projects()->orderBy('name');
-            if (\Illuminate\Support\Facades\Schema::hasColumn('projects', 'is_active')) {
-                $query->where('is_active', true);
+                return $query->get();
             }
 
-            return $query->get();
-        }
-
-        // Также менеджер с актами видит все проекты
-        if ($user->hasAccess('platform.systems.acts')) {
-            $query = Project::query()->orderBy('name');
-            if (\Illuminate\Support\Facades\Schema::hasColumn('projects', 'is_active')) {
-                $query->where('is_active', true);
+            if ($user->hasAccess('platform.systems.acts')) {
+                return $this->activeProjectsQuery()->orderBy('name')->get();
             }
 
+            // Сотрудник: один UNION вместо двух pluck + whereIn
+            $member = DB::table('project_members')
+                ->where('user_id', $user->id)
+                ->select('project_id');
+
+            $assigned = DB::table('tasks')
+                ->where('executor_id', $user->id)
+                ->whereNotNull('project_id')
+                ->distinct()
+                ->select('project_id');
+
+            $ids = $member->union($assigned)->pluck('project_id')->filter()->unique()->values();
+
+            if ($ids->isEmpty()) {
+                return collect();
+            }
+
+            $query = Project::query()->whereIn('id', $ids)->orderBy('name');
+            $this->applyActiveFilter($query);
+
             return $query->get();
-        }
-
-        // Сотрудник: проекты, где он участник или исполнитель задач
-        $memberIds = $user->memberProjects()->pluck('projects.id');
-        $executorIds = $user->assignedTasks()->distinct()->pluck('project_id');
-
-        $ids = $memberIds->merge($executorIds)->unique()->filter()->values();
-
-        if ($ids->isEmpty()) {
-            return collect();
-        }
-
-        $query = Project::query()->whereIn('id', $ids)->orderBy('name');
-
-        if (\Illuminate\Support\Facades\Schema::hasColumn('projects', 'is_active')) {
-            $query->where('is_active', true);
-        }
-
-        return $query->get();
+        });
     }
 
     public function isAccessible(int $projectId): bool
@@ -152,5 +181,40 @@ class ProjectContext
     public function defaultProjectId(): ?int
     {
         return $this->id();
+    }
+
+    /** Сбросить кэш списка проектов пользователя (после смены состава проекта и т.п.). */
+    public function forgetUserCache(?int $userId = null): void
+    {
+        $userId ??= Auth::id();
+        if ($userId) {
+            Cache::forget('project_context.user.'.$userId);
+        }
+        $this->availableCache = null;
+        $this->idResolved = false;
+        $this->resolvedId = null;
+    }
+
+    private function activeProjectsQuery()
+    {
+        $query = Project::query();
+        $this->applyActiveFilter($query);
+
+        return $query;
+    }
+
+    private function applyActiveFilter($query): void
+    {
+        if (self::$projectsHaveIsActive === null) {
+            self::$projectsHaveIsActive = Cache::remember(
+                'schema.projects.is_active',
+                86400,
+                fn () => Schema::hasColumn('projects', 'is_active')
+            );
+        }
+
+        if (self::$projectsHaveIsActive) {
+            $query->where('is_active', true);
+        }
     }
 }

@@ -140,11 +140,14 @@ class PlatformProvider extends OrchidServiceProvider
         }
 
         $userId = auth()->id();
-        $count = \App\Models\Task::where('executor_id', $userId)
-            ->whereIn('status', ['new', 'estimation'])
-            ->count();
 
-        return $count > 0 ? $count : null;
+        return \Illuminate\Support\Facades\Cache::remember("menu.inbox_badge.{$userId}", 30, function () use ($userId) {
+            $count = \App\Models\Task::where('executor_id', $userId)
+                ->whereIn('status', ['new', 'estimation'])
+                ->count();
+
+            return $count > 0 ? $count : null;
+        });
     }
 
     private function chatsBadgeCount(): ?int
@@ -153,27 +156,29 @@ class PlatformProvider extends OrchidServiceProvider
             return null;
         }
 
-        try {
-            $userId = auth()->id();
+        $userId = auth()->id();
 
-            return \App\Models\ChatMessage::query()
-                ->whereIn('chat_id', function ($q) use ($userId) {
-                    $q->select('chat_id')
-                        ->from('chat_user')
-                        ->where('user_id', $userId)
-                        ->where(function ($qq) {
-                            $qq->whereNull('is_muted')->orWhere('is_muted', false);
-                        });
-                })
-                ->where('user_id', '!=', $userId)
-                ->whereRaw('created_at > COALESCE(
-                    (SELECT last_read_at FROM chat_user WHERE chat_user.chat_id = chat_messages.chat_id AND chat_user.user_id = ?),
-                    "1970-01-01"
-                )', [$userId])
-                ->count() ?: null;
-        } catch (\Throwable) {
-            return null;
-        }
+        return \Illuminate\Support\Facades\Cache::remember("menu.chats_badge.{$userId}", 30, function () use ($userId) {
+            try {
+                return \App\Models\ChatMessage::query()
+                    ->whereIn('chat_id', function ($q) use ($userId) {
+                        $q->select('chat_id')
+                            ->from('chat_user')
+                            ->where('user_id', $userId)
+                            ->where(function ($qq) {
+                                $qq->whereNull('is_muted')->orWhere('is_muted', false);
+                            });
+                    })
+                    ->where('user_id', '!=', $userId)
+                    ->whereRaw('created_at > COALESCE(
+                        (SELECT last_read_at FROM chat_user WHERE chat_user.chat_id = chat_messages.chat_id AND chat_user.user_id = ?),
+                        "1970-01-01"
+                    )', [$userId])
+                    ->count() ?: null;
+            } catch (\Throwable) {
+                return null;
+            }
+        });
     }
 
     /**

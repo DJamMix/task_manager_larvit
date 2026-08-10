@@ -29,7 +29,7 @@ class MyTasksViewScreen extends Screen
     {
         $this->authorizeAccess($task);
 
-        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue', 'workflowStatus', 'sprint']);
+        $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue', 'workflowStatus', 'sprint', 'project.clients']);
 
         $comments = $task->comments()
             ->with(['user', 'parent.user', 'attachment'])

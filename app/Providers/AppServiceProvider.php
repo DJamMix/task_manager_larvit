@@ -38,11 +38,15 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $context = app(ProjectContext::class);
+            $projects = $context->availableProjects();
+            $activeId = $context->id();
 
             $view->with([
-                'availableProjects' => $context->availableProjects(),
-                'activeProject' => $context->project(),
-                'activeProjectId' => $context->id(),
+                'availableProjects' => $projects,
+                'activeProject' => $activeId
+                    ? ($projects->firstWhere('id', $activeId) ?: $context->project())
+                    : null,
+                'activeProjectId' => $activeId,
             ]);
         });
     }

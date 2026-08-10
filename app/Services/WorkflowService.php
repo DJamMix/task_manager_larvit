@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkflowStatus;
 use App\Models\WorkflowTransition;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,9 +19,26 @@ class WorkflowService
 {
     /**
      * Сид статусов и переходов из текущего enum + дефолтная доска.
+     * Быстрый путь: после первой инициализации почти ничего не делает (cache).
      */
     public function bootstrapDefaults(?User $actor = null): void
     {
+        if (Cache::get('workflow.defaults_ready')) {
+            return;
+        }
+
+        $expectedStatuses = count(TaskStatusEnum::cases());
+        $ready = WorkflowStatus::query()->count() >= $expectedStatuses
+            && WorkflowTransition::query()->exists()
+            && Board::query()->exists();
+
+        if ($ready) {
+            $this->backfillMissingTaskStatusIds();
+            Cache::forever('workflow.defaults_ready', 1);
+
+            return;
+        }
+
         DB::transaction(function () use ($actor) {
             $order = 0;
             $map = [];
@@ -124,6 +142,36 @@ class WorkflowService
                 }
             }
         });
+
+        $this->backfillMissingTaskStatusIds();
+        Cache::forever('workflow.defaults_ready', 1);
+    }
+
+    /**
+     * Разово (не чаще раза в 10 мин) проставляет status_id задачам без него.
+     */
+    private function backfillMissingTaskStatusIds(): void
+    {
+        if (! Cache::add('workflow.backfill_lock', 1, 600)) {
+            return;
+        }
+
+        $map = WorkflowStatus::query()->pluck('id', 'slug');
+        if ($map->isEmpty()) {
+            return;
+        }
+
+        Task::query()
+            ->whereNull('status_id')
+            ->orderBy('id')
+            ->limit(300)
+            ->get(['id', 'status'])
+            ->each(function (Task $task) use ($map) {
+                $slug = (string) $task->status;
+                if (isset($map[$slug])) {
+                    $task->forceFill(['status_id' => $map[$slug]])->saveQuietly();
+                }
+            });
     }
 
     public function allowedTransitions(Task $task, User $actor): array
@@ -158,21 +206,23 @@ class WorkflowService
                 ->all();
         }
 
-        return WorkflowTransition::query()
-            ->with('toStatus')
-            ->where('from_status_id', $fromId)
-            ->orderBy('sort_order')
-            ->get()
-            ->filter(fn (WorkflowTransition $t) => $t->toStatus && $t->toStatus->is_active)
-            ->map(fn (WorkflowTransition $t) => [
-                'id' => $t->toStatus->id,
-                'slug' => $t->toStatus->slug,
-                'name' => $t->label(),
-                'color' => $t->toStatus->color,
-                'transition_id' => $t->id,
-            ])
-            ->values()
-            ->all();
+        return Cache::remember("workflow.transitions.from.{$fromId}", 300, function () use ($fromId) {
+            return WorkflowTransition::query()
+                ->with('toStatus')
+                ->where('from_status_id', $fromId)
+                ->orderBy('sort_order')
+                ->get()
+                ->filter(fn (WorkflowTransition $t) => $t->toStatus && $t->toStatus->is_active)
+                ->map(fn (WorkflowTransition $t) => [
+                    'id' => $t->toStatus->id,
+                    'slug' => $t->toStatus->slug,
+                    'name' => $t->label(),
+                    'color' => $t->toStatus->color,
+                    'transition_id' => $t->id,
+                ])
+                ->values()
+                ->all();
+        });
     }
 
     public function changeStatus(Task $task, User $actor, int|string $toStatus, bool $force = false): Task
@@ -327,7 +377,11 @@ class WorkflowService
 
     public function ensureBoardColumns(Board $board): void
     {
-        if ($board->columns()->exists()) {
+        if ($board->relationLoaded('columns')) {
+            if ($board->columns->isNotEmpty()) {
+                return;
+            }
+        } elseif ($board->columns()->exists()) {
             return;
         }
 

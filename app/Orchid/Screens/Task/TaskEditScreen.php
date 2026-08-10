@@ -37,7 +37,7 @@ class TaskEditScreen extends Screen
         }
 
         if ($task->exists) {
-            $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue', 'workflowStatus', 'sprint']);
+            $task->load(['project', 'executor', 'creator', 'category', 'attachment', 'queue', 'links.relatedTask.queue', 'workflowStatus', 'sprint', 'project.clients']);
         }
 
         $user = auth()->user();
