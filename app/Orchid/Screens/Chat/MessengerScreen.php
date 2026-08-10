@@ -137,7 +137,10 @@ class MessengerScreen extends Screen
             'can_chat_clients' => $chats->canChatWithClients($user),
             'can_write' => $canWrite,
             'can_edit_chat' => $canEditChat,
-            'member_options' => $chats->chatMemberOptions($user->id),
+            'member_options' => $chats->chatMemberOptions(
+                $user->id,
+                app(\App\Services\BotService::class)->canAddBotsToChats($user)
+            ),
             'direct_options' => $chats->directInterlocutorOptions($user),
             'staff_options' => $chats->directInterlocutorOptions($user),
             'active_chat_id' => $resolved?->id,

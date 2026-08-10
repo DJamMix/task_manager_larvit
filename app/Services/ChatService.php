@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Models\Bot;
 use App\Models\Chat;
 use App\Models\ChatMessage;
 use App\Models\ChatMessageHide;
@@ -23,16 +24,33 @@ class ChatService
         private readonly DashboardNotifier $notifier,
     ) {}
 
-    /** Участники чатов: сотрудники + клиентские контакты */
-    public function chatMemberOptions(?int $exceptId = null): array
+    /** Участники чатов: сотрудники + клиентские контакты (+ боты для админов) */
+    public function chatMemberOptions(?int $exceptId = null, bool $includeBots = false): array
     {
-        return User::query()
+        $humans = User::query()
+            ->where(fn ($q) => $q->where('is_bot', false)->orWhereNull('is_bot'))
             ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::CHAT_MEMBER_SLUGS))
             ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
             ->orderBy('name')
             ->get()
-            ->mapWithKeys(fn (User $u) => [$u->id => $u->displayName()])
-            ->all();
+            ->mapWithKeys(fn (User $u) => [$u->id => $u->displayName()]);
+
+        if (! $includeBots) {
+            return $humans->all();
+        }
+
+        $bots = User::query()
+            ->where('is_bot', true)
+            ->with('bot')
+            ->whereHas('bot', fn ($q) => $q->where('is_active', true)->where('can_join_groups', true))
+            ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
+            ->orderBy('name')
+            ->get()
+            ->mapWithKeys(fn (User $u) => [
+                $u->id => '[бот] '.$u->name.($u->bot?->username ? ' (@'.$u->bot->username.')' : ''),
+            ]);
+
+        return $humans->union($bots)->all();
     }
 
     /**
@@ -48,6 +66,7 @@ class ChatService
         if ($actor->isClientAccount()) {
             return User::query()
                 ->whereKeyNot($exceptId)
+                ->where(fn ($q) => $q->where('is_bot', false)->orWhereNull('is_bot'))
                 ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::STAFF_SLUGS))
                 ->get()
                 ->filter(fn (User $u) => $u->hasAccess('platform.systems.chats.clients'))
@@ -57,12 +76,13 @@ class ChatService
         }
 
         if ($this->canChatWithClients($actor)) {
-            return $this->chatMemberOptions($exceptId);
+            return $this->chatMemberOptions($exceptId, false);
         }
 
         // Обычный сотрудник — только коллеги
         return User::query()
             ->whereKeyNot($exceptId)
+            ->where(fn ($q) => $q->where('is_bot', false)->orWhereNull('is_bot'))
             ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::STAFF_SLUGS))
             ->orderBy('name')
             ->get()
@@ -197,6 +217,10 @@ class ChatService
     /** Личный чат с клиентом — писать может только staff с chats.clients (и сам клиент). */
     public function assertCanWriteInChat(Chat $chat, User $actor): void
     {
+        if ($actor->is_bot) {
+            return;
+        }
+
         if ($chat->type !== 'direct') {
             return;
         }
@@ -1172,6 +1196,11 @@ class ChatService
             ->reject(fn ($id) => $chat->isMember($id))
             ->values();
 
+        $botIds = User::query()->whereIn('id', $ids)->where('is_bot', true)->pluck('id');
+        if ($botIds->isNotEmpty() && ! app(BotService::class)->canAddBotsToChats($actor)) {
+            abort(403, 'Нет права добавлять ботов в чаты');
+        }
+
         foreach ($ids as $id) {
             $chat->members()->attach($id, [
                 'role' => 'member',
@@ -1182,7 +1211,7 @@ class ChatService
         }
 
         if ($ids->isNotEmpty()) {
-            $names = User::query()->whereIn('id', $ids)->get()
+            $names = User::query()->whereIn('id', $ids)->with('bot')->get()
                 ->map(fn (User $u) => $u->displayName())
                 ->filter()
                 ->implode(', ');
@@ -1193,6 +1222,24 @@ class ChatService
                     ? "{$actor->displayName()} добавил(а): {$names}"
                     : "{$actor->displayName()} добавил(а) участников"
             );
+
+            foreach ($botIds as $botUserId) {
+                $bot = Bot::query()->where('user_id', $botUserId)->first();
+                if ($bot) {
+                    app(BotService::class)->pushUpdate($bot, 'my_chat_member', [
+                        'chat' => app(BotService::class)->chatPayload($chat, $bot->user),
+                        'from' => [
+                            'id' => (int) $actor->id,
+                            'is_bot' => false,
+                            'first_name' => $actor->name,
+                        ],
+                        'new_chat_member' => [
+                            'user' => app(BotService::class)->botUserPayload($bot),
+                            'status' => 'member',
+                        ],
+                    ]);
+                }
+            }
         }
 
         return $chat->fresh(['members']);
@@ -1537,6 +1584,12 @@ class ChatService
         $this->markRead($chat, $actor);
         $this->notifyMembers($chat, $actor, $message, $mentions->all());
 
+        try {
+            app(BotService::class)->dispatchMessageToBots($chat, $message, $actor);
+        } catch (\Throwable) {
+            // боты не должны ломать отправку сообщений
+        }
+
         return $message;
     }
 
@@ -1657,12 +1710,14 @@ class ChatService
 
         $recipients = $chat->members
             ->reject(fn (User $u) => (int) $u->id === (int) $actor->id)
+            ->reject(fn (User $u) => (bool) $u->is_bot)
             ->reject(fn (User $u) => (bool) ($u->pivot?->is_muted ?? false));
 
         // Упоминания — всегда (даже если чат замьючен), как в Telegram/Bitrix
         if ($mentionIds !== []) {
             $mentioned = $chat->members
                 ->reject(fn (User $u) => (int) $u->id === (int) $actor->id)
+                ->reject(fn (User $u) => (bool) $u->is_bot)
                 ->filter(fn (User $u) => in_array((int) $u->id, $mentionIds, true));
 
             foreach ($mentioned as $user) {
@@ -1771,9 +1826,21 @@ class ChatService
 
     private function isChatMemberUserId(int $userId): bool
     {
-        return User::query()
-            ->whereKey($userId)
-            ->whereHas('roles', fn ($q) => $q->whereIn('slug', RoleCatalog::CHAT_MEMBER_SLUGS))
+        $user = User::query()->whereKey($userId)->first();
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->is_bot) {
+            return Bot::query()
+                ->where('user_id', $userId)
+                ->where('is_active', true)
+                ->where('can_join_groups', true)
+                ->exists();
+        }
+
+        return $user->roles()
+            ->whereIn('slug', RoleCatalog::CHAT_MEMBER_SLUGS)
             ->exists();
     }
 }

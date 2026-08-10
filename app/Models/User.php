@@ -26,6 +26,7 @@ class User extends Authenticatable
         'telegram_id',
         'telegram_verification_code',
         'ui_preferences',
+        'is_bot',
     ];
 
     protected $hidden = [
@@ -38,6 +39,7 @@ class User extends Authenticatable
         'permissions' => 'array',
         'ui_preferences' => 'array',
         'email_verified_at' => 'datetime',
+        'is_bot' => 'boolean',
     ];
 
     protected $allowedFilters = [
@@ -84,6 +86,16 @@ class User extends Authenticatable
         return $this->hasMany(Comment::class);
     }
 
+    public function bot(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Bot::class);
+    }
+
+    public function isBot(): bool
+    {
+        return (bool) $this->is_bot;
+    }
+
     public function timeEntries()
     {
         return $this->hasMany(TrackingTime::class);
@@ -110,8 +122,16 @@ class User extends Authenticatable
 
     public function displayName(): string
     {
+        if ($this->is_bot) {
+            $username = $this->relationLoaded('bot')
+                ? $this->bot?->username
+                : $this->bot()->value('username');
+
+            return $username ? $this->name.' (@'.$username.')' : (string) $this->name;
+        }
+
         if ($this->position) {
-            return trim($this->name . ' · ' . $this->position);
+            return trim($this->name.' · '.$this->position);
         }
 
         return (string) $this->name;

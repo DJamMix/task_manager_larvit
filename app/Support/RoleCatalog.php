@@ -33,6 +33,7 @@ final class RoleCatalog
             'platform.systems.chats',
             'platform.systems.chats.create',
             'platform.systems.chats.clients',
+            'platform.systems.bots',
             'platform.systems.client.projects',
             'platform.systems.client.project.tasks',
             'platform.systems.client.project.tasks.view',

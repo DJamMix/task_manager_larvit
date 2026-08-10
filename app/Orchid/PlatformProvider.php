@@ -88,6 +88,17 @@ class PlatformProvider extends OrchidServiceProvider
                 ->route('platform.systems.roles')
                 ->permission('platform.systems.roles'),
 
+            Menu::make('Боты')
+                ->icon('bs.robot')
+                ->route('platform.systems.bots')
+                ->permission('platform.systems.bots'),
+
+            Menu::make('Bot API')
+                ->icon('bs.book')
+                ->route('platform.systems.bots.docs')
+                ->permission('platform.systems.bots')
+                ->divider(),
+
             Menu::make(__('adminpanel.Acts'))
                 ->icon('bs.journal-text')
                 ->route('platform.systems.acts')
@@ -204,7 +215,8 @@ class PlatformProvider extends OrchidServiceProvider
                 ->addPermission('platform.systems.my_tasks', 'Мои задачи / входящие / время')
                 ->addPermission('platform.systems.chats', 'Чаты (участие)')
                 ->addPermission('platform.systems.chats.create', 'Чаты (создание групп)')
-                ->addPermission('platform.systems.chats.clients', 'Чаты с клиентами (личные)'),
+                ->addPermission('platform.systems.chats.clients', 'Чаты с клиентами (личные)')
+                ->addPermission('platform.systems.bots', 'Боты мессенджера (создание и API)'),
 
             ItemPermission::group('Клиент / Заказчик')
                 ->addPermission('platform.systems.client.projects', 'Мои проекты')

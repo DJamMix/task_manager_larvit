@@ -458,6 +458,30 @@ Route::screen('task_queues/create', \App\Orchid\Screens\TaskQueue\TaskQueueEditS
         ->parent('platform.systems.task_queues')
         ->push('Создать', route('platform.systems.task_queues.create')));
 
+Route::screen('bots', \App\Orchid\Screens\Bot\BotListScreen::class)
+    ->name('platform.systems.bots')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.index')
+        ->push('Боты', route('platform.systems.bots')));
+
+Route::screen('bots/docs', \App\Orchid\Screens\Bot\BotApiDocsScreen::class)
+    ->name('platform.systems.bots.docs')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.systems.bots')
+        ->push('API', route('platform.systems.bots.docs')));
+
+Route::screen('bots/create', \App\Orchid\Screens\Bot\BotEditScreen::class)
+    ->name('platform.systems.bots.create')
+    ->breadcrumbs(fn (Trail $trail) => $trail
+        ->parent('platform.systems.bots')
+        ->push('Создать', route('platform.systems.bots.create')));
+
+Route::screen('bots/{bot}/edit', \App\Orchid\Screens\Bot\BotEditScreen::class)
+    ->name('platform.systems.bots.edit')
+    ->breadcrumbs(fn (Trail $trail, $bot) => $trail
+        ->parent('platform.systems.bots')
+        ->push($bot->name ?? 'Бот', route('platform.systems.bots.edit', $bot)));
+
 Route::screen('my_tasks', MyTasksListScreen::class)
     ->name('platform.systems.my_tasks')
     ->breadcrumbs(fn (Trail $trail) => $trail
@@ -910,7 +934,8 @@ Route::post('chats/{chat}/members/add', function (
                 'id' => (int) $u->id,
                 'name' => $u->displayName(),
                 'role' => (string) ($u->pivot->role ?? 'member'),
-                'position' => (string) ($u->position ?? ''),
+                'position' => (string) ($u->is_bot ? 'бот' : ($u->position ?? '')),
+                'is_bot' => (bool) $u->is_bot,
                 'is_owner' => ($u->pivot->role ?? '') === 'owner',
                 'online' => !empty($presence[(int) $u->id]),
                 'avatar_url' => (string) $u->avatarUrl(),
