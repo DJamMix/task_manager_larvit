@@ -102,11 +102,17 @@
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
                 <span class="bx-msg__forwarded-text">
                     Переслано от <span class="bx-msg__forwarded-name">{{ $forwardOriginName ?: 'пользователя' }}</span>
+                    @if($forwardOrigin?->is_bot)
+                        <span class="bx-msg__bot-tag">бот</span>
+                    @endif
                 </span>
             </div>
         @elseif(!$message->is_system)
             <div class="bx-msg__meta">
                 <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
+                @if($message->user?->is_bot)
+                    <span class="bx-msg__bot-tag">бот</span>
+                @endif
             </div>
         @endif
 

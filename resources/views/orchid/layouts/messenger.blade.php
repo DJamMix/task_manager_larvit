@@ -638,21 +638,29 @@
                                     $isOwnerMember = ($member->pivot?->role ?? '') === 'owner'
                                         || (int) $member->id === (int) $active->created_by;
                                 @endphp
-                                <li class="bx-members-modal__item" data-user-id="{{ $member->id }}" data-is-owner="{{ $isOwnerMember ? '1' : '0' }}">
+                                <li class="bx-members-modal__item" data-user-id="{{ $member->id }}" data-is-owner="{{ $isOwnerMember ? '1' : '0' }}" data-is-bot="{{ $member->is_bot ? '1' : '0' }}">
                                     @include('orchid.layouts.partials.bx-avatar', [
                                         'avatarUser' => $member,
                                         'avatarChat' => null,
                                         'size' => 'md',
                                         'shape' => 'round',
-                                        'showOnline' => true,
+                                        'showOnline' => ! $member->is_bot,
                                         'isOnline' => $presenceOnline($member->id),
+                                        'isBot' => (bool) $member->is_bot,
                                     ])
                                     <div class="bx-members-modal__meta">
-                                        <div class="bx-members-modal__name">{{ $member->displayName() }}</div>
-                                        <div class="bx-members-modal__status {{ $presenceOnline($member->id) ? 'is-online' : '' }}"
+                                        <div class="bx-members-modal__name">
+                                            {{ $member->displayName() }}
+                                            @if($member->is_bot)
+                                                <span class="bx-msg__bot-tag">бот</span>
+                                            @endif
+                                        </div>
+                                        <div class="bx-members-modal__status {{ $presenceOnline($member->id) && ! $member->is_bot ? 'is-online' : '' }}"
                                              data-online-label="в сети"
-                                             data-offline-label="{{ $isOwnerMember ? 'владелец' : ($member->position ?: 'не в сети') }}">
-                                            @if($presenceOnline($member->id))
+                                             data-offline-label="{{ $member->is_bot ? 'бот' : ($isOwnerMember ? 'владелец' : ($member->position ?: 'не в сети')) }}">
+                                            @if($member->is_bot)
+                                                бот
+                                            @elseif($presenceOnline($member->id))
                                                 в сети
                                             @elseif($isOwnerMember)
                                                 владелец
@@ -1839,25 +1847,31 @@
             if (!list || !Array.isArray(members)) return;
             const selfId = String(root.getAttribute('data-self-id') || '');
             list.innerHTML = members.map((m) => {
-                const online = !!m.online;
+                const online = !!m.online && !m.is_bot;
                 const owner = !!m.is_owner;
-                const status = online ? 'в сети' : (owner ? 'владелец' : (m.position || 'не в сети'));
+                const isBot = !!m.is_bot;
+                const status = isBot ? 'бот' : (online ? 'в сети' : (owner ? 'владелец' : (m.position || 'не в сети')));
                 const img = m.avatar_url
                     ? `<img class="bx-avatar__img" src="${escapeHtml(m.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`
                     : '';
+                const botBadge = isBot
+                    ? `<span class="bx-bot-badge" title="Бот" aria-label="Бот"><svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true"><path d="M8 1.5a.75.75 0 0 1 .75.75v.76A3.75 3.75 0 0 1 11.75 6.5h.5a.75.75 0 0 1 0 1.5h-.5v.25c0 .69-.28 1.32-.73 1.77l.98 1.47a.75.75 0 1 1-1.25.83l-.9-1.35a3.73 3.73 0 0 1-1.6.35h-.5c-.56 0-1.1-.12-1.6-.35l-.9 1.35a.75.75 0 1 1-1.25-.83l.98-1.47A2.49 2.49 0 0 1 4.25 8.25V8h-.5a.75.75 0 0 1 0-1.5h.5A3.75 3.75 0 0 1 7.25 3.01V2.25A.75.75 0 0 1 8 1.5zm-1.5 6a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5zm3 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5z"/></svg></span>`
+                    : '';
+                const botTag = isBot ? ' <span class="bx-msg__bot-tag">бот</span>' : '';
                 const removeBtn = (!owner)
                     ? `<button type="button" class="bx-members-modal__remove" data-remove-member="${m.id}" title="Удалить из чата" aria-label="Удалить"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`
                     : '';
-                return `<li class="bx-members-modal__item" data-user-id="${m.id}" data-is-owner="${owner ? '1' : '0'}">
-                    <div class="bx-avatar-wrap" data-user-id="${m.id}">
-                        <span class="bx-avatar bx-avatar--md bx-avatar--round" style="--bx-avatar-bg:${escapeHtml(m.avatar_color || '#64748b')}">
+                return `<li class="bx-members-modal__item" data-user-id="${m.id}" data-is-owner="${owner ? '1' : '0'}" data-is-bot="${isBot ? '1' : '0'}">
+                    <div class="bx-avatar-wrap ${isBot ? 'is-bot' : ''}" data-user-id="${m.id}" ${isBot ? 'data-is-bot="1"' : ''}>
+                        <span class="bx-avatar bx-avatar--md bx-avatar--round ${isBot ? 'bx-avatar--bot' : ''}" style="--bx-avatar-bg:${escapeHtml(m.avatar_color || '#64748b')}">
                             <span class="bx-avatar__initials">${escapeHtml(m.avatar_initials || '?')}</span>${img}
                         </span>
+                        ${botBadge}
                         <span class="bx-online-dot ${online ? '' : 'd-none'}"></span>
                     </div>
                     <div class="bx-members-modal__meta">
-                        <div class="bx-members-modal__name">${escapeHtml(m.name || 'Участник')}${String(m.id) === selfId ? ' (вы)' : ''}</div>
-                        <div class="bx-members-modal__status ${online ? 'is-online' : ''}" data-online-label="в сети" data-offline-label="${escapeHtml(owner ? 'владелец' : (m.position || 'не в сети'))}">${escapeHtml(status)}</div>
+                        <div class="bx-members-modal__name">${escapeHtml(m.name || 'Участник')}${String(m.id) === selfId ? ' (вы)' : ''}${botTag}</div>
+                        <div class="bx-members-modal__status ${online ? 'is-online' : ''}" data-online-label="в сети" data-offline-label="${escapeHtml(isBot ? 'бот' : (owner ? 'владелец' : (m.position || 'не в сети')))}">${escapeHtml(status)}</div>
                     </div>
                     ${removeBtn}
                 </li>`;
