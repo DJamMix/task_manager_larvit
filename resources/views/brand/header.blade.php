@@ -33,6 +33,7 @@ window.__crewdevUi = window.__crewdevUi || {
 (function () {
     var KEY = 'crewdev.aside.collapsed';
     var CLASS = 'crewdev-aside-collapsed';
+    var scrollTimer = null;
 
     function readLocal() {
         try { return localStorage.getItem(KEY); } catch (e) { return null; }
@@ -42,6 +43,44 @@ window.__crewdevUi = window.__crewdevUi || {
         try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch (e) {}
     }
 
+    function isIconEl(el) {
+        if (!el || el.nodeType !== 1) return false;
+        return el.matches('svg, i, img, .icon, [class*="bi"], .orchid-icon')
+            || !!el.querySelector('svg, i, .icon, [class*="bi"]');
+    }
+
+    /** Orchid часто рендерит название текстовой нодой — оборачиваем, чтобы надёжно скрыть */
+    function wrapNavLabels() {
+        document.querySelectorAll('.aside a.nav-link').forEach(function (link) {
+            if (link.dataset.crewdevLabeled === '1') return;
+            link.dataset.crewdevLabeled = '1';
+
+            Array.prototype.slice.call(link.childNodes).forEach(function (node) {
+                if (node.nodeType === 3) {
+                    var text = node.textContent.replace(/\s+/g, ' ');
+                    if (!text.trim()) {
+                        node.textContent = '';
+                        return;
+                    }
+                    var span = document.createElement('span');
+                    span.className = 'crewdev-nav-label';
+                    span.textContent = text.trim();
+                    link.replaceChild(span, node);
+                    return;
+                }
+                if (node.nodeType === 1) {
+                    if (node.classList.contains('badge')) return;
+                    if (isIconEl(node)) return;
+                    if (node.classList.contains('crewdev-nav-label')) return;
+                    // обычный span/div с текстом без иконки внутри
+                    if (!node.querySelector('svg, i, .icon, [class*="bi"]')) {
+                        node.classList.add('crewdev-nav-label');
+                    }
+                }
+            });
+        });
+    }
+
     function syncLinkTitles(collapsed) {
         document.querySelectorAll('.aside a.nav-link').forEach(function (link) {
             if (collapsed) {
@@ -49,7 +88,10 @@ window.__crewdevUi = window.__crewdevUi || {
                     link.dataset.crewdevTitleSaved = '1';
                     link.dataset.crewdevTitleOrig = link.getAttribute('title') || '';
                 }
-                var label = (link.textContent || '').replace(/\s+/g, ' ').trim();
+                var labelEl = link.querySelector('.crewdev-nav-label');
+                var label = labelEl
+                    ? labelEl.textContent.replace(/\s+/g, ' ').trim()
+                    : (link.textContent || '').replace(/\s+/g, ' ').trim();
                 if (label) link.setAttribute('title', label);
             } else if (link.dataset.crewdevTitleSaved) {
                 var orig = link.dataset.crewdevTitleOrig || '';
@@ -61,8 +103,23 @@ window.__crewdevUi = window.__crewdevUi || {
         });
     }
 
+    function bindScrollbar() {
+        document.querySelectorAll('.aside .aside-collapse, .aside-collapse').forEach(function (el) {
+            if (el.dataset.crewdevScrollBound === '1') return;
+            el.dataset.crewdevScrollBound = '1';
+            el.addEventListener('scroll', function () {
+                el.classList.add('is-scrolling');
+                clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(function () {
+                    el.classList.remove('is-scrolling');
+                }, 700);
+            }, { passive: true });
+        });
+    }
+
     function apply(collapsed) {
         collapsed = !!collapsed;
+        wrapNavLabels();
         document.documentElement.classList.toggle(CLASS, collapsed);
         if (document.body) document.body.classList.toggle(CLASS, collapsed);
 
@@ -73,6 +130,7 @@ window.__crewdevUi = window.__crewdevUi || {
             btn.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
         }
         syncLinkTitles(collapsed);
+        bindScrollbar();
     }
 
     function current() {

@@ -2,7 +2,7 @@
  * CrewDev shell: имя приложения + сворачивание меню до иконок.
  */
 
-/* ===== Brand text (как в Orchid header) ===== */
+/* ===== Brand text ===== */
 .crewdev-aside-brand-wrap {
     display: flex;
     align-items: center;
@@ -59,14 +59,56 @@
     color: #ffffff;
 }
 
-/* ===== Collapsed: только иконки, без поломки collapse Orchid ===== */
+/* ===== Custom thin scrollbar (aside) — виден только при скролле/hover ===== */
+.aside .aside-collapse,
+.aside-collapse {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+.aside .aside-collapse:hover,
+.aside .aside-collapse.is-scrolling,
+.aside-collapse:hover,
+.aside-collapse.is-scrolling {
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+.aside .aside-collapse::-webkit-scrollbar,
+.aside-collapse::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+}
+.aside .aside-collapse::-webkit-scrollbar-track,
+.aside-collapse::-webkit-scrollbar-track {
+    background: transparent;
+}
+.aside .aside-collapse::-webkit-scrollbar-thumb,
+.aside-collapse::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 8px;
+}
+.aside .aside-collapse:hover::-webkit-scrollbar-thumb,
+.aside .aside-collapse.is-scrolling::-webkit-scrollbar-thumb,
+.aside-collapse:hover::-webkit-scrollbar-thumb,
+.aside-collapse.is-scrolling::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+/* ===== Collapsed: только иконки ===== */
 @media (min-width: 992px) {
     html.crewdev-aside-collapsed > .container-fluid > .row > .aside,
-    body.crewdev-aside-collapsed > .container-fluid > .row > .aside {
-        flex: 0 0 4.75rem !important;
-        width: 4.75rem !important;
-        max-width: 4.75rem !important;
-        min-width: 4.75rem !important;
+    body.crewdev-aside-collapsed > .container-fluid > .row > .aside,
+    html.crewdev-aside-collapsed .aside,
+    body.crewdev-aside-collapsed .aside {
+        flex: 0 0 4.5rem !important;
+        width: 4.5rem !important;
+        max-width: 4.5rem !important;
+        min-width: 4.5rem !important;
+        overflow-x: hidden !important;
+    }
+
+    html.crewdev-aside-collapsed .aside .aside-collapse,
+    body.crewdev-aside-collapsed .aside .aside-collapse {
+        overflow-x: hidden !important;
+        width: 100%;
     }
 
     html.crewdev-aside-collapsed .crewdev-aside-brand-wrap,
@@ -74,8 +116,8 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 0.85rem 0.35rem 0.55rem;
-        gap: 0.5rem;
+        padding: 0.85rem 0.25rem 0.55rem;
+        gap: 0.45rem;
     }
 
     html.crewdev-aside-collapsed .crewdev-aside-brand,
@@ -88,59 +130,74 @@
         transform: rotate(180deg);
     }
 
-    /* Заголовки секций меню */
+    /* Заголовки секций */
     html.crewdev-aside-collapsed .aside .nav-heading,
     body.crewdev-aside-collapsed .aside .nav-heading,
-    html.crewdev-aside-collapsed .aside .nav-item .nav-heading,
-    body.crewdev-aside-collapsed .aside .nav-item .nav-heading {
+    html.crewdev-aside-collapsed .aside .nav-item > .nav-heading,
+    body.crewdev-aside-collapsed .aside .nav-item > .nav-heading,
+    html.crewdev-aside-collapsed .aside .nav-item.mt-3,
+    body.crewdev-aside-collapsed .aside .nav-item.mt-3 {
         display: none !important;
     }
 
-    /* Пункты: прячем подписи через font-size:0, иконки оставляем */
+    /* Пункт меню: только иконка */
     html.crewdev-aside-collapsed .aside a.nav-link,
     body.crewdev-aside-collapsed .aside a.nav-link {
-        font-size: 0 !important;
-        line-height: 0 !important;
-        gap: 0 !important;
+        display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-        padding: 0.7rem 0.4rem !important;
-        overflow: hidden;
+        gap: 0 !important;
+        padding: 0.75rem 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        white-space: nowrap !important;
+        text-indent: 0 !important;
+    }
+
+    /* Подпись пункта (обёртка из JS + любые лишние span) */
+    html.crewdev-aside-collapsed .aside a.nav-link .crewdev-nav-label,
+    body.crewdev-aside-collapsed .aside a.nav-link .crewdev-nav-label,
+    html.crewdev-aside-collapsed .aside a.nav-link .badge,
+    body.crewdev-aside-collapsed .aside a.nav-link .badge,
+    html.crewdev-aside-collapsed .aside a.nav-link > span:not(.icon):not([class*="bi"]),
+    body.crewdev-aside-collapsed .aside a.nav-link > span:not(.icon):not([class*="bi"]) {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        visibility: hidden !important;
     }
 
     html.crewdev-aside-collapsed .aside a.nav-link .icon,
     body.crewdev-aside-collapsed .aside a.nav-link .icon,
     html.crewdev-aside-collapsed .aside a.nav-link svg,
     body.crewdev-aside-collapsed .aside a.nav-link svg,
-    html.crewdev-aside-collapsed .aside a.nav-link i,
-    body.crewdev-aside-collapsed .aside a.nav-link i {
-        font-size: 1.15rem !important;
-        width: 1.25rem !important;
-        height: 1.25rem !important;
-        min-width: 1.25rem !important;
+    html.crewdev-aside-collapsed .aside a.nav-link > i,
+    body.crewdev-aside-collapsed .aside a.nav-link > i,
+    html.crewdev-aside-collapsed .aside a.nav-link [class*="bi"],
+    body.crewdev-aside-collapsed .aside a.nav-link [class*="bi"] {
+        display: inline-flex !important;
+        visibility: visible !important;
+        position: static !important;
+        width: 1.35rem !important;
+        height: 1.35rem !important;
+        min-width: 1.35rem !important;
+        min-height: 1.35rem !important;
         margin: 0 !important;
+        padding: 0 !important;
+        flex: 0 0 auto !important;
+        font-size: 1.2rem !important;
         line-height: 1 !important;
-        flex: 0 0 auto;
+        opacity: 1 !important;
     }
 
-    html.crewdev-aside-collapsed .aside a.nav-link .badge,
-    body.crewdev-aside-collapsed .aside a.nav-link .badge,
-    html.crewdev-aside-collapsed .aside a.nav-link > span,
-    body.crewdev-aside-collapsed .aside a.nav-link > span {
+    /* Профиль снизу — только аватар */
+    html.crewdev-aside-collapsed .aside .crewdev-nav-label,
+    body.crewdev-aside-collapsed .aside .crewdev-nav-label {
         display: none !important;
-    }
-
-    /* Профиль внизу — компактнее */
-    html.crewdev-aside-collapsed .aside .d-flex.align-items-center.gap-3 span,
-    body.crewdev-aside-collapsed .aside .d-flex.align-items-center.gap-3 span,
-    html.crewdev-aside-collapsed .aside .aside-collapse + div span,
-    body.crewdev-aside-collapsed .aside .aside-collapse + div span {
-        display: none !important;
-    }
-
-    html.crewdev-aside-collapsed .aside .aside-collapse,
-    body.crewdev-aside-collapsed .aside .aside-collapse {
-        overflow-x: hidden;
     }
 }
 
