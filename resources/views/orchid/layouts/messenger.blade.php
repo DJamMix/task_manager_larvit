@@ -24,6 +24,8 @@
      data-call-join-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.calls.join', ['call' => 999999])) }}"
      data-forward-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.forward', $active_chat_id) : '' }}"
      data-delete-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.messages.delete', $active_chat_id) : '' }}"
+     data-read-url="{{ ($active_chat_id ?? null) ? route('platform.systems.chats.read', $active_chat_id) : '' }}"
+     data-first-unread="{{ $first_unread_id ?? '' }}"
      data-chats-picker-url="{{ $chats_picker_url ?? route('platform.systems.chats.picker') }}"
      data-media-url="{{ $chats_media_url ?? '' }}"
      data-vapid-key-url="{{ route('platform.web-push.vapid-key') }}"
@@ -87,7 +89,9 @@
                    class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}"
                    data-chat-id="{{ $item->id }}"
                    data-peer-id="{{ $peer?->id ?? '' }}"
-                   data-title="{{ mb_strtolower($item->displayTitle()) }}">
+                   data-title="{{ mb_strtolower($item->displayTitle()) }}"
+                   data-turbo-prefetch="false"
+                   data-turbo="true">
                     @if($item->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
                             'avatarUser' => $peer,
@@ -280,7 +284,14 @@
                     <button type="button" class="bx-feed-older__btn" id="bx-load-older">Загрузить ещё</button>
                     <span class="bx-feed-older__spin d-none" id="bx-load-older-spin">Загрузка…</span>
                 </div>
+                @php $unreadDividerDone = false; $firstUnreadId = (int) ($first_unread_id ?? 0); @endphp
                 @forelse($feed as $message)
+                    @if(!$unreadDividerDone && $firstUnreadId > 0 && (int) $message->id === $firstUnreadId)
+                        <div class="bx-unread-divider" id="bx-unread-divider" role="separator">
+                            <span>Непрочитанные сообщения</span>
+                        </div>
+                        @php $unreadDividerDone = true; @endphp
+                    @endif
                     @include('orchid.layouts.partials.bx-message', [
                         'message' => $message,
                         'chat' => $active,
@@ -294,11 +305,22 @@
             <div id="bx-typing" class="bx-typing d-none" aria-live="polite"></div>
 
             <div class="bx-selection-bar" id="bx-selection-bar" hidden>
-                <span id="bx-selection-count">Выбрано: 0</span>
-                <div>
-                    <button type="button" class="btn btn-sm btn-primary" id="bx-forward-selected">Переслать (0)</button>
-                    <button type="button" class="btn btn-sm btn-outline-danger" id="bx-delete-selected">Удалить</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="bx-selection-cancel">Отмена</button>
+                <div class="bx-selection-bar__info">
+                    <button type="button" class="bx-selection-bar__close" id="bx-selection-cancel" title="Отмена" aria-label="Отмена">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                    <span id="bx-selection-count">Выбрано: 0</span>
+                </div>
+                <div class="bx-selection-bar__actions">
+                    <button type="button" class="bx-selection-bar__btn bx-selection-bar__btn--primary" id="bx-forward-selected">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
+                        <span>Переслать</span>
+                        <em class="bx-selection-bar__count" id="bx-forward-count">0</em>
+                    </button>
+                    <button type="button" class="bx-selection-bar__btn bx-selection-bar__btn--danger" id="bx-delete-selected">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                        <span>Удалить</span>
+                    </button>
                 </div>
             </div>
 
@@ -667,10 +689,31 @@
         });
     }
 
-    const feed = document.getElementById('chat-feed');
-    if (feed) feed.scrollTop = feed.scrollHeight;
-
     const root = document.querySelector('.bx-messenger');
+    const feed = document.getElementById('chat-feed');
+    const firstUnreadAttr = root?.getAttribute('data-first-unread') || '';
+    const firstUnreadId = parseInt(firstUnreadAttr, 10) || 0;
+    const scrollFeedInitial = () => {
+        if (!feed) return;
+        if (firstUnreadId > 0) {
+            const divider = document.getElementById('bx-unread-divider');
+            const target = divider || document.getElementById('chat-msg-' + firstUnreadId);
+            if (target) {
+                // Как в Telegram: к первому непрочитанному, а не в самый низ
+                const feedRect = feed.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                const delta = (targetRect.top - feedRect.top) - Math.max(24, feed.clientHeight * 0.18);
+                feed.scrollTop = Math.max(0, feed.scrollTop + delta);
+                return;
+            }
+        }
+        feed.scrollTop = feed.scrollHeight;
+    };
+    if (feed) {
+        // Дождаться layout (аватары/код), затем позиционировать
+        requestAnimationFrame(() => requestAnimationFrame(scrollFeedInitial));
+    }
+
     const lockMessengerHeight = () => {
         if (!root) return;
         document.body.classList.add('bx-messenger-page');
@@ -961,12 +1004,19 @@
             return;
         }
 
-        mentionMenu.innerHTML = filtered.map((u, i) =>
-            `<button type="button" class="bx-mention-item ${i === 0 ? 'is-active' : ''}" data-mention-name="${escapeHtml(u.name)}" role="option">
-                <span class="bx-mention-item__avatar">${escapeHtml((u.name || '?').slice(0, 1).toUpperCase())}</span>
-                <span>${escapeHtml(u.name)}</span>
-            </button>`
-        ).join('');
+        mentionMenu.innerHTML = filtered.map((u, i) => {
+            const color = escapeHtml(u.avatar_color || '#64748b');
+            const initials = escapeHtml((u.avatar_initials || (u.name || '?').slice(0, 1)).toUpperCase());
+            const img = u.avatar_url
+                ? `<img class="bx-avatar__img" src="${escapeHtml(u.avatar_url)}" alt="" loading="lazy" onerror="this.remove()">`
+                : '';
+            return `<button type="button" class="bx-mention-item ${i === 0 ? 'is-active' : ''}" data-mention-name="${escapeHtml(u.name)}" role="option">
+                <span class="bx-avatar bx-avatar--xs bx-avatar--round bx-mention-item__avatar" style="--bx-avatar-bg:${color}">
+                    <span class="bx-avatar__initials">${initials}</span>${img}
+                </span>
+                <span class="bx-mention-item__name">${escapeHtml(u.name)}</span>
+            </button>`;
+        }).join('');
         mentionMenu.classList.remove('d-none');
     };
 
@@ -1262,8 +1312,12 @@
     const updateSelection = () => {
         const count = selectedMessageIds.size;
         selectionBar?.toggleAttribute('hidden', count === 0);
-        if (selectionCount) selectionCount.textContent = 'Выбрано: ' + count;
-        if (forwardSelected) forwardSelected.textContent = 'Переслать (' + count + ')';
+        if (selectionCount) selectionCount.textContent = count ? ('Выбрано: ' + count) : 'Выбрано: 0';
+        const forwardCount = document.getElementById('bx-forward-count');
+        if (forwardCount) forwardCount.textContent = String(count);
+        if (forwardSelected) {
+            forwardSelected.setAttribute('aria-label', 'Переслать (' + count + ')');
+        }
         root?.classList.toggle('is-selecting', count > 0);
         document.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach((message) => {
             const id = Number(String(message.id || '').replace('chat-msg-', ''));
@@ -1296,7 +1350,13 @@
         const holdMs = () => (isCoarse() ? 450 : 380);
         const msgIdOf = (el) => Number(String(el?.id || '').replace('chat-msg-', ''));
         const msgFromTarget = (t) => t?.closest?.('.bx-msg:not(.bx-msg--system)');
-        const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox');
+        const isInteractive = (t) => !!t?.closest?.('button,a,input,textarea,label,.bx-voice,.bx-msg__receipt,.bx-lightbox,.bx-msg__body a');
+        const hasTextSelection = () => {
+            const sel = window.getSelection?.();
+            if (!sel || sel.isCollapsed || !sel.toString().trim()) return false;
+            const node = sel.anchorNode;
+            return !!(node && feedEl.contains(node));
+        };
 
         const clearHoldTimer = () => {
             if (timer) clearTimeout(timer);
@@ -1365,6 +1425,13 @@
             if (e.pointerType === 'mouse' && e.button !== 0) return;
             const message = msgFromTarget(e.target);
             if (!message || isInteractive(e.target)) return;
+            // Если пользователь выделяет текст в теле сообщения — не запускаем long-press выбора
+            if (e.target.closest?.('.bx-msg__body, .tw-codeblock, pre, code')) {
+                if (e.pointerType === 'mouse' && !e.ctrlKey && !e.metaKey && selectedMessageIds.size === 0) {
+                    return;
+                }
+            }
+            if (hasTextSelection() && selectedMessageIds.size === 0) return;
 
             // Уже режим выбора — переключаем на pointerup/touchend
             if (e.ctrlKey || e.metaKey || selectedMessageIds.size > 0) {
@@ -1429,8 +1496,9 @@
             }
         }, true);
 
-        // Блок нативного меню «Копировать» при long-press
+        // Нативное «Копировать» разрешаем при выделении текста; блокируем только при выборе сообщений / long-press
         feedEl.addEventListener('contextmenu', (e) => {
+            if (hasTextSelection()) return;
             if (msgFromTarget(e.target) && (holding || holdFired || selectedMessageIds.size > 0 || isCoarse())) {
                 e.preventDefault();
             }
@@ -3033,7 +3101,7 @@
                 const unread = c.unread > 0
                     ? '<span class="bx-search-hit__badge">' + escapeHtmlSearch(String(c.unread)) + '</span>'
                     : '';
-                return '<a class="bx-search-hit bx-search-hit--chat" href="' + escapeHtmlSearch(c.url) + '">'
+                return '<a class="bx-search-hit bx-search-hit--chat" href="' + escapeHtmlSearch(c.url) + '" data-turbo-prefetch="false">'
                     + avatarHtml(c.avatar)
                     + '<div class="bx-search-hit__body">'
                     +   '<div class="bx-search-hit__top">'
@@ -3056,7 +3124,7 @@
                 const previewLine = isDirect
                     ? highlight(m.preview)
                     : '<span class="bx-search-hit__from">' + escapeHtmlSearch(m.author) + ':</span> ' + highlight(m.preview);
-                return '<a class="bx-search-hit bx-search-hit--msg" href="' + escapeHtmlSearch(m.url) + '">'
+                return '<a class="bx-search-hit bx-search-hit--msg" href="' + escapeHtmlSearch(m.url) + '" data-turbo-prefetch="false">'
                     + avatarHtml(m.avatar)
                     + '<div class="bx-search-hit__body">'
                     +   '<div class="bx-search-hit__top">'
@@ -3119,6 +3187,108 @@
             searchInput.blur();
         }
     });
+
+    /* Прочтение как в Telegram: только видимые сообщения */
+    (() => {
+        const readUrl = root?.getAttribute('data-read-url') || '';
+        const selfId = String(root?.getAttribute('data-self-id') || '');
+        if (!feed || !readUrl) return;
+
+        let pendingMaxId = 0;
+        let sentMaxId = 0;
+        let timer = null;
+        let busy = false;
+
+        const flushRead = async () => {
+            if (busy || pendingMaxId <= sentMaxId) return;
+            busy = true;
+            const upTo = pendingMaxId;
+            try {
+                const res = await fetch(readUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ up_to: upTo }),
+                });
+                if (!res.ok) return;
+                sentMaxId = Math.max(sentMaxId, upTo);
+                const data = await res.json().catch(() => ({}));
+                const nextUnread = parseInt(data.first_unread_id || '0', 10) || 0;
+                if (!nextUnread) {
+                    document.getElementById('bx-unread-divider')?.remove();
+                    const activeChat = root?.getAttribute('data-active-chat') || '';
+                    const badge = document.querySelector('.bx-chat-item[data-chat-id="' + activeChat + '"] .bx-chat-item__badge');
+                    badge?.remove();
+                } else if (nextUnread > (parseInt(root?.getAttribute('data-first-unread') || '0', 10) || 0)) {
+                    root?.setAttribute('data-first-unread', String(nextUnread));
+                }
+            } catch (e) {
+            } finally {
+                busy = false;
+                if (pendingMaxId > sentMaxId) scheduleFlush(120);
+            }
+        };
+
+        const scheduleFlush = (ms = 450) => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(flushRead, ms);
+        };
+
+        const observeMessage = (el) => {
+            if (!el || el.dataset.readObserved === '1') return;
+            const id = Number(String(el.id || '').replace('chat-msg-', ''));
+            if (!id) return;
+            // Свои сообщения не двигают «непрочитанные»
+            if (el.classList.contains('bx-msg--mine') || el.classList.contains('bx-msg--system')) {
+                el.dataset.readObserved = '1';
+                return;
+            }
+            el.dataset.readObserved = '1';
+            observer.observe(el);
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            let advanced = false;
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting || entry.intersectionRatio < 0.55) return;
+                const id = Number(String(entry.target.id || '').replace('chat-msg-', ''));
+                if (!id) return;
+                if (id > pendingMaxId) {
+                    pendingMaxId = id;
+                    advanced = true;
+                }
+            });
+            if (advanced) scheduleFlush();
+        }, {
+            root: feed,
+            threshold: [0.55, 0.8],
+            rootMargin: '0px 0px -8% 0px',
+        });
+
+        feed.querySelectorAll('.bx-msg:not(.bx-msg--system)').forEach(observeMessage);
+
+        const mo = new MutationObserver((mutations) => {
+            mutations.forEach((m) => {
+                m.addedNodes.forEach((node) => {
+                    if (!(node instanceof HTMLElement)) return;
+                    if (node.classList?.contains('bx-msg')) observeMessage(node);
+                    node.querySelectorAll?.('.bx-msg:not(.bx-msg--system)').forEach(observeMessage);
+                });
+            });
+        });
+        mo.observe(feed, { childList: true, subtree: true });
+
+        // При уходе со страницы — дожать прочтение видимого
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushRead();
+        });
+        window.addEventListener('pagehide', () => { flushRead(); });
+    })();
 
     /* Переход к сообщению из поиска ?msg= */
     const focusMessageFromQuery = () => {

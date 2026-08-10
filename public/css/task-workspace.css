@@ -42,6 +42,8 @@
     font-size: 0.95rem;
     line-height: 1.6;
     color: var(--tw-ink);
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 .tw-card {
@@ -671,6 +673,8 @@
     line-height: 1.45;
     word-break: break-word;
     color: var(--tw-ink);
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 .tw-msg__body p {
@@ -2304,14 +2308,120 @@ body.bx-messenger-page .command-bar {
 .bx-mention-item__avatar {
     width: 28px;
     height: 28px;
-    border-radius: 8px;
-    background: #2563eb;
-    color: #fff;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+}
+.bx-mention-item__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bx-unread-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0.35rem 0 0.55rem;
+    color: #2563eb;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    user-select: none;
+}
+.bx-unread-divider::before,
+.bx-unread-divider::after {
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #93c5fd, transparent);
+}
+.bx-unread-divider span {
+    flex: 0 0 auto;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+}
+
+.bx-selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    background: #0f172a;
+    color: #f8fafc;
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+    animation: bx-sel-bar-in .16s ease;
+}
+.bx-selection-bar[hidden] { display: none !important; }
+@keyframes bx-sel-bar-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+}
+.bx-selection-bar__info {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+.bx-selection-bar__close {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    color: #e2e8f0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75rem;
-    font-weight: 700;
+    cursor: pointer;
+}
+.bx-selection-bar__close:hover { background: rgba(255,255,255,0.14); }
+.bx-selection-bar__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.bx-selection-bar__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    border-radius: 10px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s ease, transform .12s ease;
+}
+.bx-selection-bar__btn:active { transform: scale(0.98); }
+.bx-selection-bar__btn--primary {
+    background: #2563eb;
+    color: #fff;
+}
+.bx-selection-bar__btn--primary:hover { background: #1d4ed8; }
+.bx-selection-bar__btn--danger {
+    background: rgba(239, 68, 68, 0.16);
+    color: #fecaca;
+}
+.bx-selection-bar__btn--danger:hover { background: rgba(239, 68, 68, 0.28); }
+.bx-selection-bar__count {
+    font-style: normal;
+    min-width: 1.15rem;
+    height: 1.15rem;
+    padding: 0 0.3rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.22);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
 }
 
 .bx-messenger__feed {
@@ -2831,6 +2941,7 @@ body.bx-messenger-page .command-bar {
     border-radius: 12px;
     padding: 0.65rem 0.8rem;
     min-width: 0;
+    transition: box-shadow .12s ease, background .12s ease, transform .12s ease;
 }
 
 .bx-msg--mine {
@@ -2959,8 +3070,11 @@ body.bx-messenger-page .command-bar {
     font-weight: 600;
 }
 .bx-msg.is-selected .bx-msg__bubble {
-    outline: 2px solid #2563eb;
-    outline-offset: 2px;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45);
+    background: #eff6ff;
+}
+.bx-msg--mine.is-selected .bx-msg__bubble {
+    background: #dbeafe;
 }
 
 .bx-msg__files { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; align-items: flex-start; }
@@ -3086,17 +3200,6 @@ body.bx-lightbox-open { overflow: hidden; }
     cursor: pointer;
 }
 .bx-msg__select-btn[aria-pressed="true"] { color: #2563eb; font-weight: 600; }
-.bx-selection-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.55rem 0.8rem;
-    border-top: 1px solid #e2e8f0;
-    background: #fff;
-}
-.bx-selection-bar[hidden] { display: none; }
-.bx-selection-bar > div { display: flex; gap: 0.4rem; }
 .bx-sheet {
     position: fixed;
     inset: 0;
@@ -3126,12 +3229,24 @@ body.bx-lightbox-open { overflow: hidden; }
     transform: scale(0.98);
     transition: transform .12s ease;
 }
-/* Long-press на тач-устройствах: без callout/выделения текста и без увода в scroll */
+/* Long-press на тач-устройствах: без callout; текст в bubble можно выделять */
 .bx-messenger__feed .bx-msg:not(.bx-msg--system) {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
+    -webkit-touch-callout: default;
     touch-action: pan-y;
+}
+.bx-msg__body,
+.bx-msg__body *,
+.tw-msg__body,
+.tw-msg__body *,
+.tw-description,
+.tw-description *,
+.tw-codeblock,
+.tw-codeblock *,
+pre.ql-syntax,
+.tw-inline-code {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    cursor: text;
 }
 .bx-messenger__feed.is-press-hold {
     touch-action: none;
@@ -3153,7 +3268,8 @@ body.bx-lightbox-open { overflow: hidden; }
         padding: 0.65rem 0.8rem calc(0.65rem + env(safe-area-inset-bottom, 0px));
         box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.08);
     }
-    .bx-selection-bar .btn {
+    .bx-selection-bar .btn,
+    .bx-selection-bar__btn {
         min-height: 44px;
     }
 }
@@ -3175,9 +3291,14 @@ body.bx-lightbox-open { overflow: hidden; }
 }
 
 .bx-messenger.is-selecting .bx-msg,
-.bx-msg.is-hold {
-    user-select: none;
-    -webkit-user-select: none;
+.bx-messenger.is-selecting .bx-msg__body,
+.bx-messenger.is-selecting .bx-msg__body *,
+.bx-msg.is-hold,
+.bx-msg.is-hold .bx-msg__body,
+.bx-msg.is-hold .bx-msg__body * {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    cursor: pointer;
 }
 
 .bx-forward-search {

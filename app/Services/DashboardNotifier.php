@@ -6,10 +6,11 @@ namespace App\Services;
 
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\AppDashboardMessage;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
-use Orchid\Platform\Notifications\DashboardMessage;
 use Orchid\Support\Color;
 
 /**
@@ -17,25 +18,44 @@ use Orchid\Support\Color;
  */
 class DashboardNotifier
 {
+    /**
+     * @param  array<string, mixed>  $meta
+     */
     public function send(
         User $user,
         string $title,
         string $message,
         string $actionUrl,
-        Color $type = Color::INFO
+        Color $type = Color::INFO,
+        array $meta = []
     ): void {
         try {
-            $user->notify(
-                DashboardMessage::make()
-                    ->title($title)
-                    ->message(Str::limit(strip_tags($message), 240))
-                    ->action($actionUrl)
-                    ->type($type)
-            );
+            $body = Str::limit(strip_tags($message), 240);
+            if ($type instanceof \BackedEnum) {
+                $typeValue = strtolower((string) $type->value);
+            } elseif ($type instanceof \UnitEnum) {
+                $typeValue = strtolower($type->name);
+            } else {
+                $typeValue = strtolower(trim((string) $type));
+            }
+            if (!in_array($typeValue, ['info', 'success', 'warning', 'error', 'danger', 'primary', 'secondary', 'light', 'dark'], true)) {
+                $typeValue = 'info';
+            }
+            if ($typeValue === 'danger') {
+                $typeValue = 'error';
+            }
+
+            $user->notify(new AppDashboardMessage(
+                $title,
+                $body,
+                $actionUrl,
+                $typeValue,
+                $meta
+            ));
             app(WebPushService::class)->send(
                 $user,
                 $title,
-                Str::limit(strip_tags($message), 240),
+                $body,
                 $actionUrl
             );
         } catch (\Throwable) {
@@ -44,7 +64,40 @@ class DashboardNotifier
     }
 
     /**
+     * Удаляет уведомления колокольчика, привязанные к сообщениям чата.
+     *
+     * @param  list<int>  $messageIds
+     */
+    public function deleteForChatMessages(array $messageIds): void
+    {
+        $ids = collect($messageIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        try {
+            $query = DB::table('notifications')->where(function ($outer) use ($ids) {
+                $outer->where('type', AppDashboardMessage::class)
+                    ->orWhere('type', 'like', '%DashboardMessage%');
+
+                $outer->where(function ($q) use ($ids) {
+                    foreach ($ids as $messageId) {
+                        $q->orWhere('data', 'like', '%"message_id":' . $messageId . '%')
+                            ->orWhere('data', 'like', '%"message_id": ' . $messageId . '%')
+                            ->orWhere('data', 'like', '%msg=' . $messageId . '%');
+                    }
+                });
+            });
+
+            $query->delete();
+        } catch (\Throwable) {
+            // ignore
+        }
+    }
+
+    /**
      * @param  iterable<int|User>  $recipients
+     * @param  array<string, mixed>  $meta
      */
     public function sendMany(
         iterable $recipients,
@@ -52,12 +105,13 @@ class DashboardNotifier
         string $message,
         string $actionUrl,
         Color $type = Color::INFO,
-        ?int $exceptUserId = null
+        ?int $exceptUserId = null,
+        array $meta = []
     ): void {
         $users = $this->resolveUsers($recipients, $exceptUserId);
 
         foreach ($users as $user) {
-            $this->send($user, $title, $message, $actionUrl, $type);
+            $this->send($user, $title, $message, $actionUrl, $type, $meta);
         }
     }
 

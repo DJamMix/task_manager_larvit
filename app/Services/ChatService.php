@@ -444,11 +444,11 @@ class ChatService
         $active = null;
         if ($activeChatId) {
             $active = Chat::query()->with('members')->find($activeChatId);
-            if ($active && $active->isMember($user->id)) {
-                $this->markRead($active, $user);
-            } else {
+            if (!$active || !$active->isMember($user->id)) {
                 $active = null;
             }
+            // Не помечаем прочитанным здесь — только когда сообщения реально на экране
+            // (IntersectionObserver / mark-read endpoint), как в Telegram.
         }
 
         $chats = $this->chatsFor($user);
@@ -1336,11 +1336,67 @@ class ChatService
         return $ids->unique()->values();
     }
 
-    public function markRead(Chat $chat, User $user): void
+    public function markRead(Chat $chat, User $user, ?\Carbon\CarbonInterface $at = null): void
     {
+        if (!$chat->isMember($user->id)) {
+            return;
+        }
+
+        $at = $at ?: now();
+        $current = $chat->members()->where('users.id', $user->id)->first()?->pivot?->last_read_at;
+        // Не откатываем курсор прочтения назад
+        if ($current && $at->lt($current)) {
+            return;
+        }
+
         $chat->members()->updateExistingPivot($user->id, [
-            'last_read_at' => now(),
+            'last_read_at' => $at,
         ]);
+    }
+
+    /**
+     * Пометить прочитанным до конкретного сообщения (включительно), как в Telegram.
+     */
+    public function markReadUpTo(Chat $chat, User $user, int $messageId): void
+    {
+        if (!$chat->isMember($user->id)) {
+            abort(403);
+        }
+
+        $message = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->whereKey($messageId)
+            ->first();
+
+        if (!$message || !$message->created_at) {
+            return;
+        }
+
+        $this->markRead($chat, $user, $message->created_at);
+    }
+
+    /**
+     * Первое непрочитанное чужое сообщение (для divider и скролла).
+     */
+    public function firstUnreadMessageId(Chat $chat, User $user): ?int
+    {
+        if (!$chat->isMember($user->id)) {
+            return null;
+        }
+
+        $lastReadAt = $chat->members->firstWhere('id', $user->id)?->pivot?->last_read_at
+            ?? $chat->members()->where('users.id', $user->id)->first()?->pivot?->last_read_at;
+
+        $id = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->visibleTo($user)
+            ->where('user_id', '!=', $user->id)
+            ->where('is_system', false)
+            ->where('created_at', '>', $lastReadAt ?: '1970-01-01 00:00:00')
+            ->orderBy('id')
+            ->value('id');
+
+        return $id ? (int) $id : null;
     }
 
     private function postSystem(Chat $chat, User $actor, string $text): void
@@ -1358,7 +1414,11 @@ class ChatService
         $preview = \Illuminate\Support\Str::limit($message->plain_text, 140);
         // Только автор + текст. Название чата не дублируем: в личке это имя получателя («это я»).
         $body = "{$actor->displayName()}: {$preview}";
-        $url = route('platform.systems.chats.view', $chat);
+        $url = route('platform.systems.chats.view', $chat) . '?msg=' . (int) $message->id;
+        $meta = [
+            'message_id' => (int) $message->id,
+            'chat_id' => (int) $chat->id,
+        ];
 
         $recipients = $chat->members
             ->reject(fn (User $u) => (int) $u->id === (int) $actor->id)
@@ -1371,20 +1431,20 @@ class ChatService
                 ->filter(fn (User $u) => in_array((int) $u->id, $mentionIds, true));
 
             foreach ($mentioned as $user) {
-                $this->notifier->send($user, 'Вас упомянули в чате', $body, $url, Color::INFO);
+                $this->notifier->send($user, 'Вас упомянули в чате', $body, $url, Color::INFO, $meta);
             }
 
             // Остальным незамьюченным — обычное «новое сообщение»
             $mentionedIds = $mentioned->pluck('id')->all();
             foreach ($recipients->reject(fn (User $u) => in_array((int) $u->id, $mentionedIds, true)) as $user) {
-                $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO);
+                $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO, $meta);
             }
 
             return;
         }
 
         foreach ($recipients as $user) {
-            $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO);
+            $this->notifier->send($user, 'Новое сообщение в чате', $body, $url, Color::INFO, $meta);
         }
     }
 
@@ -1436,6 +1496,10 @@ class ChatService
 
         if ($deletedIds !== []) {
             $chat->touch();
+            // Удаление «у всех» — убираем связанные уведомления из колокольчика
+            if ($scope === 'everyone') {
+                $this->notifier->deleteForChatMessages($deletedIds);
+            }
         }
 
         return ['deleted_ids' => $deletedIds, 'scope' => $scope];

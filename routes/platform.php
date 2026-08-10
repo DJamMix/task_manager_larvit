@@ -481,6 +481,32 @@ Route::post('chats/{chat}/forward', function (
     return response()->json(['ok' => true]);
 })->name('platform.systems.chats.forward');
 
+Route::post('chats/{chat}/read', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    abort_unless($chat->isMember($request->user()->id), 403);
+
+    $data = $request->validate([
+        'message_id' => 'nullable|integer',
+        'up_to' => 'nullable|integer',
+    ]);
+
+    $messageId = (int) ($data['up_to'] ?? $data['message_id'] ?? 0);
+    if ($messageId > 0) {
+        $chats->markReadUpTo($chat, $request->user(), $messageId);
+    } else {
+        $chats->markRead($chat, $request->user());
+    }
+
+    return response()->json([
+        'ok' => true,
+        'first_unread_id' => $chats->firstUnreadMessageId($chat->fresh(['members']), $request->user()),
+    ]);
+})->name('platform.systems.chats.read');
+
 Route::post('chats/{chat}/messages/delete', function (
     \Illuminate\Http\Request $request,
     \App\Models\Chat $chat,

@@ -40,6 +40,7 @@ class ChatController extends Controller
         $this->assertChats($user);
         $this->assertMember($chat, $user);
 
+        // На мобильном открытие чата по-прежнему помечает прочитанным (клиент пока без IO).
         $this->chats->markRead($chat, $user);
         $feed = $this->chats->feedForChat($chat, $user, null, (int) $request->integer('limit', 40));
         $token = $request->bearerToken();
@@ -64,12 +65,15 @@ class ChatController extends Controller
             ->reject(fn ($u) => (int) $u->id === (int) $user->id)
             ->map(fn ($u) => [
                 'id' => (int) $u->id,
-                'name' => (string) ($u->name ?: $u->displayName()),
+                'name' => (string) ($u->displayName() ?: $u->name),
                 'aliases' => array_values(array_unique(array_filter([
                     $u->name,
                     $u->displayName(),
                     $u->email ? strtok((string) $u->email, '@') : null,
                 ]))),
+                'avatar_url' => (string) $u->avatarUrl(),
+                'avatar_initials' => (string) $u->avatarInitials(),
+                'avatar_color' => (string) $u->avatarColor(),
             ])
             ->values()
             ->all();
@@ -81,6 +85,7 @@ class ChatController extends Controller
                 ->values(),
             'has_more' => (bool) $feed['has_more'],
             'oldest_id' => $feed['oldest_id'],
+            'first_unread_id' => $this->chats->firstUnreadMessageId($chat, $user),
             'mention_users' => $mentionUsers,
         ]);
     }

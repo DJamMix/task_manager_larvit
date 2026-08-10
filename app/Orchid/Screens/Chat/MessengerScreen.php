@@ -52,32 +52,46 @@ class MessengerScreen extends Screen
                 abort(403);
             }
             $resolved = $routeChat->load(['members']);
-            $chats->markRead($resolved, $user);
         } elseif (is_numeric($routeChat)) {
             $resolved = Chat::query()->findOrFail((int) $routeChat);
             if (!$resolved->isMember($user->id)) {
                 abort(403);
             }
             $resolved->load(['members']);
-            $chats->markRead($resolved, $user);
         }
 
         $focusMessageId = request()->integer('msg') ?: null;
+        $firstUnreadId = null;
+        if ($resolved && !$focusMessageId) {
+            $firstUnreadId = $chats->firstUnreadMessageId($resolved, $user);
+            // Открываем ленту вокруг первого непрочитанного, а не всегда в самом низу
+            if ($firstUnreadId) {
+                $focusMessageId = $firstUnreadId;
+            }
+        }
+
         $feedMeta = $resolved
             ? $chats->feedForChat($resolved, $user, $focusMessageId, 40)
             : ['messages' => collect(), 'has_more' => false, 'oldest_id' => null];
         $messages = $feedMeta['messages'];
 
+        if ($resolved && $firstUnreadId === null) {
+            $firstUnreadId = $chats->firstUnreadMessageId($resolved, $user);
+        }
+
         $mentionUsers = $resolved?->members
             ?->reject(fn ($u) => (int) $u->id === (int) $user->id)
             ->map(fn ($u) => [
                 'id' => (int) $u->id,
-                'name' => $u->name,
+                'name' => $u->displayName() ?: $u->name,
                 'aliases' => array_values(array_unique(array_filter([
                     $u->name,
                     $u->displayName(),
                     $u->email ? strtok($u->email, '@') : null,
                 ]))),
+                'avatar_url' => (string) $u->avatarUrl(),
+                'avatar_initials' => (string) $u->avatarInitials(),
+                'avatar_color' => (string) $u->avatarColor(),
             ])
             ->values()
             ->all() ?? [];
@@ -127,6 +141,7 @@ class MessengerScreen extends Screen
             'staff_options' => $chats->directInterlocutorOptions($user),
             'active_chat_id' => $resolved?->id,
             'mention_users' => $mentionUsers,
+            'first_unread_id' => $firstUnreadId,
             'composer_tasks' => $composerTasks,
             'composer_tasks_search_url' => route('platform.systems.chats.tasks'),
             'chat_is_muted' => $isMuted,

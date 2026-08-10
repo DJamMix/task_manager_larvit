@@ -3,267 +3,260 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ env('APP_NAME') }} HelpDesk</title>
-    <!-- Подключаем Tailwind CSS с дополнительными настройками -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    animation: {
-                        'float': 'float 6s ease-in-out infinite',
-                        'fade-in': 'fadeIn 1s ease-in-out',
-                        'slide-up': 'slideUp 0.8s ease-out',
-                    },
-                    keyframes: {
-                        float: {
-                            '0%, 100%': { transform: 'translateY(0)' },
-                            '50%': { transform: 'translateY(-20px)' },
-                        },
-                        fadeIn: {
-                            '0%': { opacity: '0' },
-                            '100%': { opacity: '1' },
-                        },
-                        slideUp: {
-                            '0%': { 
-                                opacity: '0',
-                                transform: 'translateY(20px)'
-                            },
-                            '100%': { 
-                                opacity: '1',
-                                transform: 'translateY(0)'
-                            },
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <title>{{ config('app.name', env('APP_NAME', 'CrewDev')) }} HelpDesk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
+        :root {
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: rgba(15, 23, 42, 0.08);
+            --surface: rgba(255, 255, 255, 0.88);
+            --accent: #0f172a;
+            --soft: #f1f5f9;
+        }
+        * { box-sizing: border-box; }
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f5f5f5 0%, #e5e5e5 100%);
+            margin: 0;
+            min-height: 100vh;
+            font-family: Manrope, system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 600px at 10% -10%, #e2e8f0 0%, transparent 55%),
+                radial-gradient(900px 500px at 100% 0%, #cbd5e1 0%, transparent 50%),
+                linear-gradient(160deg, #f8fafc 0%, #eef2f7 100%);
             overflow-x: hidden;
         }
-        
-        .card {
-            backdrop-filter: blur(16px);
-            background: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .btn-primary {
-            position: relative;
+        #particles-js {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
             overflow: hidden;
-            transition: all 0.3s;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        .btn-primary::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-            transition: all 0.5s;
-        }
-        
-        .btn-primary:hover::after {
-            left: 100%;
-        }
-        
-        .task-preview {
-            transition: all 0.3s;
-            border-left: 4px solid transparent;
-        }
-        
-        .task-preview:hover {
-            transform: translateX(5px);
-            border-left-color: #3b82f6;
-        }
-        
-        .logo {
-            filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-        }
-        
         .particle {
             position: absolute;
-            background: rgba(0, 0, 0, 0.1);
+            background: rgba(15, 23, 42, 0.08);
             border-radius: 50%;
             pointer-events: none;
+            will-change: transform;
+        }
+        .shell {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+        }
+        .card {
+            width: 100%;
+            max-width: 920px;
+            display: grid;
+            grid-template-columns: 1.05fr 0.95fr;
+            border-radius: 24px;
+            overflow: hidden;
+            background: var(--surface);
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+            backdrop-filter: blur(16px);
+            animation: fadeIn .7s ease both;
+        }
+        @media (max-width: 800px) {
+            .card { grid-template-columns: 1fr; }
+            .visual { min-height: 240px; }
+        }
+        .content { padding: 2.5rem 2.75rem; }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            margin-bottom: 1.5rem;
+        }
+        .brand svg { width: 2.4rem; height: 2.4rem; filter: drop-shadow(0 4px 8px rgba(15,23,42,.12)); }
+        .brand h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; }
+        h2 {
+            margin: 0 0 .75rem;
+            font-size: clamp(1.8rem, 3vw, 2.4rem);
+            line-height: 1.15;
+            letter-spacing: -.03em;
+            font-weight: 800;
+        }
+        .lead { margin: 0 0 1.75rem; color: var(--muted); font-size: 1.05rem; line-height: 1.55; }
+        .previews { display: grid; gap: .75rem; margin-bottom: 1.75rem; }
+        .preview {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: .9rem 1rem;
+            border-left: 4px solid transparent;
+            transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+        }
+        .preview:hover {
+            transform: translateX(4px);
+            border-left-color: #2563eb;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        }
+        .preview-top { display: flex; align-items: center; gap: .65rem; font-weight: 600; }
+        .dot { width: .7rem; height: .7rem; border-radius: 50%; flex-shrink: 0; }
+        .dot-blue { background: #3b82f6; }
+        .dot-green { background: #22c55e; }
+        .preview-meta { margin: .35rem 0 0; color: var(--muted); font-size: .85rem; }
+        .actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: .85rem 1.25rem;
+            border-radius: 12px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22); }
+        .btn-ghost {
+            background: transparent;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+        .btn-ghost:hover { background: #f8fafc; }
+        .visual {
+            position: relative;
+            background: linear-gradient(160deg, #f1f5f9, #e2e8f0);
+            padding: 2rem;
+            overflow: hidden;
+            min-height: 420px;
+        }
+        .float-card {
+            position: absolute;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.1);
+            border: 1px solid rgba(255,255,255,.8);
+            animation: float 6s ease-in-out infinite;
+        }
+        .float-a { top: 8%; left: 6%; width: 68%; padding: 1rem; animation-delay: 0s; }
+        .float-b { top: 34%; right: 4%; width: 58%; padding: 1rem; animation-delay: 1s; }
+        .float-c { bottom: 8%; left: 18%; width: 52%; padding: .85rem; animation-delay: 2s; }
+        .skeleton { background: #e2e8f0; border-radius: 999px; height: .55rem; }
+        .skeleton-lg { height: 5.5rem; border-radius: 12px; background: #f1f5f9; }
+        .row { display: flex; gap: .5rem; align-items: center; }
+        .avatar { width: 1.7rem; height: 1.7rem; border-radius: 50%; background: #dbeafe; }
+        .avatar.g { background: #dcfce7; }
+        .avatar.y { background: #fef9c3; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-14px); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: none; }
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
-    <!-- Частицы фона -->
-    <div id="particles-js"></div>
-    
-    <!-- Основной контент -->
-    <div class="card w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-fade-in">
-        <div class="flex flex-col md:flex-row">
-            <!-- Левая часть - информация -->
-            <div class="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-                <div class="animate-slide-up">
-                    <div class="flex items-center justify-center md:justify-start mb-6">
-                        <svg class="logo w-10 h-10 text-gray-900 mr-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M12 8V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                        <h1 class="text-2xl font-bold text-gray-900">CrewDev</h1>
-                    </div>
-                    
-                    <h2 class="text-4xl font-bold text-gray-900 mb-4">Менеджер задач</h2>
-                    <p class="text-gray-600 mb-8">Профессиональное управление проектами для вашей команды и клиентов</p>
-                    
-                    <div class="space-y-4 mb-8">
-                        <div class="task-preview bg-white p-4 rounded-lg shadow-sm">
-                            <div class="flex items-center">
-                                <div class="w-3 h-3 rounded-full bg-blue-500 mr-3"></div>
-                                <p class="text-gray-800 font-medium">Новая функция разработки</p>
-                            </div>
-                            <p class="text-gray-500 text-sm mt-1">В процессе • Приоритет: Высокий</p>
+<body>
+    <div id="particles-js" aria-hidden="true"></div>
+
+    <div class="shell">
+        <div class="card">
+            <div class="content">
+                <div class="brand">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 8V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <h1>CrewDev</h1>
+                </div>
+
+                <h2>Менеджер задач</h2>
+                <p class="lead">Профессиональное управление проектами для вашей команды и клиентов</p>
+
+                <div class="previews">
+                    <div class="preview">
+                        <div class="preview-top">
+                            <span class="dot dot-blue"></span>
+                            <span>Новая функция разработки</span>
                         </div>
-                        
-                        <div class="task-preview bg-white p-4 rounded-lg shadow-sm">
-                            <div class="flex items-center">
-                                <div class="w-3 h-3 rounded-full bg-green-500 mr-3"></div>
-                                <p class="text-gray-800 font-medium">Исправление бага</p>
-                            </div>
-                            <p class="text-gray-500 text-sm mt-1">Завершено • Клиент: ООО "Технологии"</p>
-                        </div>
+                        <p class="preview-meta">В процессе · Приоритет: Высокий</p>
                     </div>
-                    
-                    <div class="flex flex-col sm:flex-row gap-4">
-                        <a href="/admin" class="btn-primary px-6 py-3 bg-gray-900 text-white rounded-lg font-medium text-center transition-all duration-300">
-                            Панель управления
-                        </a>
-                        <a href="#" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium text-center hover:bg-gray-50 transition-all duration-300">
-                            Попробуй потом
-                        </a>
+                    <div class="preview">
+                        <div class="preview-top">
+                            <span class="dot dot-green"></span>
+                            <span>Исправление бага</span>
+                        </div>
+                        <p class="preview-meta">Завершено · Клиент: ООО «Технологии»</p>
                     </div>
                 </div>
+
+                <div class="actions">
+                    <a href="/admin" class="btn btn-primary">Панель управления</a>
+                    <a href="/admin/login" class="btn btn-ghost">Войти</a>
+                </div>
             </div>
-            
-            <!-- Правая часть - графическая -->
-            <div class="w-full md:w-1/2 bg-gray-50 p-8 md:p-12 flex items-center justify-center relative overflow-hidden">
-                <div class="relative w-full h-64 md:h-full">
-                    <!-- Анимированные элементы интерфейса -->
-                    <div class="absolute top-0 left-0 w-64 h-64 bg-white rounded-xl shadow-md animate-float" style="animation-delay: 0s;">
-                        <div class="p-4">
-                            <div class="flex justify-between items-center mb-3">
-                                <div class="w-20 h-2 bg-gray-200 rounded"></div>
-                                <div class="w-6 h-6 bg-gray-200 rounded-full"></div>
-                            </div>
-                            <div class="space-y-2">
-                                <div class="w-full h-2 bg-gray-100 rounded"></div>
-                                <div class="w-3/4 h-2 bg-gray-100 rounded"></div>
-                                <div class="w-1/2 h-2 bg-gray-100 rounded"></div>
-                            </div>
-                            <div class="mt-4 flex space-x-2">
-                                <div class="w-8 h-8 bg-blue-100 rounded-full"></div>
-                                <div class="w-8 h-8 bg-green-100 rounded-full"></div>
-                                <div class="w-8 h-8 bg-yellow-100 rounded-full"></div>
-                            </div>
-                        </div>
+
+            <div class="visual" aria-hidden="true">
+                <div class="float-card float-a">
+                    <div class="row" style="justify-content:space-between;margin-bottom:.75rem;">
+                        <div class="skeleton" style="width:5rem;"></div>
+                        <div class="avatar"></div>
                     </div>
-                    
-                    <div class="absolute top-1/4 right-0 w-56 h-56 bg-white rounded-xl shadow-md animate-float" style="animation-delay: 1s;">
-                        <div class="p-4">
-                            <div class="flex items-center mb-3">
-                                <div class="w-6 h-6 bg-gray-200 rounded-full mr-2"></div>
-                                <div class="w-16 h-2 bg-gray-200 rounded"></div>
-                            </div>
-                            <div class="h-24 bg-gray-100 rounded mb-2"></div>
-                            <div class="flex justify-between">
-                                <div class="w-12 h-2 bg-gray-200 rounded"></div>
-                                <div class="w-8 h-2 bg-gray-200 rounded"></div>
-                            </div>
-                        </div>
+                    <div class="skeleton" style="width:100%;margin-bottom:.4rem;"></div>
+                    <div class="skeleton" style="width:75%;margin-bottom:.4rem;"></div>
+                    <div class="skeleton" style="width:50%;"></div>
+                    <div class="row" style="margin-top:1rem;">
+                        <div class="avatar"></div>
+                        <div class="avatar g"></div>
+                        <div class="avatar y"></div>
                     </div>
-                    
-                    <div class="absolute bottom-0 left-1/4 w-48 h-48 bg-white rounded-xl shadow-md animate-float" style="animation-delay: 2s;">
-                        <div class="p-3">
-                            <div class="flex items-center mb-2">
-                                <div class="w-4 h-4 bg-gray-200 rounded-full mr-2"></div>
-                                <div class="w-12 h-1.5 bg-gray-200 rounded"></div>
-                            </div>
-                            <div class="space-y-1.5">
-                                <div class="w-full h-1 bg-gray-100 rounded"></div>
-                                <div class="w-full h-1 bg-gray-100 rounded"></div>
-                                <div class="w-2/3 h-1 bg-gray-100 rounded"></div>
-                            </div>
-                            <div class="mt-2 flex justify-end">
-                                <div class="w-6 h-6 bg-gray-200 rounded-full"></div>
-                            </div>
-                        </div>
+                </div>
+                <div class="float-card float-b">
+                    <div class="row" style="margin-bottom:.75rem;">
+                        <div class="avatar"></div>
+                        <div class="skeleton" style="width:4rem;"></div>
                     </div>
+                    <div class="skeleton-lg"></div>
+                    <div class="row" style="justify-content:space-between;margin-top:.75rem;">
+                        <div class="skeleton" style="width:3rem;"></div>
+                        <div class="skeleton" style="width:2rem;"></div>
+                    </div>
+                </div>
+                <div class="float-card float-c">
+                    <div class="row" style="margin-bottom:.55rem;">
+                        <div class="avatar" style="width:1rem;height:1rem;"></div>
+                        <div class="skeleton" style="width:3rem;height:.4rem;"></div>
+                    </div>
+                    <div class="skeleton" style="width:100%;height:.35rem;margin-bottom:.3rem;"></div>
+                    <div class="skeleton" style="width:100%;height:.35rem;margin-bottom:.3rem;"></div>
+                    <div class="skeleton" style="width:66%;height:.35rem;"></div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script>
-        // Создание частиц фона
-        document.addEventListener('DOMContentLoaded', function() {
-            const particlesContainer = document.getElementById('particles-js');
-            const particleCount = 30;
-            
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.classList.add('particle');
-                
-                // Случайные параметры частицы
-                const size = Math.random() * 10 + 5;
-                const posX = Math.random() * 100;
-                const posY = Math.random() * 100;
-                const opacity = Math.random() * 0.2 + 0.05;
-                const animationDuration = Math.random() * 20 + 10;
-                const animationDelay = Math.random() * 5;
-                
-                particle.style.width = `${size}px`;
-                particle.style.height = `${size}px`;
-                particle.style.left = `${posX}%`;
-                particle.style.top = `${posY}%`;
-                particle.style.opacity = opacity;
-                particle.style.animation = `float ${animationDuration}s ease-in-out ${animationDelay}s infinite`;
-                
-                particlesContainer.appendChild(particle);
+        document.addEventListener('DOMContentLoaded', function () {
+            const root = document.getElementById('particles-js');
+            if (!root) return;
+            for (let i = 0; i < 28; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                const size = Math.random() * 10 + 4;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.left = (Math.random() * 100) + '%';
+                p.style.top = (Math.random() * 100) + '%';
+                p.style.opacity = String(Math.random() * 0.18 + 0.04);
+                p.style.animation = 'float ' + (Math.random() * 18 + 10) + 's ease-in-out ' + (Math.random() * 5) + 's infinite';
+                root.appendChild(p);
             }
-            
-            // Анимация при наведении на кнопку
-            const btnPrimary = document.querySelector('.btn-primary');
-            if (btnPrimary) {
-                btnPrimary.addEventListener('mouseenter', function() {
-                    const particles = document.querySelectorAll('.particle');
-                    particles.forEach(particle => {
-                        particle.style.transform = 'translateY(-5px)';
-                    });
-                });
-                
-                btnPrimary.addEventListener('mouseleave', function() {
-                    const particles = document.querySelectorAll('.particle');
-                    particles.forEach(particle => {
-                        particle.style.transform = 'translateY(0)';
-                    });
-                });
-            }
-        });
-        
-        // Плавное появление элементов при загрузке
-        document.body.style.opacity = '0';
-        window.addEventListener('load', function() {
-            document.body.style.transition = 'opacity 0.5s ease-in-out';
-            document.body.style.opacity = '1';
         });
     </script>
 </body>
