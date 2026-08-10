@@ -52,51 +52,72 @@
         <div class="bx-messenger__sidebar-head">
             <div class="bx-messenger__sidebar-title">
                 <strong>Чаты</strong>
-                <span class="badge text-bg-light border">{{ $chatList->count() }}</span>
             </div>
             <div class="bx-messenger__sidebar-actions">
                 <button type="button"
-                        class="bx-sidebar-action"
+                        class="bx-sidebar-icon"
                         data-bx-open-modal="createDirectModal"
-                        title="Начать личный чат">
-                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span>Личный</span>
+                        title="Написать сообщение">
+                    <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                 </button>
                 @if(!empty($can_create))
                     <button type="button"
-                            class="bx-sidebar-action bx-sidebar-action--primary"
+                            class="bx-sidebar-icon"
                             data-bx-open-modal="createChatModal"
-                            title="Создать групповой чат">
+                            title="Создать группу">
                         <svg class="bx-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
-                        <span>Группа</span>
                     </button>
                 @endif
             </div>
         </div>
         <div class="bx-messenger__search">
-            <input type="search"
-                   id="bx-chat-search"
-                   class="bx-messenger__search-input"
-                   placeholder="Поиск по чатам и сообщениям…"
-                   autocomplete="off"
-                   data-search-url="{{ $chats_search_url ?? route('platform.systems.chats.search') }}">
+            <div class="bx-messenger__search-wrap">
+                <svg class="bx-messenger__search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3-3"/></svg>
+                <input type="search"
+                       id="bx-chat-search"
+                       class="bx-messenger__search-input"
+                       placeholder="Поиск"
+                       autocomplete="off"
+                       data-search-url="{{ $chats_search_url ?? route('platform.systems.chats.search') }}">
+            </div>
         </div>
 
-        <div class="bx-messenger__list" id="bx-chat-list">
+        <div class="bx-messenger__list" id="bx-chat-list"
+             data-pin-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.pin', ['chat' => 999999])) }}"
+             data-mute-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.mute', ['chat' => 999999])) }}">
+            @php $chatTimeFmt = app(\App\Services\ChatService::class); @endphp
             @forelse($chatList as $item)
-                @php $peer = $item->type === 'direct' ? $item->otherMember() : null; @endphp
+                @php
+                    $peer = $item->type === 'direct' ? $item->otherMember() : null;
+                    $latest = $item->latestMessage;
+                    $previewRaw = trim((string) ($latest?->plain_text ?? ''));
+                    if ($previewRaw === '') {
+                        $listPreview = $latest ? 'Вложение' : 'Нет сообщений';
+                    } elseif ($item->type !== 'direct' && $latest?->user) {
+                        $who = (int) $latest->user_id === (int) auth()->id()
+                            ? 'Вы'
+                            : ($latest->user->displayName() ?: 'Участник');
+                        $listPreview = $who . ': ' . $previewRaw;
+                    } elseif ($latest && (int) $latest->user_id === (int) auth()->id()) {
+                        $listPreview = 'Вы: ' . $previewRaw;
+                    } else {
+                        $listPreview = $previewRaw;
+                    }
+                    $listTime = $chatTimeFmt->formatChatListTime($latest?->created_at);
+                @endphp
                 <a href="{{ route('platform.systems.chats.view', $item) }}"
                    class="bx-chat-item {{ (int)$activeId === (int)$item->id ? 'is-active' : '' }} {{ !empty($item->is_muted) ? 'is-muted' : '' }} {{ !empty($item->is_pinned) ? 'is-pinned' : '' }}"
                    data-chat-id="{{ $item->id }}"
                    data-peer-id="{{ $peer?->id ?? '' }}"
                    data-title="{{ mb_strtolower($item->displayTitle()) }}"
+                   data-last-id="{{ $latest?->id ?? '' }}"
                    data-turbo-prefetch="false"
                    data-turbo="true">
                     @if($item->type === 'direct')
                         @include('orchid.layouts.partials.bx-avatar', [
                             'avatarUser' => $peer,
                             'avatarChat' => null,
-                            'size' => 'md',
+                            'size' => 'lg',
                             'shape' => 'round',
                             'showOnline' => true,
                             'isOnline' => $presenceOnline($peer?->id),
@@ -105,32 +126,35 @@
                         @include('orchid.layouts.partials.bx-avatar', [
                             'avatarChat' => $item,
                             'avatarUser' => null,
-                            'size' => 'md',
+                            'size' => 'lg',
                             'shape' => 'square',
                         ])
                     @endif
                     <div class="bx-chat-item__body">
                         <div class="bx-chat-item__top">
-                            <strong>
+                            <strong class="bx-chat-item__title">{{ $item->displayTitle() }}</strong>
+                            <span class="bx-chat-item__meta">
                                 @if(!empty($item->is_pinned))
-                                    <svg class="bx-icon bx-icon--xs bx-pin" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                                    <svg class="bx-chat-item__pin" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
                                 @endif
-                                {{ $item->displayTitle() }}
-                                @if(!empty($item->is_muted))
-                                    <svg class="bx-icon bx-icon--xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                                @endif
-                            </strong>
-                            @if(($item->unread_count ?? 0) > 0)
-                                <span class="bx-chat-item__badge">{{ $item->unread_count }}</span>
-                            @endif
+                                <span class="bx-chat-item__time">{{ $listTime }}</span>
+                            </span>
                         </div>
-                        <div class="bx-chat-item__preview text-muted">
-                            {{ \Illuminate\Support\Str::limit($item->latestMessage?->plain_text ?? 'Нет сообщений', 48) }}
+                        <div class="bx-chat-item__bottom">
+                            <div class="bx-chat-item__preview">{{ \Illuminate\Support\Str::limit($listPreview, 64) }}</div>
+                            <span class="bx-chat-item__trail">
+                                @if(!empty($item->is_muted))
+                                    <svg class="bx-chat-item__mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                                @endif
+                                @if(($item->unread_count ?? 0) > 0)
+                                    <span class="bx-chat-item__badge {{ !empty($item->is_muted) ? 'is-muted' : '' }}">{{ $item->unread_count }}</span>
+                                @endif
+                            </span>
                         </div>
                     </div>
                 </a>
             @empty
-                <div class="text-muted small p-3">Пока нет чатов. Напишите коллеге или создайте группу.</div>
+                <div class="bx-chat-list-empty" id="bx-chat-list-empty">Пока нет чатов</div>
             @endforelse
         </div>
         <div class="bx-search-panel d-none" id="bx-search-panel" hidden>
@@ -613,6 +637,28 @@
             </button>
         </div>
         <button type="button" class="bx-msg-actions__cancel" id="bx-msg-actions-cancel">Отмена</button>
+    </div>
+</div>
+
+<div class="bx-sheet bx-chat-actions-sheet" id="bx-chat-actions" hidden>
+    <button type="button" class="bx-sheet__backdrop" id="bx-chat-actions-bg" aria-label="Закрыть"></button>
+    <div class="bx-sheet__panel bx-chat-actions__panel" role="dialog" aria-modal="true">
+        <div class="bx-chat-actions__preview" id="bx-chat-actions-preview"></div>
+        <div class="bx-chat-actions__list" role="menu">
+            <button type="button" class="bx-msg-actions__item" data-chat-action="pin" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                <span id="bx-chat-action-pin-label">Закрепить</span>
+            </button>
+            <button type="button" class="bx-msg-actions__item" data-chat-action="mute" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
+                <span id="bx-chat-action-mute-label">Без звука</span>
+            </button>
+            <button type="button" class="bx-msg-actions__item" data-chat-action="open" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+                <span>Открыть</span>
+            </button>
+        </div>
+        <button type="button" class="bx-msg-actions__cancel" id="bx-chat-actions-cancel">Отмена</button>
     </div>
 </div>
 
@@ -2467,7 +2513,16 @@
         if (activeChat && payload.preview != null) {
             const link = document.querySelector('.bx-chat-item[data-chat-id="' + activeChat + '"]');
             const preview = link?.querySelector('.bx-chat-item__preview');
-            if (preview) preview.textContent = payload.preview;
+            if (preview) {
+                const text = String(payload.preview || '').trim();
+                preview.textContent = text ? ('Вы: ' + text) : preview.textContent;
+            }
+            const timeEl = link?.querySelector('.bx-chat-item__time');
+            if (timeEl) {
+                const now = new Date();
+                timeEl.textContent = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+            }
+            if (payload.id) link?.setAttribute('data-last-id', String(payload.id));
             bumpChatInList(activeChat);
         }
         return true;
@@ -2477,45 +2532,106 @@
         const list = document.getElementById('bx-chat-list');
         const link = list?.querySelector('.bx-chat-item[data-chat-id="' + chatId + '"]');
         if (!list || !link) return;
+
+        const items = [...list.querySelectorAll('.bx-chat-item')];
+        const pinned = items.filter((el) => el.classList.contains('is-pinned'));
+        const unpinned = items.filter((el) => !el.classList.contains('is-pinned'));
+
+        let desired;
         if (link.classList.contains('is-pinned')) {
-            // Среди закреплённых — наверх закреплённого блока
-            const firstPinned = list.querySelector('.bx-chat-item.is-pinned');
-            if (firstPinned && firstPinned !== link) {
-                list.insertBefore(link, firstPinned);
-            } else if (!firstPinned) {
-                list.insertBefore(link, list.firstChild);
-            }
-            return;
-        }
-        // Незакреплённые — сразу после последнего закреплённого
-        const pinned = list.querySelectorAll('.bx-chat-item.is-pinned');
-        const lastPinned = pinned.length ? pinned[pinned.length - 1] : null;
-        if (lastPinned) {
-            lastPinned.after(link);
+            desired = [link, ...pinned.filter((el) => el !== link), ...unpinned];
         } else {
-            list.insertBefore(link, list.firstChild);
+            desired = [...pinned, link, ...unpinned.filter((el) => el !== link)];
         }
+
+        let same = desired.length === items.length;
+        if (same) {
+            for (let i = 0; i < desired.length; i++) {
+                if (desired[i] !== items[i]) { same = false; break; }
+            }
+        }
+        if (same) return;
+
+        const scrollTop = list.scrollTop;
+        const frag = document.createDocumentFragment();
+        desired.forEach((el) => frag.appendChild(el));
+        list.appendChild(frag);
+        list.scrollTop = scrollTop;
+    };
+
+    const syncChatPinIcon = (link, pinned) => {
+        const meta = link.querySelector('.bx-chat-item__meta');
+        if (!meta) return;
+        let pin = meta.querySelector('.bx-chat-item__pin');
+        if (pinned && !pin) {
+            pin = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            pin.setAttribute('class', 'bx-chat-item__pin');
+            pin.setAttribute('viewBox', '0 0 24 24');
+            pin.setAttribute('aria-hidden', 'true');
+            pin.innerHTML = '<path fill="currentColor" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/>';
+            meta.insertBefore(pin, meta.firstChild);
+        } else if (!pinned && pin) {
+            pin.remove();
+        }
+    };
+
+    const syncChatMuteIcon = (link, muted) => {
+        const trail = link.querySelector('.bx-chat-item__trail');
+        if (!trail) return;
+        let mute = trail.querySelector('.bx-chat-item__mute');
+        if (muted && !mute) {
+            mute = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            mute.setAttribute('class', 'bx-chat-item__mute');
+            mute.setAttribute('viewBox', '0 0 24 24');
+            mute.setAttribute('fill', 'none');
+            mute.setAttribute('stroke', 'currentColor');
+            mute.setAttribute('stroke-width', '2');
+            mute.setAttribute('aria-hidden', 'true');
+            mute.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>';
+            trail.insertBefore(mute, trail.firstChild);
+        } else if (!muted && mute) {
+            mute.remove();
+        }
+        const badge = trail.querySelector('.bx-chat-item__badge');
+        badge?.classList.toggle('is-muted', !!muted);
     };
 
     const applyChatsFromPoll = (chats) => {
         const list = document.getElementById('bx-chat-list');
         if (!list || !Array.isArray(chats) || !chats.length) return;
 
+        const scrollTop = list.scrollTop;
+        const desired = [];
+
         chats.forEach((c) => {
             const link = list.querySelector('.bx-chat-item[data-chat-id="' + c.id + '"]');
             if (!link) return;
+            desired.push(link);
 
+            const wasPinned = link.classList.contains('is-pinned');
+            const wasMuted = link.classList.contains('is-muted');
             link.classList.toggle('is-pinned', !!c.pinned);
             link.classList.toggle('is-muted', !!c.muted);
+            if (wasPinned !== !!c.pinned) syncChatPinIcon(link, !!c.pinned);
+            if (wasMuted !== !!c.muted) syncChatMuteIcon(link, !!c.muted);
+            if (c.last_id != null) link.dataset.lastId = String(c.last_id);
 
-            let b = link.querySelector('.bx-chat-item__badge');
+            let trail = link.querySelector('.bx-chat-item__trail');
+            if (!trail) {
+                const bottom = link.querySelector('.bx-chat-item__bottom') || link.querySelector('.bx-chat-item__body');
+                trail = document.createElement('span');
+                trail.className = 'bx-chat-item__trail';
+                bottom?.appendChild(trail);
+            }
+            let b = trail.querySelector('.bx-chat-item__badge');
             if (c.unread > 0) {
                 if (!b) {
                     b = document.createElement('span');
                     b.className = 'bx-chat-item__badge';
-                    link.querySelector('.bx-chat-item__top')?.appendChild(b);
+                    trail.appendChild(b);
                 }
                 b.textContent = String(c.unread);
+                b.classList.toggle('is-muted', !!c.muted);
             } else if (b) {
                 b.remove();
             }
@@ -2524,10 +2640,34 @@
                 const preview = link.querySelector('.bx-chat-item__preview');
                 if (preview) preview.textContent = c.preview || 'Нет сообщений';
             }
-
-            // Порядок как с сервера: pinned → по последнему сообщению
-            list.appendChild(link);
+            if (c.time != null) {
+                const timeEl = link.querySelector('.bx-chat-item__time');
+                if (timeEl) timeEl.textContent = c.time;
+            }
         });
+
+        const current = [...list.querySelectorAll('.bx-chat-item')];
+        let needsReorder = desired.length > 0 && desired.length === current.length;
+        if (needsReorder) {
+            needsReorder = false;
+            for (let i = 0; i < desired.length; i++) {
+                if (desired[i] !== current[i]) {
+                    needsReorder = true;
+                    break;
+                }
+            }
+        } else if (desired.length && desired.length !== current.length) {
+            needsReorder = true;
+        }
+
+        if (needsReorder) {
+            const frag = document.createDocumentFragment();
+            const seen = new Set(desired);
+            desired.forEach((el) => frag.appendChild(el));
+            current.forEach((el) => { if (!seen.has(el)) frag.appendChild(el); });
+            list.appendChild(frag);
+            list.scrollTop = scrollTop;
+        }
     };
 
     /* Подгрузка старых сообщений (скролл вверх) */
@@ -3568,6 +3708,136 @@
             toast('Не удалось открыть форму. Обновите страницу.', 'error');
         });
     });
+
+    /* Контекстное меню чата (ПКМ / long-press) — как в Telegram */
+    (() => {
+        const list = document.getElementById('bx-chat-list');
+        const sheet = document.getElementById('bx-chat-actions');
+        const preview = document.getElementById('bx-chat-actions-preview');
+        const pinLabel = document.getElementById('bx-chat-action-pin-label');
+        const muteLabel = document.getElementById('bx-chat-action-mute-label');
+        if (!list || !sheet) return;
+
+        let targetLink = null;
+        let holdTimer = null;
+        let suppressNavUntil = 0;
+        let holdStart = null;
+
+        const closeChatActions = () => {
+            sheet.setAttribute('hidden', '');
+            targetLink = null;
+        };
+        const openChatActions = (link) => {
+            if (!link) return;
+            targetLink = link;
+            const title = link.querySelector('.bx-chat-item__title')?.textContent?.trim()
+                || link.getAttribute('data-title')
+                || 'Чат';
+            const sub = link.querySelector('.bx-chat-item__preview')?.textContent?.trim() || '';
+            if (preview) {
+                preview.innerHTML = `<div class="bx-msg-actions__preview-card"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(sub)}</span></div>`;
+            }
+            const pinned = link.classList.contains('is-pinned');
+            const muted = link.classList.contains('is-muted');
+            if (pinLabel) pinLabel.textContent = pinned ? 'Открепить' : 'Закрепить';
+            if (muteLabel) muteLabel.textContent = muted ? 'Включить звук' : 'Без звука';
+            sheet.removeAttribute('hidden');
+        };
+
+        const chatActionUrl = (kind, id) => {
+            const tpl = list.getAttribute(kind === 'pin' ? 'data-pin-tpl' : 'data-mute-tpl') || '';
+            return tpl.replace('__ID__', String(id));
+        };
+
+        const postChatAction = async (kind, link) => {
+            if (!link) return;
+            const id = link.getAttribute('data-chat-id');
+            const url = chatActionUrl(kind, id);
+            if (!url || url.includes('__ID__')) return;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(csrf ? { 'X-CSRF-TOKEN': csrf } : {}),
+                    },
+                    credentials: 'same-origin',
+                    body: csrf ? new URLSearchParams({ _token: csrf }) : undefined,
+                });
+                if (!res.ok) throw new Error('fail');
+                const data = await res.json();
+                if (kind === 'pin') {
+                    link.classList.toggle('is-pinned', !!data.pinned);
+                    syncChatPinIcon(link, !!data.pinned);
+                    bumpChatInList(id);
+                    toast(data.pinned ? 'Чат закреплён' : 'Чат откреплён', 'success');
+                } else {
+                    link.classList.toggle('is-muted', !!data.muted);
+                    syncChatMuteIcon(link, !!data.muted);
+                    toast(data.muted ? 'Без звука' : 'Звук включён', 'success');
+                }
+            } catch (e) {
+                toast('Не удалось выполнить действие', 'error');
+            }
+        };
+
+        document.getElementById('bx-chat-actions-bg')?.addEventListener('click', closeChatActions);
+        document.getElementById('bx-chat-actions-cancel')?.addEventListener('click', closeChatActions);
+        sheet.addEventListener('click', (e) => {
+            const btn = e.target.closest?.('[data-chat-action]');
+            if (!btn || !targetLink) return;
+            const action = btn.getAttribute('data-chat-action');
+            const link = targetLink;
+            closeChatActions();
+            if (action === 'open') {
+                link.click();
+                return;
+            }
+            if (action === 'pin' || action === 'mute') postChatAction(action, link);
+        });
+
+        list.addEventListener('contextmenu', (e) => {
+            const link = e.target.closest?.('.bx-chat-item');
+            if (!link || !list.contains(link)) return;
+            e.preventDefault();
+            openChatActions(link);
+        });
+
+        list.addEventListener('click', (e) => {
+            if (Date.now() < suppressNavUntil) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+
+        list.addEventListener('pointerdown', (e) => {
+            if (e.pointerType !== 'touch') return;
+            const link = e.target.closest?.('.bx-chat-item');
+            if (!link) return;
+            holdStart = { x: e.clientX || 0, y: e.clientY || 0 };
+            holdTimer = window.setTimeout(() => {
+                holdTimer = null;
+                suppressNavUntil = Date.now() + 600;
+                openChatActions(link);
+                try { navigator.vibrate?.(18); } catch (err) {}
+            }, 480);
+        });
+        const clearHold = () => {
+            if (holdTimer) clearTimeout(holdTimer);
+            holdTimer = null;
+            holdStart = null;
+        };
+        list.addEventListener('pointerup', clearHold);
+        list.addEventListener('pointercancel', clearHold);
+        list.addEventListener('pointermove', (e) => {
+            if (!holdTimer || !holdStart) return;
+            if (Math.abs((e.clientX || 0) - holdStart.x) > 12
+                || Math.abs((e.clientY || 0) - holdStart.y) > 12) {
+                clearHold();
+            }
+        });
+    })();
 
     /* Поиск по чатам и сообщениям */
     const searchInput = document.getElementById('bx-chat-search');

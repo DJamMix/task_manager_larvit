@@ -131,7 +131,7 @@ return [
             '/css/app-shell.css?v=20260810b',
             '/css/ui-toast.css?v=20260730a',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260810g',
+            '/css/task-workspace.css?v=20260810h',
             '/css/act-composer.css',
         ],
         'scripts'     => [

@@ -717,5 +717,27 @@ Route::delete('chats/calls/{call}/guest-link', function (
     return response()->json(['ok' => true]);
 })->name('platform.systems.chats.calls.guest.revoke');
 
+Route::post('chats/{chat}/pin', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $pinned = $chats->togglePin($chat, $request->user());
+
+    return response()->json(['ok' => true, 'pinned' => $pinned]);
+})->name('platform.systems.chats.pin');
+
+Route::post('chats/{chat}/mute', function (
+    \Illuminate\Http\Request $request,
+    \App\Models\Chat $chat,
+    \App\Services\ChatService $chats
+) {
+    abort_unless($chats->canAccessMessenger($request->user()), 403);
+    $muted = $chats->toggleMute($chat, $request->user());
+
+    return response()->json(['ok' => true, 'muted' => $muted]);
+})->name('platform.systems.chats.mute');
+
 Route::screen('chats/{chat}', \App\Orchid\Screens\Chat\MessengerScreen::class)
     ->name('platform.systems.chats.view');

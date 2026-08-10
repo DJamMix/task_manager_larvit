@@ -538,12 +538,25 @@ class ChatService
                 $peerId = $chat->type === 'direct'
                     ? $chat->otherMember($user->id)?->id
                     : null;
+                $latest = $chat->latestMessage;
+                $preview = trim((string) ($latest?->plain_text ?? ''));
+                if ($preview === '') {
+                    $preview = $latest ? 'Вложение' : 'Нет сообщений';
+                } elseif ($chat->type !== 'direct' && $latest?->user) {
+                    $who = $latest->user->id === $user->id
+                        ? 'Вы'
+                        : ($latest->user->displayName() ?: 'Участник');
+                    $preview = $who . ': ' . $preview;
+                } elseif ($latest && (int) $latest->user_id === (int) $user->id) {
+                    $preview = 'Вы: ' . $preview;
+                }
 
                 return [
                     'id' => (int) $chat->id,
                     'unread' => (int) ($chat->unread_count ?? 0),
-                    'last_id' => $chat->latestMessage?->id ? (int) $chat->latestMessage->id : null,
-                    'preview' => \Illuminate\Support\Str::limit($chat->latestMessage?->plain_text ?? '', 48),
+                    'last_id' => $latest?->id ? (int) $latest->id : null,
+                    'preview' => \Illuminate\Support\Str::limit($preview, 64),
+                    'time' => $this->formatChatListTime($latest?->created_at),
                     'muted' => (bool) $chat->is_muted,
                     'pinned' => (bool) $chat->is_pinned,
                     'peer_id' => $peerId ? (int) $peerId : null,
@@ -1008,6 +1021,37 @@ class ChatService
         ]);
 
         return $next;
+    }
+
+    /** Время в списке чатов как в Telegram. */
+    public function formatChatListTime(mixed $at): string
+    {
+        if (!$at) {
+            return '';
+        }
+
+        try {
+            $dt = \Illuminate\Support\Carbon::parse($at)->timezone(config('app.timezone'));
+        } catch (\Throwable) {
+            return '';
+        }
+
+        if ($dt->isToday()) {
+            return $dt->format('H:i');
+        }
+        if ($dt->isYesterday()) {
+            return 'вчера';
+        }
+        if ($dt->greaterThan(now()->subDays(6)->startOfDay())) {
+            $map = [1 => 'пн', 2 => 'вт', 3 => 'ср', 4 => 'чт', 5 => 'пт', 6 => 'сб', 7 => 'вс'];
+
+            return $map[(int) $dt->dayOfWeekIso] ?? $dt->format('d.m');
+        }
+        if ((int) $dt->year === (int) now()->year) {
+            return $dt->format('d.m');
+        }
+
+        return $dt->format('d.m.y');
     }
 
     public function updateChat(Chat $chat, User $actor, array $data): Chat
