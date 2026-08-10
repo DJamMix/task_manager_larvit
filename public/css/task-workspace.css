@@ -4975,6 +4975,18 @@ pre.ql-syntax,
     gap: 0.5rem;
     padding: 0.4rem 0 0.65rem;
 }
+.bx-feed-newer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0 0.35rem;
+}
+.bx-feed-newer.d-none { display: none !important; }
+.bx-feed-newer__spin {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
 .bx-feed-older__btn {
     border: 1px solid #dbe3ee;
     background: #f8fafc;

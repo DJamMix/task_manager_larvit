@@ -131,6 +131,8 @@ class MessengerScreen extends Screen
             'messages' => $messages,
             'messages_has_more' => (bool) ($feedMeta['has_more'] ?? false),
             'messages_oldest_id' => $feedMeta['oldest_id'] ?? null,
+            'messages_has_more_newer' => (bool) ($feedMeta['has_more_newer'] ?? false),
+            'messages_newest_id' => $feedMeta['newest_id'] ?? null,
             'can_create' => $chats->canCreate($user),
             'can_chat_clients' => $chats->canChatWithClients($user),
             'can_write' => $canWrite,

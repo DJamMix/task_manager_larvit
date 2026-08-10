@@ -401,10 +401,19 @@ Route::get('chats/{chat}/messages', function (
     abort_unless($chats->canAccessMessenger($request->user()), 403);
 
     $before = $request->integer('before');
-    abort_unless($before > 0, 422, 'before required');
+    $after = $request->integer('after');
+    $limit = $request->integer('limit') ?: 40;
+
+    if ($after > 0) {
+        return response()->json(
+            $chats->newerPayload($request->user(), $chat, $after, $limit)
+        );
+    }
+
+    abort_unless($before > 0, 422, 'before or after required');
 
     return response()->json(
-        $chats->historyPayload($request->user(), $chat, $before, $request->integer('limit') ?: 40)
+        $chats->historyPayload($request->user(), $chat, $before, $limit)
     );
 })->name('platform.systems.chats.messages');
 

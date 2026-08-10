@@ -820,7 +820,7 @@ class ChatService
     /**
      * Последние N сообщений (или окно вокруг focusMessageId для перехода из поиска).
      *
-     * @return array{messages: \Illuminate\Support\Collection, has_more: bool, oldest_id: int|null}
+     * @return array{messages: \Illuminate\Support\Collection, has_more: bool, oldest_id: int|null, has_more_newer: bool, newest_id: int|null}
      */
     public function feedForChat(Chat $chat, User $viewer, ?int $focusMessageId = null, int $limit = 40): array
     {
@@ -851,25 +851,32 @@ class ChatService
                     ->sortBy('id')
                     ->values();
 
+                // Не грузим всю непрочитанную историю сразу — догрузим при скролле вниз
                 $after = ChatMessage::query()
                     ->where('chat_id', $chat->id)
                     ->visibleTo($viewer)
                     ->where('id', '>', $focus->id)
                     ->with($with)
                     ->orderBy('id')
-                    ->limit(20)
+                    ->limit($limit)
                     ->get();
 
                 $messages = $before->concat($after)->unique('id')->sortBy('id')->values();
                 $oldestId = $messages->first()?->id ? (int) $messages->first()->id : null;
+                $newestId = $messages->last()?->id ? (int) $messages->last()->id : null;
                 $hasMore = $oldestId
                     ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($viewer)->where('id', '<', $oldestId)->exists()
+                    : false;
+                $hasMoreNewer = $newestId
+                    ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($viewer)->where('id', '>', $newestId)->exists()
                     : false;
 
                 return [
                     'messages' => $messages,
                     'has_more' => $hasMore,
                     'oldest_id' => $oldestId,
+                    'has_more_newer' => $hasMoreNewer,
+                    'newest_id' => $newestId,
                 ];
             }
         }
@@ -885,21 +892,27 @@ class ChatService
             ->values();
 
         $oldestId = $messages->first()?->id ? (int) $messages->first()->id : null;
+        $newestId = $messages->last()?->id ? (int) $messages->last()->id : null;
         $hasMore = $oldestId
             ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($viewer)->where('id', '<', $oldestId)->exists()
+            : false;
+        $hasMoreNewer = $newestId
+            ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($viewer)->where('id', '>', $newestId)->exists()
             : false;
 
         return [
             'messages' => $messages,
             'has_more' => $hasMore,
             'oldest_id' => $oldestId,
+            'has_more_newer' => $hasMoreNewer,
+            'newest_id' => $newestId,
         ];
     }
 
     /**
      * Более старые сообщения для бесконечного скролла вверх.
      *
-     * @return array{messages: list<array>, has_more: bool, oldest_id: int|null}
+     * @return array{messages: list<array>, has_more: bool, oldest_id: int|null, has_more_newer?: bool, newest_id?: int|null}
      */
     public function historyPayload(User $user, Chat $chat, int $beforeId, int $limit = 40): array
     {
@@ -932,6 +945,44 @@ class ChatService
                 ->all(),
             'has_more' => $hasMore,
             'oldest_id' => $oldestId,
+        ];
+    }
+
+    /**
+     * Более новые сообщения для бесконечного скролла вниз (после прыжка к непрочитанным).
+     *
+     * @return array{messages: list<array>, has_more_newer: bool, newest_id: int|null}
+     */
+    public function newerPayload(User $user, Chat $chat, int $afterId, int $limit = 40): array
+    {
+        $chat->loadMissing('members');
+        if (!$chat->isMember($user->id)) {
+            abort(403);
+        }
+
+        $limit = max(10, min(100, $limit));
+        $batch = ChatMessage::query()
+            ->where('chat_id', $chat->id)
+            ->visibleTo($user)
+            ->where('id', '>', $afterId)
+            ->with(['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment', 'forwardedFromUser'])
+            ->orderBy('id')
+            ->limit($limit)
+            ->get()
+            ->values();
+
+        $newestId = $batch->last()?->id ? (int) $batch->last()->id : $afterId;
+        $hasMoreNewer = $newestId
+            ? ChatMessage::query()->where('chat_id', $chat->id)->visibleTo($user)->where('id', '>', $newestId)->exists()
+            : false;
+
+        return [
+            'messages' => $batch
+                ->map(fn (ChatMessage $message) => $this->renderMessagePayload($chat, $message, $user))
+                ->values()
+                ->all(),
+            'has_more_newer' => $hasMoreNewer,
+            'newest_id' => $newestId,
         ];
     }
 

@@ -19,6 +19,8 @@
      data-self-id="{{ auth()->id() }}"
      data-has-more="{{ !empty($messages_has_more) ? '1' : '0' }}"
      data-oldest-id="{{ $messages_oldest_id ?? '' }}"
+     data-has-more-newer="{{ !empty($messages_has_more_newer) ? '1' : '0' }}"
+     data-newest-id="{{ $messages_newest_id ?? (isset($messages) ? $messages->last()?->id : '') }}"
      data-calls-enabled="{{ !empty($calls_enabled) ? '1' : '0' }}"
      data-calls-start-url="{{ $calls_start_url ?? '' }}"
      data-call-join-tpl="{{ str_replace('999999', '__ID__', route('platform.systems.chats.calls.join', ['call' => 999999])) }}"
@@ -345,6 +347,10 @@
                 @empty
                     <div class="text-muted text-center py-5" id="bx-feed-empty">Начните переписку</div>
                 @endforelse
+                <div class="bx-feed-newer {{ !empty($messages_has_more_newer) ? '' : 'd-none' }}" id="bx-feed-newer">
+                    <span class="bx-feed-newer__spin d-none" id="bx-load-newer-spin">Загрузка…</span>
+                    <button type="button" class="bx-feed-older__btn" id="bx-load-newer">Загрузить новые</button>
+                </div>
             </div>
 
             <div id="bx-typing" class="bx-typing d-none" aria-live="polite"></div>
@@ -603,12 +609,6 @@
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
                             </span>
                             <span>Добавить</span>
-                        </button>
-                        <button type="button" class="bx-chat-info__action" data-bx-open-modal="editChatModal" title="Ещё">
-                            <span class="bx-chat-info__action-ico">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-                            </span>
-                            <span>Ещё</span>
                         </button>
                     </div>
                 @endif
@@ -2975,15 +2975,25 @@
     const appendMessage = (payload) => {
         if (!feed || !payload?.html || !payload?.id) return false;
         if (document.getElementById('chat-msg-' + payload.id)) return false;
+        // Пока догружаем «хвост» непрочитанных — не вставляем live-сообщения вразрез
+        if (root?.getAttribute('data-has-more-newer') === '1') return false;
         document.getElementById('bx-feed-empty')?.remove();
         const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 120;
-        feed.insertAdjacentHTML('beforeend', payload.html);
+        const newerAnchor = document.getElementById('bx-feed-newer');
+        if (newerAnchor) newerAnchor.insertAdjacentHTML('beforebegin', payload.html);
+        else feed.insertAdjacentHTML('beforeend', payload.html);
         const node = document.getElementById('chat-msg-' + payload.id);
         if (node) {
             highlightCodes(node);
             initVoicePlayers(node);
         }
         if (nearBottom) feed.scrollTop = feed.scrollHeight;
+
+        const msgId = parseInt(payload.id, 10) || 0;
+        const curNewest = parseInt(root?.getAttribute('data-newest-id') || '0', 10) || 0;
+        if (msgId > curNewest) {
+            root?.setAttribute('data-newest-id', String(msgId));
+        }
 
         const activeChat = root?.getAttribute('data-active-chat') || '';
         if (activeChat && payload.preview != null) {
@@ -3146,19 +3156,35 @@
         }
     };
 
-    /* Подгрузка старых сообщений (скролл вверх) */
+    /* Подгрузка старых (вверх) и новых (вниз) сообщений */
     let oldestId = parseInt(root?.getAttribute('data-oldest-id') || '0', 10) || 0;
+    let newestId = parseInt(root?.getAttribute('data-newest-id') || '0', 10) || 0;
     let hasMoreOlder = root?.getAttribute('data-has-more') === '1';
+    let hasMoreNewer = root?.getAttribute('data-has-more-newer') === '1';
     let loadingOlder = false;
+    let loadingNewer = false;
     const messagesUrl = root?.getAttribute('data-messages-url') || '';
     const olderWrap = document.getElementById('bx-feed-older');
     const olderBtn = document.getElementById('bx-load-older');
     const olderSpin = document.getElementById('bx-load-older-spin');
+    const newerWrap = document.getElementById('bx-feed-newer');
+    const newerBtn = document.getElementById('bx-load-newer');
+    const newerSpin = document.getElementById('bx-load-newer-spin');
+
+    if (!newestId && feed) {
+        const lastMsg = [...feed.querySelectorAll('.bx-msg[id^="chat-msg-"]')].pop();
+        newestId = parseInt(String(lastMsg?.id || '').replace('chat-msg-', ''), 10) || 0;
+    }
 
     const setOlderUi = () => {
         if (!olderWrap) return;
         if (hasMoreOlder) olderWrap.classList.remove('d-none');
         else olderWrap.classList.add('d-none');
+    };
+    const setNewerUi = () => {
+        if (!newerWrap) return;
+        if (hasMoreNewer) newerWrap.classList.remove('d-none');
+        else newerWrap.classList.add('d-none');
     };
 
     const prependMessages = (items) => {
@@ -3180,6 +3206,24 @@
             }
         });
         feed.scrollTop = feed.scrollHeight - prevHeight + prevTop;
+    };
+
+    const appendHistoryMessages = (items) => {
+        if (!feed || !items?.length) return 0;
+        let added = 0;
+        const anchor = newerWrap;
+        items.forEach((m) => {
+            if (!m?.id || document.getElementById('chat-msg-' + m.id)) return;
+            if (anchor) anchor.insertAdjacentHTML('beforebegin', m.html);
+            else feed.insertAdjacentHTML('beforeend', m.html);
+            const node = document.getElementById('chat-msg-' + m.id);
+            if (node) {
+                highlightCodes(node);
+                initVoicePlayers(node);
+            }
+            added++;
+        });
+        return added;
     };
 
     const loadOlderMessages = async () => {
@@ -3210,10 +3254,43 @@
         }
     };
 
+    const loadNewerMessages = async () => {
+        if (!messagesUrl || !hasMoreNewer || loadingNewer || !newestId) return;
+        loadingNewer = true;
+        newerBtn?.classList.add('d-none');
+        newerSpin?.classList.remove('d-none');
+        try {
+            const url = messagesUrl + '?after=' + encodeURIComponent(String(newestId)) + '&limit=40';
+            const res = await fetch(url, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const items = data.messages || [];
+            appendHistoryMessages(items);
+            hasMoreNewer = !!data.has_more_newer;
+            const nextNewest = parseInt(data.newest_id || '0', 10) || 0;
+            if (nextNewest > newestId) newestId = nextNewest;
+            root?.setAttribute('data-has-more-newer', hasMoreNewer ? '1' : '0');
+            root?.setAttribute('data-newest-id', String(newestId || ''));
+            setNewerUi();
+        } catch (e) {
+        } finally {
+            loadingNewer = false;
+            newerSpin?.classList.add('d-none');
+            if (hasMoreNewer) newerBtn?.classList.remove('d-none');
+        }
+    };
+
     olderBtn?.addEventListener('click', () => loadOlderMessages());
+    newerBtn?.addEventListener('click', () => loadNewerMessages());
     feed?.addEventListener('scroll', () => {
         if (feed.scrollTop < 60) loadOlderMessages();
+        const distBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight;
+        if (distBottom < 140) loadNewerMessages();
     }, { passive: true });
+    setNewerUi();
 
     initVoicePlayers(document);
 
@@ -3382,6 +3459,13 @@
             }
             const data = await res.json();
             if (data.message) {
+                // Если читали непрочитанные с середины — сначала догрузим хвост
+                if (hasMoreNewer) {
+                    let guard = 0;
+                    while (hasMoreNewer && guard++ < 25) {
+                        await loadNewerMessages();
+                    }
+                }
                 appendMessage(data.message);
                 const id = parseInt(data.message.id, 10) || 0;
                 if (id > since) {
@@ -3391,6 +3475,10 @@
                 if (id > lastBeepMaxId) {
                     lastBeepMaxId = id;
                     sessionStorage.setItem(beepKey, String(lastBeepMaxId));
+                }
+                if (id > newestId) {
+                    newestId = id;
+                    root?.setAttribute('data-newest-id', String(newestId));
                 }
             }
             resetComposer();
