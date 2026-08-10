@@ -90,7 +90,10 @@
         </div>
     </div>
 
-    <form class="yt-filters" method="get" action="{{ route('platform.systems.boards') }}" id="yt-filters">
+    {{-- Не <form>: Orchid оборачивает экран в post-form, вложенный GET-form игнорируется браузером --}}
+    <div class="yt-filters"
+         id="yt-filters"
+         data-action="{{ route('platform.systems.boards') }}">
         @if($board)
             <input type="hidden" name="board" value="{{ $board->id }}">
         @endif
@@ -105,7 +108,8 @@
                        name="q"
                        value="{{ $filters['q'] ?? '' }}"
                        placeholder="Поиск по названию или ключу"
-                       autocomplete="off">
+                       autocomplete="off"
+                       id="yt-filter-q">
             </label>
 
             <button type="button"
@@ -119,7 +123,7 @@
                 </svg>
             </button>
 
-            <button type="submit" class="yt-btn yt-btn--primary yt-btn--sm">Применить</button>
+            <button type="button" class="yt-btn yt-btn--primary yt-btn--sm" id="yt-apply-filters">Применить</button>
             <a href="{{ route('platform.systems.boards', array_filter(['board' => $board?->id, 'assignee' => $defaultAssignee])) }}"
                class="yt-btn yt-btn--ghost yt-btn--sm"
                title="Сбросить фильтры">Сбросить</a>
@@ -258,7 +262,7 @@
                 </button>
             </div>
         </div>
-    </form>
+    </div>
 
     <div class="yt-board__gap" aria-hidden="true"></div>
 
@@ -414,8 +418,34 @@
     const csrf = root.dataset.csrf;
     let dragCard = null;
 
+    const filtersBox = document.getElementById('yt-filters');
+    const applyBoardFilters = () => {
+        if (!filtersBox) return;
+        const action = filtersBox.getAttribute('data-action') || window.location.pathname;
+        const qs = new URLSearchParams();
+        filtersBox.querySelectorAll('input[name], select[name]').forEach((el) => {
+            if (!el.name || el.disabled) return;
+            const v = String(el.value ?? '').trim();
+            if (v === '') return;
+            qs.set(el.name, v);
+        });
+        const url = action + (qs.toString() ? ('?' + qs.toString()) : '');
+        if (window.Turbo?.visit) window.Turbo.visit(url);
+        else window.location.assign(url);
+    };
+
+    document.getElementById('yt-apply-filters')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        applyBoardFilters();
+    });
     document.querySelectorAll('#yt-filters select').forEach((el) => {
-        el.addEventListener('change', () => el.form?.requestSubmit());
+        el.addEventListener('change', () => applyBoardFilters());
+    });
+    document.getElementById('yt-filter-q')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            applyBoardFilters();
+        }
     });
 
     const params = document.getElementById('yt-params');
