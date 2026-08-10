@@ -1110,7 +1110,9 @@
     };
     const setComposerText = (text) => {
         if (!input) return;
-        input.textContent = text || '';
+        const next = text || '';
+        input.textContent = next;
+        setCaretOffset(next.length);
     };
     const getCaretOffset = () => {
         const sel = window.getSelection();
@@ -3544,18 +3546,6 @@
     const botCmdMenu = document.getElementById('bx-bot-cmd-menu');
     const botReplyKb = document.getElementById('bx-bot-reply-keyboard');
 
-    const setComposerText = (text) => {
-        if (!input) return;
-        input.textContent = text;
-        input.focus();
-        const range = document.createRange();
-        range.selectNodeContents(input);
-        range.collapse(false);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-    };
-
     document.addEventListener('click', async (e) => {
         const cbBtn = e.target.closest?.('.bx-bot-btn--callback');
         if (cbBtn) {
@@ -3596,6 +3586,7 @@
             const text = replyBtn.getAttribute('data-reply-text') || '';
             if (!text) return;
             setComposerText(text);
+            focusComposer();
             if (botReplyKb?.getAttribute('data-one-time') === '1') {
                 botReplyKb.classList.add('d-none');
             }
@@ -3629,6 +3620,7 @@
         if (!item) return;
         setComposerText(item.getAttribute('data-cmd') + ' ');
         botCmdMenu.classList.add('d-none');
+        focusComposer();
     });
 
     input?.addEventListener('input', () => {
