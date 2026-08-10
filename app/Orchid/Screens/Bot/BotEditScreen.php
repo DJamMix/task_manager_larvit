@@ -12,6 +12,7 @@ use Orchid\Screen\Actions\Button;
 use Orchid\Screen\Actions\Link;
 use Orchid\Screen\Fields\CheckBox;
 use Orchid\Screen\Fields\Input;
+use Orchid\Screen\Fields\Picture;
 use Orchid\Screen\Fields\TextArea;
 use Orchid\Screen\Screen;
 use Orchid\Support\Facades\Layout;
@@ -27,6 +28,11 @@ class BotEditScreen extends Screen
     {
         $this->bot = $bot;
         $this->plain_token = $request->session()->pull('bot_plain_token');
+
+        if ($bot->exists) {
+            $bot->loadMissing('user');
+            $bot->setAttribute('avatar_path', $bot->user?->avatar_path);
+        }
 
         $chats = collect();
         if ($bot->exists && $bot->user_id) {
@@ -100,6 +106,13 @@ class BotEditScreen extends Screen
         return [
             $tokenAlert,
             Layout::rows([
+                Picture::make('bot.avatar_path')
+                    ->title('Аватар')
+                    ->storage('public')
+                    ->path('avatars/bots')
+                    ->targetRelativeUrl()
+                    ->acceptedFiles('image/jpeg,image/png,image/webp,image/gif')
+                    ->help('Фото бота в чатах и списках. Если нет — показываются инициалы.'),
                 Input::make('bot.name')
                     ->title('Имя бота')
                     ->required()
@@ -165,6 +178,7 @@ class BotEditScreen extends Screen
                 'max:32',
             ],
             'bot.description' => 'nullable|string|max:1000',
+            'bot.avatar_path' => 'nullable|string|max:500',
             'bot.is_active' => 'nullable|boolean',
             'bot.can_join_groups' => 'nullable|boolean',
             'bot.can_read_messages' => 'nullable|boolean',

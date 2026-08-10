@@ -52,6 +52,18 @@ class BotListScreen extends Screen
     {
         return [
             Layout::table('bots', [
+                TD::make('avatar', '')
+                    ->width('56px')
+                    ->render(function (Bot $b) {
+                        $url = $b->user?->avatarUrl();
+                        if ($url) {
+                            return '<img src="'.e($url).'" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover">';
+                        }
+                        $initials = e($b->user?->avatarInitials() ?: mb_strtoupper(mb_substr($b->name, 0, 1)));
+                        $color = e($b->user?->avatarColor() ?: '#64748b');
+
+                        return '<span style="display:inline-flex;width:36px;height:36px;border-radius:50%;align-items:center;justify-content:center;background:'.$color.';color:#fff;font-size:12px;font-weight:700">'.$initials.'</span>';
+                    }),
                 TD::make('id', 'ID')->width('70px'),
                 TD::make('name', 'Имя')
                     ->render(fn (Bot $b) => '<a href="'.route('platform.systems.bots.edit', $b).'">'

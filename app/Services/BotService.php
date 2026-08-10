@@ -59,6 +59,7 @@ class BotService
                 'password' => Hash::make(Str::random(48)),
                 'position' => 'бот',
                 'is_bot' => true,
+                'avatar_path' => $data['avatar_path'] ?? null,
                 'permissions' => [
                     'platform.systems.chats' => true,
                 ],
@@ -96,6 +97,12 @@ class BotService
             $bot->user?->forceFill([
                 'name' => $bot->name,
                 'position' => 'бот',
+            ])->save();
+        }
+
+        if (array_key_exists('avatar_path', $data) && $bot->user) {
+            $bot->user->forceFill([
+                'avatar_path' => $data['avatar_path'] ?: null,
             ])->save();
         }
 
@@ -183,6 +190,7 @@ class BotService
     public function botUserPayload(Bot $bot): array
     {
         $user = $bot->user;
+        $photo = $user?->avatarUrl() ?: null;
 
         return [
             'id' => (int) $user->id,
@@ -191,6 +199,7 @@ class BotService
             'username' => $bot->username,
             'can_join_groups' => (bool) $bot->can_join_groups,
             'can_read_all_group_messages' => (bool) $bot->can_read_messages,
+            'photo_url' => $photo,
         ];
     }
 
