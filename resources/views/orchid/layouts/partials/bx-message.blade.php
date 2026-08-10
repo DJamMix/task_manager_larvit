@@ -4,6 +4,10 @@
     /** @var \App\Models\Chat $chat */
     /** @var \App\Models\User $viewer */
     $mine = (int) $message->user_id === (int) $viewer->id;
+    $isForwarded = (bool) ($message->forwarded_from_message_id || $message->forwarded_from_user_id);
+    $forwardOrigin = $isForwarded ? $message->forwardOriginUser() : null;
+    $forwardOriginName = $forwardOrigin?->displayName()
+        ?: ($forwardOrigin?->name ?: null);
     $readers = [];
     $readStatus = null;
     if (!$message->is_system && $mine) {
@@ -32,13 +36,20 @@
 
         return in_array($ext, ['webm', 'ogg', 'oga', 'mp3', 'm4a', 'mp4', 'wav', 'aac', 'opus'], true);
     };
+
+    $quickPreview = trim(strip_tags((string) ($message->plain_text ?? '')));
+    if ($quickPreview === '') {
+        $quickPreview = $message->attachment?->isNotEmpty() ? 'Вложение' : 'Сообщение';
+    }
 @endphp
-<article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }}"
-         id="chat-msg-{{ $message->id }}">
+<article class="bx-msg {{ $mine ? 'bx-msg--mine' : '' }} {{ $message->is_system ? 'bx-msg--system' : '' }} {{ $isForwarded ? 'bx-msg--forwarded' : '' }}"
+         id="chat-msg-{{ $message->id }}"
+         data-author="{{ $message->user?->displayName() ?? 'участник' }}"
+         data-preview="{{ \Illuminate\Support\Str::limit($quickPreview, 120) }}">
     @unless($message->is_system)
         <div class="bx-msg__avatar">
             @include('orchid.layouts.partials.bx-avatar', [
-                'avatarUser' => $message->user,
+                'avatarUser' => $isForwarded && $forwardOrigin ? $forwardOrigin : $message->user,
                 'avatarChat' => null,
                 'size' => 'sm',
                 'shape' => 'round',
@@ -76,19 +87,23 @@
             @endif
         @endif
 
-        @if($message->forwarded_from_message_id)
+        @if($isForwarded)
             <div class="bx-msg__forwarded">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/><path d="M10 4L6 8l4 4"/></svg>
-                Переслано
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
+                <div class="bx-msg__forwarded-meta">
+                    <span class="bx-msg__forwarded-label">Переслано от</span>
+                    <strong class="bx-msg__forwarded-name">{{ $forwardOriginName ?: 'пользователя' }}</strong>
+                </div>
             </div>
-        @endif
-
-        @unless($message->is_system)
+            <div class="bx-msg__meta bx-msg__meta--time-only">
+                <span>{{ $message->created_at?->format('d.m H:i') }}</span>
+            </div>
+        @elseif(!$message->is_system)
             <div class="bx-msg__meta">
                 <strong>{{ $message->user?->displayName() ?? 'Участник' }}</strong>
                 <span>{{ $message->created_at?->format('d.m H:i') }}</span>
             </div>
-        @endunless
+        @endif
 
         @php
             $voiceFiles = $message->attachment->filter(fn ($f) => $isVoiceAttachment($f));
@@ -187,28 +202,15 @@
 
         <div class="bx-msg__footer">
             @unless($message->is_system)
-                @php
-                    $quickPreview = trim(strip_tags((string) ($message->plain_text ?? '')));
-                    if ($quickPreview === '') {
-                        $quickPreview = $message->attachment?->isNotEmpty() ? 'Вложение' : 'Сообщение';
-                    }
-                @endphp
                 <div class="bx-msg__actions">
                     <button type="button"
                             class="bx-msg__action bx-msg__reply-btn"
                             data-parent-id="{{ $message->id }}"
-                            data-author="{{ $message->user?->displayName() ?? 'участник' }}"
+                            data-author="{{ $isForwarded ? ($forwardOriginName ?: 'участник') : ($message->user?->displayName() ?? 'участник') }}"
                             data-preview="{{ \Illuminate\Support\Str::limit($quickPreview, 120) }}"
                             title="Ответить">
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><path d="M15 15l5-5-5-5"/><path d="M20 10H11"/></svg>
                         <span>Ответить</span>
-                    </button>
-                    <button type="button"
-                            class="bx-msg__action bx-msg__forward-btn"
-                            data-message-id="{{ $message->id }}"
-                            title="Переслать">
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
-                        <span>Переслать</span>
                     </button>
                 </div>
             @endunless

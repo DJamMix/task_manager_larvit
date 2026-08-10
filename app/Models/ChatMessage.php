@@ -26,6 +26,7 @@ class ChatMessage extends Model
         'is_system',
         'forwarded_from_message_id',
         'forwarded_from_chat_id',
+        'forwarded_from_user_id',
         'deleted_by',
     ];
 
@@ -81,6 +82,35 @@ class ChatMessage extends Model
     public function forwardedFromChat(): BelongsTo
     {
         return $this->belongsTo(Chat::class, 'forwarded_from_chat_id');
+    }
+
+    public function forwardedFromUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'forwarded_from_user_id');
+    }
+
+    /**
+     * Автор оригинала для пересланных сообщений (как «Forwarded from» в Telegram).
+     */
+    public function forwardOriginUser(): ?User
+    {
+        if (!$this->forwarded_from_message_id && !$this->forwarded_from_user_id) {
+            return null;
+        }
+
+        if ($this->relationLoaded('forwardedFromUser') && $this->forwardedFromUser) {
+            return $this->forwardedFromUser;
+        }
+
+        if ($this->forwarded_from_user_id) {
+            return $this->forwardedFromUser()->first();
+        }
+
+        $origin = $this->relationLoaded('forwardedFromMessage')
+            ? $this->forwardedFromMessage
+            : $this->forwardedFromMessage()->with('user')->first();
+
+        return $origin?->forwardOriginUser() ?? $origin?->user;
     }
 
     public function scopeVisibleTo(Builder $query, User $user): Builder

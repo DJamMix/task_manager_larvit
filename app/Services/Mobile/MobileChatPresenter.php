@@ -101,7 +101,21 @@ final class MobileChatPresenter
             ],
             'parent' => $parent,
             'task' => $task,
-            'forwarded' => $message->forwarded_from_message_id ? true : false,
+            'forwarded' => (bool) ($message->forwarded_from_message_id || $message->forwarded_from_user_id),
+            'forwarded_from' => (function () use ($message) {
+                $origin = $message->forwardOriginUser();
+                if (!$origin) {
+                    return null;
+                }
+
+                return [
+                    'id' => (int) $origin->id,
+                    'name' => $origin->displayName(),
+                    'initials' => $origin->avatarInitials(),
+                    'color' => $origin->avatarColor(),
+                    'avatar_url' => $origin->avatarUrl(),
+                ];
+            })(),
             'attachments' => $attachments,
             'created_at' => $message->created_at?->toIso8601String(),
             'created_label' => $message->created_at?->format('H:i') ?? '',

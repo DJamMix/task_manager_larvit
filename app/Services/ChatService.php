@@ -322,7 +322,7 @@ class ChatService
             ->where('chat_id', $source->id)
             ->whereIn('id', $ids)
             ->where('is_system', false)
-            ->with('attachment')
+            ->with(['attachment', 'user', 'forwardedFromUser'])
             ->orderBy('id')
             ->get();
 
@@ -332,14 +332,20 @@ class ChatService
 
         DB::transaction(function () use ($messages, $source, $target, $actor) {
             foreach ($messages as $original) {
+                // Цепочка как в Telegram: сохраняем первого автора, а не промежуточного пересыльщика
+                $originUserId = (int) ($original->forwarded_from_user_id ?: $original->user_id);
+                $originMessageId = (int) ($original->forwarded_from_message_id ?: $original->id);
+                $originChatId = (int) ($original->forwarded_from_chat_id ?: $source->id);
+
                 $forwarded = $target->messages()->create([
                     'user_id' => $actor->id,
                     'text' => $original->text,
                     'plain_text' => $original->plain_text,
                     'task_id' => $original->task_id,
                     'is_system' => false,
-                    'forwarded_from_message_id' => $original->id,
-                    'forwarded_from_chat_id' => $source->id,
+                    'forwarded_from_message_id' => $originMessageId,
+                    'forwarded_from_chat_id' => $originChatId,
+                    'forwarded_from_user_id' => $originUserId ?: null,
                 ]);
 
                 $forwarded->attachment()->sync($original->attachment->pluck('id')->all());
@@ -787,7 +793,7 @@ class ChatService
             ->where('chat_id', $chat->id)
             ->visibleTo($user)
             ->where('id', '>', $sinceMessageId)
-            ->with(['user', 'parent.user' => fn ($q) => $q->withTrashed(), 'task', 'attachment'])
+            ->with(['user', 'parent.user' => fn ($q) => $q->withTrashed(), 'task', 'attachment', 'forwardedFromUser'])
             ->orderBy('id')
             ->limit(50)
             ->get();
@@ -810,7 +816,7 @@ class ChatService
             abort(403);
         }
 
-        $with = ['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment'];
+        $with = ['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment', 'forwardedFromUser'];
         $limit = max(10, min(100, $limit));
 
         if ($focusMessageId) {
@@ -894,7 +900,7 @@ class ChatService
             ->where('chat_id', $chat->id)
             ->visibleTo($user)
             ->where('id', '<', $beforeId)
-            ->with(['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment'])
+            ->with(['user', 'parent' => fn ($q) => $q->withTrashed()->with('user'), 'task', 'attachment', 'forwardedFromUser'])
             ->orderByDesc('id')
             ->limit($limit)
             ->get()
@@ -922,7 +928,7 @@ class ChatService
     public function renderMessagePayload(Chat $chat, ChatMessage $message, User $viewer): array
     {
         $chat->loadMissing('members');
-        $message->loadMissing(['user', 'parent.user', 'task', 'attachment']);
+        $message->loadMissing(['user', 'parent.user', 'task', 'attachment', 'forwardedFromUser']);
 
         return [
             'id' => (int) $message->id,

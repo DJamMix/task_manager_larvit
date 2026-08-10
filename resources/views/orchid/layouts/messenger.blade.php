@@ -585,6 +585,37 @@
     @endif
 </div>
 
+{{-- Telegram-style message actions (long-press / context menu) --}}
+<div class="bx-sheet bx-msg-actions-sheet" id="bx-msg-actions" hidden>
+    <button type="button" class="bx-sheet__backdrop" id="bx-msg-actions-bg" aria-label="Закрыть"></button>
+    <div class="bx-sheet__panel bx-msg-actions__panel" role="dialog" aria-modal="true" aria-labelledby="bx-msg-actions-title">
+        <div class="bx-msg-actions__preview" id="bx-msg-actions-preview"></div>
+        <div class="bx-msg-actions__list" role="menu">
+            <button type="button" class="bx-msg-actions__item" data-msg-action="reply" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3"/><path d="M15 15l5-5-5-5"/><path d="M20 10H11"/></svg>
+                <span>Ответить</span>
+            </button>
+            <button type="button" class="bx-msg-actions__item" data-msg-action="forward" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 8l4 4-4 4"/><path d="M6 12h12"/></svg>
+                <span>Переслать</span>
+            </button>
+            <button type="button" class="bx-msg-actions__item" data-msg-action="copy" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                <span>Копировать</span>
+            </button>
+            <button type="button" class="bx-msg-actions__item" data-msg-action="select" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.2 2.2L16 9.5"/></svg>
+                <span>Выбрать</span>
+            </button>
+            <button type="button" class="bx-msg-actions__item bx-msg-actions__item--danger" data-msg-action="delete" role="menuitem">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                <span>Удалить</span>
+            </button>
+        </div>
+        <button type="button" class="bx-msg-actions__cancel" id="bx-msg-actions-cancel">Отмена</button>
+    </div>
+</div>
+
 <div class="bx-sheet" id="bx-forward-sheet" hidden>
     <button type="button" class="bx-sheet__backdrop" id="bx-forward-close-bg" aria-label="Закрыть"></button>
     <div class="bx-sheet__panel bx-forward-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="bx-forward-title">
@@ -837,8 +868,21 @@
         } catch (e) {}
     };
 
+    const messageAuthorFromEl = (msgEl) => {
+        const forwarded = msgEl?.querySelector('.bx-msg__forwarded-name')?.textContent?.trim();
+        if (forwarded) return forwarded;
+        const fromData = msgEl?.getAttribute('data-author');
+        if (fromData) return fromData;
+        const btn = msgEl?.querySelector('.bx-msg__reply-btn');
+        return btn?.getAttribute('data-author')
+            || msgEl?.querySelector('.bx-msg__meta strong')?.textContent?.trim()
+            || 'участник';
+    };
+
     const messagePreviewFromEl = (msgEl) => {
         if (!msgEl) return 'Сообщение';
+        const fromData = msgEl.getAttribute('data-preview');
+        if (fromData) return fromData;
         const btn = msgEl.querySelector('.bx-msg__reply-btn');
         const fromBtn = btn?.getAttribute('data-preview');
         if (fromBtn) return fromBtn;
@@ -847,13 +891,6 @@
         if (msgEl.querySelector('.bx-voice')) return 'Голосовое сообщение';
         if (msgEl.querySelector('.bx-msg__image, .bx-msg__files')) return 'Вложение';
         return 'Сообщение';
-    };
-
-    const messageAuthorFromEl = (msgEl) => {
-        const btn = msgEl?.querySelector('.bx-msg__reply-btn');
-        return btn?.getAttribute('data-author')
-            || msgEl?.querySelector('.bx-msg__meta strong')?.textContent?.trim()
-            || 'участник';
     };
     const filesInput = document.getElementById('bx-composer-files');
     const filesLabel = document.getElementById('bx-files-label');
@@ -1291,18 +1328,6 @@
             return;
         }
 
-        const fwdOne = e.target.closest?.('.bx-msg__forward-btn');
-        if (fwdOne) {
-            const mid = Number(fwdOne.getAttribute('data-message-id') || 0);
-            if (mid) {
-                selectedMessageIds.clear();
-                selectedMessageIds.add(mid);
-                updateSelection();
-                document.getElementById('bx-forward-selected')?.click();
-            }
-            return;
-        }
-
         const copyBtn = e.target.closest?.('.tw-code-copy');
         if (copyBtn) {
             const code = copyBtn.closest('.tw-codeblock')?.querySelector('code')?.innerText || '';
@@ -1488,7 +1513,12 @@
     document.getElementById('bx-chat-info-close')?.addEventListener('click', closeChatInfo);
     document.getElementById('bx-chat-info-close-bg')?.addEventListener('click', closeChatInfo);
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && chatInfo && !chatInfo.hasAttribute('hidden')) {
+        if (e.key !== 'Escape') return;
+        if (msgActionsSheet && !msgActionsSheet.hasAttribute('hidden')) {
+            closeMsgActions();
+            return;
+        }
+        if (chatInfo && !chatInfo.hasAttribute('hidden')) {
             closeChatInfo();
         }
     });
@@ -1571,6 +1601,91 @@
         updateSelection();
     };
 
+    /* Telegram action sheet для сообщения */
+    const msgActionsSheet = document.getElementById('bx-msg-actions');
+    const msgActionsPreview = document.getElementById('bx-msg-actions-preview');
+    let msgActionsTargetId = 0;
+
+    const closeMsgActions = () => {
+        msgActionsSheet?.setAttribute('hidden', '');
+        msgActionsTargetId = 0;
+        if (msgActionsPreview) msgActionsPreview.innerHTML = '';
+    };
+
+    const openMsgActions = (msgEl) => {
+        if (!msgActionsSheet || !msgEl) return;
+        const id = Number(String(msgEl.id || '').replace('chat-msg-', ''));
+        if (!id) return;
+        msgActionsTargetId = id;
+        const author = escapeHtml(messageAuthorFromEl(msgEl));
+        const preview = escapeHtml(messagePreviewFromEl(msgEl));
+        if (msgActionsPreview) {
+            msgActionsPreview.innerHTML = `<div class="bx-msg-actions__preview-card"><strong>${author}</strong><span>${preview}</span></div>`;
+        }
+        msgActionsSheet.removeAttribute('hidden');
+        try { navigator.vibrate?.(18); } catch (e) {}
+    };
+
+    const openForwardForIds = (ids) => {
+        selectedMessageIds.clear();
+        ids.forEach((id) => selectedMessageIds.add(Number(id)));
+        updateSelection();
+        // Не оставляем панель выбора видимой при одиночной пересылке из меню
+        if (ids.length === 1) {
+            selectionBar?.setAttribute('hidden', '');
+            root?.classList.remove('is-selecting');
+            document.getElementById('bx-composer')?.classList.remove('is-dimmed');
+        }
+        document.getElementById('bx-forward-selected')?.click();
+    };
+
+    document.getElementById('bx-msg-actions-bg')?.addEventListener('click', closeMsgActions);
+    document.getElementById('bx-msg-actions-cancel')?.addEventListener('click', closeMsgActions);
+    msgActionsSheet?.addEventListener('click', async (e) => {
+        const btn = e.target.closest?.('[data-msg-action]');
+        if (!btn) return;
+        const action = btn.getAttribute('data-msg-action');
+        const id = msgActionsTargetId;
+        const el = document.getElementById('chat-msg-' + id);
+        closeMsgActions();
+        if (!id || !action) return;
+
+        if (action === 'reply') {
+            startReplyTo({
+                id,
+                author: messageAuthorFromEl(el),
+                preview: messagePreviewFromEl(el),
+            });
+            return;
+        }
+        if (action === 'forward') {
+            openForwardForIds([id]);
+            return;
+        }
+        if (action === 'copy') {
+            const text = messagePreviewFromEl(el);
+            try {
+                await navigator.clipboard.writeText(text);
+                toast('Скопировано', 'success');
+            } catch (err) {
+                toast('Не удалось скопировать', 'error');
+            }
+            return;
+        }
+        if (action === 'select') {
+            selectedMessageIds.clear();
+            selectedMessageIds.add(id);
+            updateSelection();
+            return;
+        }
+        if (action === 'delete') {
+            selectedMessageIds.clear();
+            selectedMessageIds.add(id);
+            updateSelection();
+            document.getElementById('bx-delete-selected')?.click();
+        }
+    });
+
     // Удержание / long-press как в Telegram; Ctrl/Cmd+клик и tap в режиме выбора — toggle.
     // Делегирование на ленту: новые сообщения тоже работают; на мобиле блокируем scroll во время удержания.
     (() => {
@@ -1627,9 +1742,16 @@
                 holdFired = true;
                 suppressClickUntil = Date.now() + 600;
                 activeMsg.classList.add('is-hold');
-                // Разрешить скролл сразу после выбора — не ждать pointerup
                 feedEl.classList.remove('is-press-hold');
-                toggleMessageSelection(msgIdOf(activeMsg));
+                const id = msgIdOf(activeMsg);
+                // Уже в режиме выбора — toggle; иначе меню действий как в Telegram
+                if (selectedMessageIds.size > 0) {
+                    toggleMessageSelection(id);
+                } else if (typeof openMsgActions === 'function') {
+                    openMsgActions(activeMsg);
+                } else {
+                    toggleMessageSelection(id);
+                }
                 try { navigator.vibrate?.(25); } catch (err) {}
                 try { input?.blur(); } catch (err) {}
             }, holdMs());
@@ -1736,12 +1858,17 @@
             }
         }, true);
 
-        // Нативное «Копировать» разрешаем при выделении текста; блокируем только при выборе сообщений / long-press
+        // Desktop: ПКМ — меню действий Telegram (не браузерное меню)
         feedEl.addEventListener('contextmenu', (e) => {
             if (hasTextSelection()) return;
-            if (msgFromTarget(e.target) && (holding || holdFired || selectedMessageIds.size > 0 || isCoarse())) {
-                e.preventDefault();
+            const message = msgFromTarget(e.target);
+            if (!message || isInteractive(e.target)) return;
+            e.preventDefault();
+            if (selectedMessageIds.size > 0) {
+                toggleMessageSelection(msgIdOf(message));
+                return;
             }
+            openMsgActions(message);
         });
     })();
     document.getElementById('bx-selection-cancel')?.addEventListener('click', () => {
@@ -1986,6 +2113,8 @@
             selectedMessageIds.clear();
             updateSelection();
             closeForward();
+            toast('Переслано', 'success');
+            // Если переслали в этот же чат — подтянется через poll; иначе просто успех
         } catch (error) {
             target.disabled = false;
             toast(error.message || 'Не удалось переслать сообщения', 'error');
