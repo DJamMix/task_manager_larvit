@@ -1535,15 +1535,17 @@
     const chatInfo = document.getElementById('bx-chat-info');
     const switchInfoTab = (tab) => {
         const isGallery = tab === 'media' || tab === 'files' || tab === 'links';
-        document.querySelectorAll('[data-info-tab]').forEach((btn) => {
+        document.querySelectorAll('#bx-chat-info [data-info-tab]').forEach((btn) => {
             btn.classList.toggle('is-active', btn.getAttribute('data-info-tab') === tab);
         });
-        document.querySelectorAll('[data-info-pane]').forEach((pane) => {
+        document.querySelectorAll('#bx-chat-info [data-info-pane]').forEach((pane) => {
             const name = pane.getAttribute('data-info-pane');
             const on = name === 'members' ? tab === 'members' : (name === 'gallery' && isGallery);
             pane.classList.toggle('is-active', on);
             pane.toggleAttribute('hidden', !on);
         });
+        const body = document.querySelector('#bx-chat-info .bx-chat-info__body');
+        if (body) body.scrollTop = 0;
         if (isGallery) {
             mediaTab = tab;
             mediaPage = 1;
