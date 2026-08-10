@@ -128,10 +128,10 @@ return [
     'resource' => [
         'stylesheets' => [
             '/css/footer.css',
-            '/css/app-shell.css?v=20260730a',
+            '/css/app-shell.css?v=20260810b',
             '/css/ui-toast.css?v=20260730a',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260810a',
+            '/css/task-workspace.css?v=20260810b',
             '/css/act-composer.css',
         ],
         'scripts'     => [
@@ -172,8 +172,8 @@ return [
      */
 
     'template' => [
-        'header' => '',
-        'footer' => '',
+        'header' => 'brand.header',
+        'footer' => 'brand.footer',
     ],
 
     /*

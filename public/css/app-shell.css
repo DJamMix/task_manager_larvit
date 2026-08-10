@@ -2,6 +2,21 @@
  * Orchid shell: независимое прокручивание левого меню и области контента.
  * Десктоп (≥1200px). На мобиле оставляем стандартное поведение Orchid.
  */
+
+/* Скрыть дефолтный футер Orchid (MIT / orchid.software) — он лезет в центр контента */
+body .text-center.user-select-none.my-4.d-none.d-lg-block,
+body .text-center.user-select-none.my-4,
+body .workspace > div.text-center.user-select-none,
+body .aside + * .text-center.user-select-none.my-4 {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
 @media (min-width: 1200px) {
     html {
         height: 100%;

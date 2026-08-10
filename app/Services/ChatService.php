@@ -373,17 +373,28 @@ class ChatService
                 ->where('chat_id', $chat->id)
                 ->where('is_system', false)
                 ->whereNotNull('plain_text')
+                ->with('user')
                 ->orderByDesc('id')
-                ->get(['id', 'plain_text', 'created_at']);
+                ->get(['id', 'user_id', 'plain_text', 'created_at']);
 
             foreach ($messages as $message) {
                 preg_match_all('~https?://[^\s<>"\']+~iu', (string) $message->plain_text, $matches);
                 foreach ($matches[0] ?? [] as $url) {
+                    $clean = rtrim($url, '.,;:!?)]}');
+                    $host = parse_url($clean, PHP_URL_HOST) ?: '';
+                    $host = preg_replace('/^www\./i', '', (string) $host);
+                    $path = (string) (parse_url($clean, PHP_URL_PATH) ?: '');
                     $items[] = [
                         'id' => (int) $message->id,
-                        'url' => rtrim($url, '.,;:!?)]}'),
-                        'text' => \Illuminate\Support\Str::limit((string) $message->plain_text, 120),
+                        'message_id' => (int) $message->id,
+                        'url' => $clean,
+                        'domain' => $host,
+                        'path' => $path === '/' ? '' : \Illuminate\Support\Str::limit($path, 48),
+                        'title' => $host !== '' ? $host : $clean,
+                        'text' => \Illuminate\Support\Str::limit(trim((string) $message->plain_text), 140),
+                        'author' => (string) ($message->user?->displayName() ?? 'Участник'),
                         'created_at' => $message->created_at?->format('d.m.Y H:i'),
+                        'created_ts' => $message->created_at?->timestamp,
                     ];
                 }
             }
@@ -396,7 +407,7 @@ class ChatService
         $messages = ChatMessage::query()
             ->where('chat_id', $chat->id)
             ->where('is_system', false)
-            ->with('attachment')
+            ->with(['attachment', 'user'])
             ->orderByDesc('id')
             ->get();
         $items = [];
@@ -421,13 +432,20 @@ class ChatService
                     continue;
                 }
 
+                $size = (int) ($file->size ?? 0);
                 $items[] = [
                     'id' => (int) $file->id,
                     'message_id' => (int) $message->id,
                     'name' => (string) $file->original_name,
+                    'ext' => $extension !== '' ? strtoupper($extension) : 'FILE',
+                    'mime' => $mime,
+                    'size' => $size,
+                    'size_label' => $this->formatBytes($size),
                     'url' => route('platform.task.attachment.download', ['attachment' => $file, 'inline' => 1]),
                     'download_url' => route('platform.task.attachment.download', $file),
+                    'author' => (string) ($message->user?->displayName() ?? 'Участник'),
                     'created_at' => $message->created_at?->format('d.m.Y H:i'),
+                    'created_ts' => $message->created_at?->timestamp,
                 ];
             }
         }
@@ -435,6 +453,20 @@ class ChatService
         $slice = array_slice($items, $offset, $perPage);
 
         return ['items' => $slice, 'page' => $page, 'has_more' => count($items) > $offset + $perPage];
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes <= 0) {
+            return '';
+        }
+        $units = ['Б', 'КБ', 'МБ', 'ГБ'];
+        $pow = (int) floor(log($bytes, 1024));
+        $pow = max(0, min($pow, count($units) - 1));
+        $value = $bytes / (1024 ** $pow);
+
+        return rtrim(rtrim(number_format($value, $pow > 0 ? 1 : 0, '.', ' '), '0'), '.')
+            . ' ' . $units[$pow];
     }
 
     public function pollState(User $user, ?int $sinceMessageId = null, ?int $activeChatId = null): array

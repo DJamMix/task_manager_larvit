@@ -1,1 +1,1 @@
-{{-- Platform footer disabled --}}
+{{-- Orchid platform footer intentionally empty --}}

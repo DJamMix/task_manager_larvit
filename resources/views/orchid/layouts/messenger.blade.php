@@ -475,12 +475,56 @@
     </div>
 
     @if($active)
+        @php
+            $infoPeer = $active->type === 'direct' ? $active->otherMember() : null;
+            $infoMembersCount = $active->members->count();
+        @endphp
         <div class="bx-sheet" id="bx-chat-info" hidden>
             <button type="button" class="bx-sheet__backdrop" id="bx-chat-info-close-bg" aria-label="Закрыть"></button>
             <div class="bx-sheet__panel bx-chat-info__panel" role="dialog" aria-modal="true" aria-labelledby="bx-chat-info-title">
-                <div class="bx-sheet__head">
-                    <strong id="bx-chat-info-title">{{ $active->displayTitle() }}</strong>
-                    <button type="button" class="bx-sheet__close" id="bx-chat-info-close" aria-label="Закрыть">×</button>
+                <div class="bx-chat-info__top">
+                    <button type="button" class="bx-chat-info__back" id="bx-chat-info-close" aria-label="Закрыть">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <div class="bx-chat-info__profile">
+                        @if($active->type === 'direct')
+                            @include('orchid.layouts.partials.bx-avatar', [
+                                'avatarUser' => $infoPeer,
+                                'avatarChat' => null,
+                                'size' => 'lg',
+                                'shape' => 'round',
+                                'showOnline' => true,
+                                'isOnline' => $presenceOnline($infoPeer?->id),
+                            ])
+                        @else
+                            @include('orchid.layouts.partials.bx-avatar', [
+                                'avatarChat' => $active,
+                                'avatarUser' => null,
+                                'size' => 'lg',
+                                'shape' => 'square',
+                            ])
+                        @endif
+                        <div class="bx-chat-info__profile-meta">
+                            <strong id="bx-chat-info-title">{{ $active->displayTitle() }}</strong>
+                            <span class="bx-chat-info__subtitle">
+                                @if($active->type === 'direct')
+                                    {{ $presenceOnline($infoPeer?->id) ? 'в сети' : 'был(а) недавно' }}
+                                @else
+                                    @php
+                                        $n = $infoMembersCount;
+                                        $mod10 = $n % 10;
+                                        $mod100 = $n % 100;
+                                        $membersWord = ($mod10 === 1 && $mod100 !== 11)
+                                            ? 'участник'
+                                            : (($mod10 >= 2 && $mod10 <= 4 && !in_array($mod100, [12, 13, 14], true))
+                                                ? 'участника'
+                                                : 'участников');
+                                    @endphp
+                                    {{ $n }} {{ $membersWord }}
+                                @endif
+                            </span>
+                        </div>
+                    </div>
                 </div>
                 <div class="bx-chat-info__tabs" role="tablist">
                     <button type="button" class="is-active" data-info-tab="members">Участники</button>
@@ -523,7 +567,7 @@
                     </div>
                     <div class="bx-chat-info__pane" data-info-pane="gallery" hidden>
                         <div id="bx-media-content" class="bx-media-content">Загрузка…</div>
-                        <button type="button" class="btn btn-sm btn-outline-secondary d-none mt-2" id="bx-media-more">Загрузить ещё</button>
+                        <button type="button" class="bx-media-more d-none" id="bx-media-more">Показать ещё</button>
                     </div>
                 </div>
             </div>
@@ -554,7 +598,10 @@
     <div class="bx-lightbox__panel" role="dialog" aria-modal="true">
         <button type="button" class="bx-lightbox__close" data-bx-lightbox-close aria-label="Закрыть">×</button>
         <img class="bx-lightbox__img" src="" alt="">
-        <a class="bx-lightbox__open" href="#" target="_blank" rel="noopener">Открыть в новой вкладке</a>
+        <div class="bx-lightbox__actions">
+            <button type="button" class="bx-lightbox__goto d-none" id="bx-lightbox-goto">Показать в чате</button>
+            <a class="bx-lightbox__open" href="#" target="_blank" rel="noopener">Открыть оригинал</a>
+        </div>
     </div>
 </div>
 
@@ -1194,38 +1241,141 @@
 
     autosize();
 
-    /* Галерея чата (внутри окна информации) */
+    /* Галерея чата (внутри окна информации) — как Shared Media в Telegram */
     const mediaContent = document.getElementById('bx-media-content');
     const mediaMore = document.getElementById('bx-media-more');
     let mediaTab = 'media';
     let mediaPage = 1;
+
+    const fileExtColor = (ext) => {
+        const e = String(ext || '').toUpperCase();
+        if (['PDF'].includes(e)) return '#e11d48';
+        if (['DOC', 'DOCX', 'TXT', 'RTF', 'ODT'].includes(e)) return '#2563eb';
+        if (['XLS', 'XLSX', 'CSV'].includes(e)) return '#16a34a';
+        if (['PPT', 'PPTX'].includes(e)) return '#ea580c';
+        if (['ZIP', 'RAR', '7Z', 'GZ'].includes(e)) return '#7c3aed';
+        if (['MP4', 'MOV', 'AVI', 'MKV', 'WEBM'].includes(e)) return '#0f766e';
+        return '#64748b';
+    };
+
+    const domainHue = (domain) => {
+        let h = 0;
+        const s = String(domain || '');
+        for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        return h % 360;
+    };
+
+    const goToChatMessage = async (messageId) => {
+        const id = Number(messageId) || 0;
+        if (!id) return;
+        closeChatInfo();
+        let el = document.getElementById('chat-msg-' + id);
+        if (!el) {
+            // Подгрузить историю вверх, пока не найдём (как «Show in chat»)
+            let guard = 0;
+            while (!el && guard < 8 && root?.getAttribute('data-has-more') === '1') {
+                guard++;
+                try {
+                    await (typeof loadOlderMessages === 'function' ? loadOlderMessages() : Promise.resolve());
+                } catch (e) { break; }
+                el = document.getElementById('chat-msg-' + id);
+            }
+        }
+        if (!el) {
+            const base = window.location.pathname;
+            window.location.href = base + '?msg=' + id;
+            return;
+        }
+        el.classList.add('bx-msg--highlight');
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setTimeout(() => el.classList.remove('bx-msg--highlight'), 2800);
+    };
+
+    const renderMediaItems = (items) => {
+        if (mediaTab === 'media') {
+            return items.map((item) => `
+                <div class="bx-shared-media__cell" data-message-id="${escapeHtml(item.message_id)}">
+                    <a class="bx-shared-media__thumb" href="${escapeHtml(item.url)}" data-bx-lightbox="${escapeHtml(item.url)}" data-message-id="${escapeHtml(item.message_id)}" title="${escapeHtml(item.name)}">
+                        <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)}" loading="lazy">
+                    </a>
+                    <button type="button" class="bx-shared-media__goto" data-goto-msg="${escapeHtml(item.message_id)}" title="Показать в чате" aria-label="Показать в чате">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    </button>
+                </div>`).join('');
+        }
+
+        if (mediaTab === 'files') {
+            return items.map((item) => {
+                const ext = escapeHtml(item.ext || 'FILE');
+                const color = fileExtColor(item.ext);
+                const meta = [item.size_label, item.author, item.created_at].filter(Boolean).join(' · ');
+                return `
+                <div class="bx-shared-row bx-shared-row--file" data-message-id="${escapeHtml(item.message_id)}">
+                    <a class="bx-shared-row__main" href="${escapeHtml(item.download_url)}" download title="Скачать">
+                        <span class="bx-shared-file-icon" style="--bx-file-bg:${color}">${ext.slice(0, 4)}</span>
+                        <span class="bx-shared-row__body">
+                            <span class="bx-shared-row__title">${escapeHtml(item.name)}</span>
+                            <span class="bx-shared-row__meta">${escapeHtml(meta)}</span>
+                        </span>
+                    </a>
+                    <button type="button" class="bx-shared-row__goto" data-goto-msg="${escapeHtml(item.message_id)}" title="Показать в чате">В чат</button>
+                </div>`;
+            }).join('');
+        }
+
+        // links
+        return items.map((item) => {
+            const domain = item.domain || '';
+            const hue = domainHue(domain);
+            const letter = escapeHtml((domain || item.title || '?').slice(0, 1).toUpperCase());
+            const subtitle = [item.path, item.author, item.created_at].filter(Boolean).join(' · ');
+            return `
+            <div class="bx-shared-row bx-shared-row--link" data-message-id="${escapeHtml(item.message_id || item.id)}">
+                <a class="bx-shared-row__main" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
+                    <span class="bx-shared-link-icon" style="--bx-link-hue:${hue}">${letter}</span>
+                    <span class="bx-shared-row__body">
+                        <span class="bx-shared-row__title">${escapeHtml(item.title || item.url)}</span>
+                        <span class="bx-shared-row__url">${escapeHtml(item.url)}</span>
+                        <span class="bx-shared-row__meta">${escapeHtml(subtitle || item.text || '')}</span>
+                    </span>
+                </a>
+                <button type="button" class="bx-shared-row__goto" data-goto-msg="${escapeHtml(item.message_id || item.id)}" title="Показать в чате">В чат</button>
+            </div>`;
+        }).join('');
+    };
+
     const loadMedia = async (replace) => {
         const mediaUrl = root?.getAttribute('data-media-url');
         if (!mediaUrl || !mediaContent) return;
-        if (replace) mediaContent.textContent = 'Загрузка…';
-        mediaContent.classList.toggle('bx-media-content--list', mediaTab !== 'media');
+        if (replace) mediaContent.innerHTML = '<div class="bx-shared-empty">Загрузка…</div>';
+        mediaContent.className = 'bx-media-content'
+            + (mediaTab === 'media' ? ' bx-media-content--grid' : ' bx-media-content--list');
         try {
             const response = await fetch(`${mediaUrl}?tab=${encodeURIComponent(mediaTab)}&page=${mediaPage}`, {
                 credentials: 'same-origin', headers: { Accept: 'application/json' },
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Не удалось загрузить материалы');
-            const html = (data.items || []).map((item) => {
-                if (mediaTab === 'media') {
-                    return `<a class="bx-media-image" href="${escapeHtml(item.url)}" data-bx-lightbox="${escapeHtml(item.url)}" title="${escapeHtml(item.name)}"><img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.name)}" loading="lazy"></a>`;
-                }
-                if (mediaTab === 'files') {
-                    return `<a class="bx-media-file" href="${escapeHtml(item.download_url)}">${escapeHtml(item.name)}</a>`;
-                }
-                return `<a class="bx-media-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.url)}</a>`;
-            }).join('') || (replace ? '<div class="text-muted">Пока ничего нет</div>' : '');
+            const items = data.items || [];
+            const html = items.length
+                ? renderMediaItems(items)
+                : (replace ? '<div class="bx-shared-empty">Пока ничего нет</div>' : '');
             if (replace) mediaContent.innerHTML = html;
             else mediaContent.insertAdjacentHTML('beforeend', html);
             mediaMore?.classList.toggle('d-none', !data.has_more);
         } catch (error) {
-            if (replace) mediaContent.textContent = error.message || 'Не удалось загрузить материалы';
+            if (replace) mediaContent.innerHTML = '<div class="bx-shared-empty">'
+                + escapeHtml(error.message || 'Не удалось загрузить материалы') + '</div>';
         }
     };
+
+    mediaContent?.addEventListener('click', (e) => {
+        const goto = e.target.closest?.('[data-goto-msg]');
+        if (!goto) return;
+        e.preventDefault();
+        e.stopPropagation();
+        goToChatMessage(goto.getAttribute('data-goto-msg'));
+    });
 
     /* Chat info (участники + медиа) */
     const chatInfo = document.getElementById('bx-chat-info');
@@ -3310,11 +3460,15 @@
     const lightbox = document.getElementById('bx-lightbox');
     const lightboxImg = lightbox?.querySelector('.bx-lightbox__img');
     const lightboxOpen = lightbox?.querySelector('.bx-lightbox__open');
-    const openLightbox = (url, alt) => {
+    const lightboxGoto = document.getElementById('bx-lightbox-goto');
+    let lightboxMessageId = 0;
+    const openLightbox = (url, alt, messageId) => {
         if (!lightbox || !lightboxImg) return;
         lightboxImg.src = url;
         lightboxImg.alt = alt || '';
         if (lightboxOpen) lightboxOpen.href = url;
+        lightboxMessageId = Number(messageId) || 0;
+        lightboxGoto?.classList.toggle('d-none', !lightboxMessageId);
         lightbox.hidden = false;
         document.body.classList.add('bx-lightbox-open');
     };
@@ -3322,13 +3476,28 @@
         if (!lightbox) return;
         lightbox.hidden = true;
         if (lightboxImg) lightboxImg.src = '';
+        lightboxMessageId = 0;
+        lightboxGoto?.classList.add('d-none');
         document.body.classList.remove('bx-lightbox-open');
     };
+    lightboxGoto?.addEventListener('click', () => {
+        const id = lightboxMessageId;
+        closeLightbox();
+        if (id) goToChatMessage(id);
+    });
     document.addEventListener('click', (e) => {
         const link = e.target.closest?.('[data-bx-lightbox]');
         if (link) {
             e.preventDefault();
-            openLightbox(link.getAttribute('data-bx-lightbox') || link.href, link.getAttribute('title') || '');
+            const msgId = link.getAttribute('data-message-id')
+                || link.closest?.('[data-message-id]')?.getAttribute('data-message-id')
+                || (link.closest?.('.bx-msg')?.id || '').replace('chat-msg-', '')
+                || '';
+            openLightbox(
+                link.getAttribute('data-bx-lightbox') || link.href,
+                link.getAttribute('title') || '',
+                msgId
+            );
             return;
         }
         if (e.target.closest?.('[data-bx-lightbox-close]')) {
