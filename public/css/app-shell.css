@@ -1,7 +1,118 @@
 /**
- * Orchid shell: независимое прокручивание левого меню и области контента.
- * Десктоп (≥1200px). На мобиле оставляем стандартное поведение Orchid.
+ * CrewDev shell: бренд в aside + сворачивание меню до иконок.
  */
+
+/* ===== Brand (logo) ===== */
+.crewdev-aside-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 1rem 0.55rem;
+    text-decoration: none !important;
+    color: #0f172a !important;
+    min-height: 52px;
+}
+.crewdev-aside-brand__mark {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.crewdev-aside-brand__mark svg {
+    width: 20px;
+    height: 20px;
+}
+.crewdev-aside-brand__text {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.crewdev-aside-toggle {
+    position: absolute;
+    top: 0.95rem;
+    right: 0.55rem;
+    width: 28px;
+    height: 28px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    z-index: 5;
+}
+.crewdev-aside-toggle:hover {
+    background: #f8fafc;
+    color: #0f172a;
+}
+body > .container-fluid > .row > .aside {
+    position: relative;
+}
+
+/* ===== Collapsed aside ===== */
+@media (min-width: 1200px) {
+    body.crewdev-aside-collapsed > .container-fluid > .row > .aside {
+        flex: 0 0 72px !important;
+        max-width: 72px !important;
+        width: 72px !important;
+    }
+
+    body.crewdev-aside-collapsed .crewdev-aside-brand {
+        justify-content: center;
+        padding: 0.85rem 0.4rem 0.55rem;
+    }
+    body.crewdev-aside-collapsed .crewdev-aside-brand__text {
+        display: none;
+    }
+    body.crewdev-aside-collapsed .crewdev-aside-toggle {
+        position: static;
+        margin: 0 auto 0.65rem;
+        display: flex;
+        transform: rotate(180deg);
+    }
+
+    body.crewdev-aside-collapsed .aside .nav-link span,
+    body.crewdev-aside-collapsed .aside .nav-link .badge,
+    body.crewdev-aside-collapsed .aside .small,
+    body.crewdev-aside-collapsed .aside h5,
+    body.crewdev-aside-collapsed .aside .text-muted,
+    body.crewdev-aside-collapsed .aside .menu-title,
+    body.crewdev-aside-collapsed .aside [data-bs-toggle="collapse"] > span:not(.icon):not(svg),
+    body.crewdev-aside-collapsed .aside .nav-heading {
+        display: none !important;
+    }
+
+    body.crewdev-aside-collapsed .aside .nav-link {
+        justify-content: center;
+        padding-left: 0.55rem !important;
+        padding-right: 0.55rem !important;
+    }
+
+    body.crewdev-aside-collapsed .aside .nav-link .icon,
+    body.crewdev-aside-collapsed .aside .nav-link svg {
+        margin: 0 !important;
+    }
+
+    body.crewdev-aside-collapsed .aside .collapse {
+        display: block !important;
+        height: auto !important;
+        visibility: visible !important;
+    }
+}
+
+@media (max-width: 1199.98px) {
+    .crewdev-aside-toggle { display: none; }
+}
 
 /* Скрыть дефолтный футер Orchid (MIT / orchid.software) — он лезет в центр контента */
 body .text-center.user-select-none.my-4.d-none.d-lg-block,

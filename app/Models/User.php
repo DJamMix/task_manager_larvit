@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'telegram_id',
         'telegram_verification_code',
+        'ui_preferences',
     ];
 
     protected $hidden = [
@@ -35,6 +36,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'permissions' => 'array',
+        'ui_preferences' => 'array',
         'email_verified_at' => 'datetime',
     ];
 
@@ -184,6 +186,29 @@ class User extends Authenticatable
     public function roleLabels(): string
     {
         return $this->roles->pluck('name')->filter()->implode(' / ');
+    }
+
+    public function uiPreference(string $key, mixed $default = null): mixed
+    {
+        try {
+            $prefs = $this->ui_preferences ?? [];
+        } catch (\Throwable) {
+            return $default;
+        }
+
+        return data_get($prefs, $key, $default);
+    }
+
+    public function setUiPreference(string $key, mixed $value): void
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasColumn($this->getTable(), 'ui_preferences')) {
+            return;
+        }
+
+        $prefs = $this->ui_preferences ?? [];
+        data_set($prefs, $key, $value);
+        $this->ui_preferences = $prefs;
+        $this->save();
     }
 
     /**

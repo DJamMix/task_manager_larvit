@@ -128,13 +128,14 @@ return [
     'resource' => [
         'stylesheets' => [
             '/css/footer.css',
-            '/css/app-shell.css?v=20260810b',
+            '/css/app-shell.css?v=20260810c',
             '/css/ui-toast.css?v=20260730a',
             '/css/project-switcher.css',
-            '/css/task-workspace.css?v=20260810t',
+            '/css/task-workspace.css?v=20260810u',
             '/css/act-composer.css',
         ],
         'scripts'     => [
+            '/js/app-shell.js?v=20260810a',
             '/js/ui-toast.js?v=20260730a',
             '/js/chat-notify.js?v=20260725h',
             '/js/web-push.js?v=20260730j',

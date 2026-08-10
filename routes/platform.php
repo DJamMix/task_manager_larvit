@@ -269,6 +269,25 @@ Route::post('boards/move', function (
     return response()->json(['ok' => true]);
 })->name('platform.systems.boards.move');
 
+Route::post('ui/preferences', function (\Illuminate\Http\Request $request) {
+    $user = $request->user();
+    abort_unless($user, 403);
+
+    $data = $request->validate([
+        'sidebar_collapsed' => 'sometimes|boolean',
+    ]);
+
+    try {
+        if (array_key_exists('sidebar_collapsed', $data)) {
+            $user->setUiPreference('sidebar_collapsed', (bool) $data['sidebar_collapsed']);
+        }
+    } catch (\Throwable) {
+        // колонка ui_preferences может ещё не быть смигрирована — localStorage всё равно работает
+    }
+
+    return response()->json(['ok' => true]);
+})->name('platform.ui.preferences');
+
 Route::post('sprints/assign', function (\Illuminate\Http\Request $request) {
     if (! $request->user()?->hasAccess('platform.systems.tasks')) {
         abort(403);

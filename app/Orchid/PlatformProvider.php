@@ -45,6 +45,12 @@ class PlatformProvider extends OrchidServiceProvider
                 ->permission('platform.systems.my_tasks')
                 ->badge(fn () => $this->inboxBadgeCount()),
 
+            Menu::make('Доски')
+                ->icon('bs.columns-gap')
+                ->route('platform.systems.boards')
+                ->canSee(fn () => (bool) (auth()->user()?->hasAccess('platform.systems.my_tasks')
+                    && ! auth()->user()?->hasAccess('platform.systems.tasks'))),
+
             Menu::make('Чаты')
                 ->icon('bs.chat-dots')
                 ->route('platform.systems.chats')
@@ -92,7 +98,8 @@ class PlatformProvider extends OrchidServiceProvider
             Menu::make('Доски')
                 ->icon('bs.columns-gap')
                 ->route('platform.systems.boards')
-                ->permission('platform.systems.tasks'),
+                ->permission('platform.systems.tasks')
+                ->canSee(fn () => (bool) auth()->user()?->hasAccess('platform.systems.tasks')),
 
             Menu::make('Спринты')
                 ->icon('bs.lightning-charge')
