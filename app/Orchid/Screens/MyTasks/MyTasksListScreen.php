@@ -234,6 +234,7 @@ class MyTasksListScreen extends Screen
             ])
                 ->title('Новая задача')
                 ->size(Modal::SIZE_XL)
+                ->method('createTask')
                 ->applyButton('Создать')
                 ->closeButton('Отмена'),
         ];

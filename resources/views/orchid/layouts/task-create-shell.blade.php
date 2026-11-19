@@ -5,13 +5,47 @@
 
 <script>
 (() => {
-    // Tom Select: выпадающий список в body — не обрезается модалкой
-    const patchTomSelect = () => {
-        document.querySelectorAll('.tc-modal .ts-wrapper, .modal .ts-wrapper').forEach((wrap) => {
-            if (wrap.dataset.tcPatched === '1') return;
+    const prepareCreateTaskForm = (root) => {
+        const modal = root?.id === 'screen-modal-createTaskModal'
+            ? root
+            : document.getElementById('screen-modal-createTaskModal');
+        if (!modal) {
+            return;
+        }
+
+        const form = modal.querySelector('form');
+        if (!form) {
+            return;
+        }
+
+        form.setAttribute('novalidate', 'novalidate');
+        form.setAttribute('data-form-submit-value', 'false');
+        form.querySelectorAll('button[type="submit"]').forEach((btn) => {
+            btn.disabled = false;
+            btn.classList.remove('cursor-wait', 'btn-loading');
+            btn.querySelectorAll('.spinner-loading').forEach((el) => el.remove());
+            btn.setAttribute('formnovalidate', 'true');
+        });
+        form.querySelectorAll('[data-controller="quill"] textarea').forEach((ta) => {
+            ta.removeAttribute('required');
+            const editor = ta.closest('[data-controller="quill"]')?.querySelector('.ql-editor');
+            if (editor) {
+                ta.value = editor.innerHTML || '';
+            }
+        });
+    };
+
+    const patchTomSelect = (root) => {
+        (root || document).querySelectorAll('.tc-modal .ts-wrapper, #screen-modal-createTaskModal .ts-wrapper').forEach((wrap) => {
+            if (wrap.dataset.tcPatched === '1') {
+                return;
+            }
+
             const select = wrap.querySelector('select');
             const tom = select?.tomselect;
-            if (!tom) return;
+            if (!tom) {
+                return;
+            }
 
             wrap.dataset.tcPatched = '1';
             try {
@@ -24,7 +58,6 @@
                         document.body.appendChild(this.dropdown);
                     }
                     this.dropdown?.classList.add('tc-ts-dropdown');
-                    // Позиционирование под контролом
                     try {
                         const rect = this.control.getBoundingClientRect();
                         Object.assign(this.dropdown.style, {
@@ -37,17 +70,34 @@
                     } catch (err) {}
                     return open();
                 };
-            } catch (e) {
-                // ignore
-            }
+            } catch (e) {}
         });
     };
 
-    const obs = new MutationObserver(() => patchTomSelect());
-    obs.observe(document.body, { childList: true, subtree: true });
-    setTimeout(patchTomSelect, 300);
-    setTimeout(patchTomSelect, 900);
-    document.addEventListener('shown.bs.modal', () => setTimeout(patchTomSelect, 50));
-    document.addEventListener('orchid:screen', () => setTimeout(patchTomSelect, 50));
+    if (!window.__tcCreateTaskBound) {
+        window.__tcCreateTaskBound = true;
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+            if (!form.closest('#screen-modal-createTaskModal') && !form.querySelector('.tc-modal')) {
+                return;
+            }
+            prepareCreateTaskForm(form.closest('.modal'));
+        }, true);
+
+        document.addEventListener('shown.bs.modal', (event) => {
+            if (event.target?.id !== 'screen-modal-createTaskModal') {
+                return;
+            }
+            prepareCreateTaskForm(event.target);
+            setTimeout(() => patchTomSelect(event.target), 50);
+        });
+    }
+
+    prepareCreateTaskForm();
+    setTimeout(() => patchTomSelect(), 300);
 })();
 </script>
